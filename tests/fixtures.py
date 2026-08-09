@@ -59,6 +59,10 @@ CHECKPASSWORD_CODES = {
                "note": "token/sessione scaduti"},
     # — non è il PIN: permessi veicolo o richiesta costruita male —
     "A00374": {"reason": "config", "counts_lockout": False, "note": "permessi veicolo"},
+    # A00084: stessa famiglia di A00374/A00554. Senza `reason` cadeva sul ramo di default e
+    # l'utente leggeva «PIN rifiutato — riconfiguralo» per un problema di permessi (issue #1).
+    "A00084": {"reason": "config", "counts_lockout": False,
+               "note": "funzione non autorizzata sul veicolo"},
     "A00554": {"reason": "config", "counts_lockout": False, "note": "autorizzazione veicolo"},
     "A00567": {"reason": "config", "counts_lockout": False, "note": "taskId non valido"},
     "A00604": {"reason": "config", "counts_lockout": False, "note": "clientType mancante/errato"},
@@ -77,7 +81,8 @@ COMMAND_CODES = {
     "A00079": {"ok": True,  "reason": None, "retryable": False, "note": "accettato dall'auto"},
     "A00082": {"ok": False, "reason": None, "retryable": True,
                "note": "veicolo OCCUPATO (un comando alla volta) → ritentabile"},
-    "A00084": {"ok": False, "reason": None, "retryable": False, "note": "comando non consentito"},
+    "A00084": {"ok": False, "reason": "config", "retryable": False,
+               "note": "funzione non autorizzata dal costruttore su questo veicolo"},
     "A00089": {"ok": False, "reason": None, "retryable": False, "note": "taskId non valido"},
     "A00546": {"ok": False, "reason": None, "retryable": False, "note": "taskId non valido"},
     "A00567": {"ok": False, "reason": None, "retryable": False, "note": "taskId non valido"},

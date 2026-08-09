@@ -109,8 +109,12 @@ _TABELLA: dict[str, Classificazione] = {
     # — rifiuti dell'auto: nessun rimedio automatico, solo avviso —
     # l'auto esegue UN comando alla volta → transitorio, ritentabile
     "A00082": _voce(esito="ko", retryable=True),
-    # permesso negato per QUELLA funzione (visto dal vivo su remoteStart)
-    "A00084": _voce(esito="ko"),
+    # A00084 = permesso negato per QUELLA funzione. `REASON_CONFIG` come i suoi gemelli
+    # A00374/A00554: senza `reason` finiva sul ramo di default di `_messaggio_checkpassword`,
+    # che dice «PIN comandi rifiutato — riconfiguralo», mandando l'utente a rifare un PIN
+    # giusto per un problema di permessi. L'azione resta identica (avviso) e `conta_lockout`
+    # resta False: cambia solo il messaggio. Segnalato da ThomasMeyer1970, issue #1.
+    "A00084": _voce(esito="ko", reason=REASON_CONFIG),
     "A07312": _voce(esito="ko"),   # rate-limit della sveglia
     "A07900": _voce(esito="ko"),   # auto a riposo / firma o car_token non validi
 

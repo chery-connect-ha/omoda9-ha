@@ -432,9 +432,14 @@ def _messaggio_checkpassword(esito, detail: str) -> str:
         return (f"Sessione scaduta [checkPassword {detail}] — riautentica dall'avviso di "
                 "Home Assistant (nuovo codice OTP)")
     if esito.reason == routing.REASON_CONFIG:
+        # Bilingue: è un messaggio d'errore mostrato all'utente e l'integrazione è usata
+        # anche fuori dall'Italia. Qui non c'è il limite dei 255 caratteri degli stati.
         return (f"Comando rifiutato dal backend [checkPassword {detail}] — non è il PIN: "
                 "l'account non ha il permesso su questa auto oppure la richiesta è stata "
-                "respinta. Riprova più tardi; se persiste servono i log.")
+                "respinta. Riprova più tardi; se persiste servono i log. · "
+                "Rejected by the backend — this is not your PIN: the account lacks "
+                "permission for this function on this vehicle, or the request was refused. "
+                "Try again later; if it persists, logs are needed.")
     return (f"PIN comandi rifiutato dal backend [checkPassword {detail}] — riconfiguralo "
             "nelle impostazioni dell'integrazione")
 

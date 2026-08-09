@@ -21,9 +21,19 @@ CODE_MEANING = {
     # eseguito. Transitorio: riprovare tra qualche secondo (verificato live 2026-06-21).
     "A00082": "auto occupata ⏳ (un altro comando è in corso) — riprova tra qualche secondo",
     # A00084 (i18n: "No vehicle control command permission"): l'account/veicolo non ha il
-    # permesso PER QUEL comando. Visto dal vivo su remoteStart (2026-06-21): la nostra Omoda 9
-    # non consente l'avvio remoto del motore, mentre clima/serratura/GPS funzionano.
-    "A00084": "comando non consentito su questa auto 🚫 (permesso negato per questa funzione)",
+    # permesso PER QUEL comando. Sull'Omoda 9 riguarda l'avvio remoto del motore, mentre
+    # clima/serratura/GPS funzionano; su una Jaecoo 7 PHEV riguarda sedili, lunotto e le macro
+    # (issue #1). ⚠️ Della nostra osservazione su remoteStart (2026-06-21) NON resta traccia
+    # strumentale — nessun log, nessuna cattura: sono note in prosa scritte allora. Trattarla
+    # come non attestata finché non la si rimisura.
+    # Il testo dice esplicitamente «non è il PIN» perché è lì che l'utente va a cercare.
+    # ⚠️ BILINGUE e CORTO di proposito: questo testo finisce nello stato di
+    # `sensor.omoda9_esito_comando`, e uno stato HA non può superare i 255 caratteri —
+    # oltre quel limite l'entità si rompe. Budget reale: 203 char (il prefisso col nome
+    # comando più lungo ne occupa 52). Le traduzioni di `translations/` non arrivano qui:
+    # lo stato è una stringa libera composta a runtime, non una chiave tradotta.
+    "A00084": ("funzione non autorizzata su questa auto 🚫 (non è il PIN) · "
+               "not authorised on this vehicle (this is not your PIN)"),
     "A00089": "taskId non valido ❌ (serve un taskId benedetto da checkPassword)",
     "A00546": "taskId non valido ❌ (scene errato in checkPassword)",
     "A00567": "parametri checkPassword incompleti ❌",
