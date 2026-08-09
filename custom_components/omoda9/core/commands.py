@@ -35,6 +35,7 @@ from . import wake
 from . import tsp_sign
 from . import omoda_auth as A
 from . import codes
+from . import permessi
 from . import routing
 from .pin_lockout import PinLockout, PinLockedError
 # H8: rimosso `importlib.reload(tsp_sign)` a import-time (side-effect inutile; tsp_sign
@@ -497,6 +498,34 @@ def get_taskid(ctx, tuid, emit=lambda m: None, force_mint=False):
     return None, "none"
 
 
+# Nomi leggibili dei campi che la potatura può togliere: servono a dire all'utente COSA non è
+# stato fatto. Corti di proposito (finiscono in uno stato Home Assistant, tetto 255 caratteri).
+NOMI_CAMPO = {
+    "steerWheelHeatSwitch": "volante", "frontWindshieldHeat": "parabrezza",
+    "backDefrosting": "lunotto", "airPurControlType": "purificatore",
+    "mSeatHeating": "sedile guida", "pSeatHeating": "sedile passeggero",
+    "blSeatHeating": "sedile post. SX", "brSeatHeating": "sedile post. DX",
+    "mSeatAiry": "aria sedile guida", "pSeatAiry": "aria sedile passeggero",
+    "blSeatAiry": "aria sedile post. SX", "brSeatAiry": "aria sedile post. DX",
+}
+
+
+def nomi_saltati(saltati) -> str:
+    """Elenco leggibile dei campi potati, per la riga di avanzamento."""
+    return ", ".join(NOMI_CAMPO.get(c, c) for c in saltati)
+
+
+def _coda_saltati(saltati, lunghezza: int, tetto: int = 255) -> str:
+    """Coda bilingue da accodare all'esito, **solo se ci sta**.
+
+    Lo stato di `sensor.omoda9_esito_comando` è troncato a 255 (`coordinator.py`): una coda che
+    non entra verrebbe tagliata a metà parola, che è peggio del non dirla. Quindi o entra
+    intera o non si mette (il dettaglio è comunque già passato dalla riga di avanzamento)."""
+    coda = (f" · saltate {len(saltati)} funzioni non autorizzate su questa auto · "
+            f"{len(saltati)} skipped (not authorised)")
+    return coda if lunghezza + len(coda) <= tetto else ""
+
+
 def send(ctx, cmd_key, emit=lambda m: None, params=None):
     """Invia un comando. emit(str) riceve i passaggi (per pubblicarli su HA).
        `params` (opzionale) = override/aggiunte al body del catalogo PRIMA dei campi
@@ -516,9 +545,11 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
             "Sessione scaduta — riautentica dall'avviso di Home Assistant (nuovo codice OTP)",
             reason="reauth")
 
-    # path esplicito (es. antifurto su /act/theftAlarm/setSwitch) oppure il classico
-    # /asc/vehicleControl/<endpoint> per i comandi veicolo standard.
-    url = ctx.tsp_host + (c.get("path") or ("/asc/vehicleControl/" + c["endpoint"]))
+    # Lista permessi del veicolo: si legge UNA volta sola, qui, perché è l'unico punto in cui
+    # token e tUserId sono già in mano (nessun login in più, nessun OTP). Se non si ottiene si
+    # memorizza `{}` e non si ritenta: non sapere è una condizione normale che non cambia nulla.
+    if ctx.permessi is None:
+        ctx.permessi = permessi.leggi(ctx, token, tuid)
 
     # Tentativo 1 col taskId riusato (veloce). Se l'auto lo rifiuta come non valido/scaduto,
     # lo si riconia (checkPassword) e si riprova UNA volta sola.
@@ -540,6 +571,24 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
         body = dict(c["body"])
         if params:
             body.update(params)    # override parametrico (temperatura/durata/controlType/piano)
+
+        # ── adattamento al veicolo (permessi.py) ─────────────────────────────────────────
+        # Il backend valida il corpo campo per campo contro le voci figlie della categoria
+        # dell'endpoint chiamato (misurato: due A/B a variabile singola su due endpoint).
+        # Quindi: si sceglie la porta aperta su QUESTA auto e si tolgono i campi che non
+        # ammette, invece di far rifiutare tutto per un solo campo. Sull'Omoda 9, dove è tutto
+        # consentito, non cambia nulla. I comandi con `path` esplicito (antifurto) restano
+        # fuori: non hanno una categoria in tabella.
+        endpoint, saltati, nota = c.get("endpoint"), [], None
+        if not c.get("path") and endpoint:
+            endpoint, body, saltati, nota = permessi.adatta(endpoint, body, ctx.permessi or {})
+            if nota:
+                emit(f"{c['name']}: {nota}")
+            if saltati:
+                emit(f"{c['name']}: non autorizzate su questa auto, salto "
+                     f"{nomi_saltati(saltati)}")
+        url = ctx.tsp_host + (c.get("path") or ("/asc/vehicleControl/" + endpoint))
+
         body.update({"clientType": "1", "seq": f"{ctx.vin}-{ts}",
                      "taskId": taskid, "vin": ctx.vin})
         m = tsp_sign.sign_body(body, ts)
@@ -576,6 +625,13 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
 
     meaning = CODE_MEANING.get(code, raw[:120])
     out = f"{c['name']}: HTTP {status} {code or ''} — {meaning}"
+    # Una macro che silenziosamente fa sei cose su sette è peggio di un errore: l'utente
+    # crede che il lunotto si stia sbrinando. Se abbiamo potato, si dice cosa manca.
+    # ⚠️ Il testo finisce nello stato di `sensor.omoda9_esito_comando`, e uno stato HA non può
+    # superare i 255 caratteri: oltre il limite l'entità si rompe. Si accodano al massimo due
+    # nomi di campo e poi si conta, e comunque si tronca (vedi `_coda_saltati`).
+    if saltati:
+        out += _coda_saltati(saltati, len(out))
     emit(out)
     # Esito reale dal `code` (il backend risponde sempre HTTP 200). Un fallimento noto =
     # comando NON eseguito → CommandError, così le entità ottimistiche annullano lo stato

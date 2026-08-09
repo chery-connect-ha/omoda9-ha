@@ -6,6 +6,22 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **I comandi non si fermano più al primo ostacolo.** Ogni auto ha un elenco, deciso dal costruttore, di ciò che si può comandare a distanza — e cambia da modello a modello. Finora l'integrazione lo ignorava: se anche una sola delle funzioni che un comando porta con sé non era abilitata sulla tua auto, il costruttore rifiutava **tutto il comando**, comprese le parti che la tua auto sapeva fare benissimo. Premevi «Riscalda tutto» e non succedeva niente. Adesso l'integrazione chiede all'auto cosa le è permesso e **toglie dal comando solo i pezzi non abilitati**: il resto parte e funziona. Se qualcosa è stato saltato te lo dice, invece di lasciartelo credere fatto.
+- **E se una funzione c'è ma passa da un'altra strada, la usa.** Alcune auto abilitano il riscaldamento dei sedili o lo sbrinamento del lunotto per una via diversa da quella che l'integrazione usava sempre. Prima era un muro: il comando falliva anche se l'auto quella cosa la sapeva fare, e dall'app ufficiale funzionava. Ora, quando la strada abituale è chiusa, l'integrazione prova quella aperta — la stessa che usa l'app. Quando passa di lì si accende anche il clima: te lo scrive, così non è una sorpresa.
+- **Se qualcosa non funziona, non ti toglie niente.** Se l'elenco non si riesce a leggere — per esempio perché il servizio del costruttore non risponde — l'integrazione si comporta **esattamente come prima**, mandando il comando per intero. Nessuna funzione sparisce mai per colpa di un problema di rete.
+- **Chi ha una Omoda 9 non nota alcuna differenza:** su quell'auto tutto ciò che l'integrazione usa è già abilitato, quindi non c'è niente da togliere e niente da cambiare di strada. Stessi comandi, stessi risultati, stesse entità di prima.
+- Grazie a **ThomasMeyer1970** e alla sua Jaecoo 7, da cui è partita tutta questa indagine.
+
+### 🇬🇧 English
+
+- **Commands no longer stop at the first obstacle.** Every car has a list, set by the manufacturer, of what may be controlled remotely — and it differs from model to model. Until now the integration ignored it: if even one of the functions a command carries was not enabled on your car, the manufacturer rejected **the whole command**, including the parts your car could perform perfectly well. You pressed "Heat everything" and nothing happened. The integration now asks the car what it is allowed to do and **removes only the parts that are not enabled**: the rest goes through and works. If something was skipped it tells you, instead of letting you believe it was done.
+- **And if a function exists but goes down another road, it takes it.** Some cars enable seat heating or rear-window defrosting through a different route than the one the integration always used. That used to be a dead end: the command failed even though the car could do it, and the official app managed fine. Now, when the usual road is closed, the integration tries the open one — the same the app uses. Going that way also switches the climate on: it tells you, so it is not a surprise.
+- **If something goes wrong, nothing is taken away from you.** If the list cannot be read — because the manufacturer's service is not answering, for instance — the integration behaves **exactly as before** and sends the command in full. No function ever disappears because of a network problem.
+- **If you have an Omoda 9 you will notice no difference:** on that car everything the integration uses is already enabled, so there is nothing to remove and no road to change. Same commands, same results, same entities as before.
+- Thanks to **ThomasMeyer1970** and his Jaecoo 7, where this whole investigation started.
+
 ## v1.10.1 — 2026-08-09
 
 ### 🇮🇹 Italiano

@@ -126,6 +126,14 @@ class CoreCtx:
     # acceso. `None` = dormiente, costo nullo. `core/` non conosce il coordinator.
     diag_hook: object | None = None
 
+    # Lista permessi del veicolo (`permessi.py`), letta UNA volta al primo comando perché è
+    # lì che token e tUserId sono già in mano. Tre stati distinti, e la differenza conta:
+    #   None  = non ancora letta      → si prova
+    #   {}    = letta e non ottenuta  → NON si riprova, e si spedisce come sempre
+    #   {...} = mappa id → 0/1        → si adatta il comando a questo veicolo
+    # È per-veicolo (anzi: per utente-su-veicolo), quindi vive nel contesto e non altrove.
+    permessi: dict | None = None
+
     # — stato per-veicolo —
     stato: _StatoVeicolo = field(default_factory=_StatoVeicolo)
 

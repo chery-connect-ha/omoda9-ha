@@ -18,7 +18,7 @@ CORE_DIR = os.path.join(_HERE, "..", "custom_components", "omoda9", "core")
 
 _NOMI = (
     "codes", "omoda", "omoda_auth", "tsp_sign", "captcha_solver", "prova_token",
-    "login_omoda", "wake", "session", "probe", "provision", "commands",
+    "login_omoda", "wake", "session", "probe", "provision", "permessi", "commands",
 )
 
 
