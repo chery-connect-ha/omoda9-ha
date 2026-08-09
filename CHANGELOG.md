@@ -6,12 +6,16 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.10.1 — 2026-08-09
+
 ### 🇮🇹 Italiano
 
+- **Un messaggio d'errore che mandava fuori strada.** Quando l'auto rifiuta un comando perché il costruttore non ha abilitato quella funzione su quel veicolo, l'integrazione diceva «PIN comandi rifiutato — riconfiguralo nelle impostazioni»: si finiva a reinserire un PIN che era già giusto, senza risolvere niente. Ora dice chiaramente che **non è il PIN** e che quella funzione non è autorizzata su quell'auto. Il messaggio è scritto in italiano e in inglese, così si legge ovunque. Per il resto non cambia nulla: i comandi che funzionavano continuano a funzionare esattamente come prima. Il problema è emerso grazie a **ThomasMeyer1970**, che ha una Jaecoo 7 dove alcuni comandi di comfort non sono abilitati dal costruttore.
 - **Il progetto si è trasferito in un'organizzazione condivisa su GitHub.** È cambiato l'indirizzo del progetto: i collegamenti alla documentazione e alla segnalazione dei problemi — quelli che trovi nella scheda dell'integrazione dentro Home Assistant — ora portano al nuovo indirizzo. Da parte tua non c'è niente da fare: l'aggiornamento da HACS continua a funzionare come sempre e la tua configurazione resta intatta.
 
 ### 🇬🇧 English
 
+- **An error message that sent you the wrong way.** When the car refuses a command because the manufacturer has not enabled that function on that vehicle, the integration used to say "command PIN rejected — reconfigure it in the settings": you ended up re-entering a PIN that was already correct, and nothing got fixed. It now says clearly that **this is not your PIN** and that the function is not authorised on that car. The message is written in both Italian and English, so it reads anywhere. Nothing else changes: commands that worked keep working exactly as before. The problem came to light thanks to **ThomasMeyer1970**, who has a Jaecoo 7 on which some comfort commands are not enabled by the manufacturer.
 - **The project has moved to a shared organisation on GitHub.** The project address has changed: the links to the documentation and to issue reporting — the ones on the integration's page inside Home Assistant — now point to the new address. There is nothing for you to do: updating through HACS keeps working exactly as before and your setup is left untouched.
 
 ## v1.10.0 — 2026-08-09
