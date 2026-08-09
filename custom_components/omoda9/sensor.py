@@ -9,7 +9,7 @@ arriva un dato live dall'auto.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from homeassistant.components.sensor import (
@@ -25,6 +25,7 @@ from homeassistant.const import (
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfLength,
+    UnitOfPower,
     UnitOfPressure,
     UnitOfSpeed,
     UnitOfTemperature,
@@ -67,6 +68,8 @@ PRESS = SensorDeviceClass.PRESSURE
 DUR = SensorDeviceClass.DURATION
 VOLTAGE = SensorDeviceClass.VOLTAGE
 CURRENT = SensorDeviceClass.CURRENT
+KW = UnitOfPower.KILO_WATT
+POWER = SensorDeviceClass.POWER
 MEAS = SensorStateClass.MEASUREMENT
 TOTAL = SensorStateClass.TOTAL_INCREASING
 
@@ -77,7 +80,11 @@ class _RtSpec:
 
     suffix: str           # unique_id suffix (stabile): f"{vin}_rt_<suffix>"
     name: str             # nome → "Omoda9 <name>" → entity_id slugificato
-    field: str            # chiave nel dict realtime
+    # chiave nel dict realtime. Una TUPLA elenca nomi alternativi per la stessa grandezza,
+    # e vince il primo presente nel frame: modelli diversi la chiamano in modo diverso
+    # (una BEV manda `dynamicPureElectricRange` dove la PHEV manda `pureElectricRange`).
+    # Su Omoda 9 il primo nome è quello che arriva già oggi → nessun cambiamento.
+    field: str | tuple[str, ...]
     device_class: SensorDeviceClass | None = None
     unit: str | None = None
     state_class: SensorStateClass | None = None
@@ -107,6 +114,23 @@ APPT_CHARGE_STATE_MAP = {"0": "Disattivata", "1": "Attiva", "2": "In esecuzione"
 FAST_GUN_MAP = {"0": "Scollegata", "1": "Collegata", "2": "Collegata (ricarica rapida)"}
 
 
+# Nomi alternativi dell'autonomia elettrica: la PHEV manda `pureElectricRange`, una BEV
+# (Omoda E5) manda `dynamicPureElectricRange`. Un unico elenco, usato sia dalle spec sia
+# dai calcoli qui sotto, così non si sfilano fra loro.
+ELEC_RANGE_FIELDS = ("pureElectricRange", "dynamicPureElectricRange")
+
+
+def _primo(rt: dict, *nomi: str):
+    """Primo dei `nomi` presente nel frame, convertito a float. None se nessuno c'è."""
+    for n in nomi:
+        if n in rt:
+            try:
+                return float(rt[n])
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
 def _frame_batteria_degradato(rt: dict) -> bool:
     """True se il frame realtime porta `pureElectricRange = 0`: NON è una lettura, è un
     segnaposto → in quel frame anche la percentuale batteria è da buttare.
@@ -124,11 +148,13 @@ def _frame_batteria_degradato(rt: dict) -> bool:
     con la carica a ~1,5 km per punto (100% = 150 km, 45% = 69 km, 16% = 12 km), quindi uno
     zero VERO vorrebbe dire scendere sotto l'~8%. Questa vettura non è mai andata sotto il
     16% (minimo assoluto in 5 settimane di storico) perché tiene una riserva per l'ibrido.
+
+    ⚠️ Quel ragionamento vale per QUESTA vettura (riserva per l'ibrido). Su una BEV uno zero
+    potrebbe in teoria essere vero; l'effetto peggiore però è tenere l'ultimo valore noto per
+    un frame, quindi la sentinella resta accettabile anche lì.
     """
-    try:
-        return float(rt.get("pureElectricRange")) == 0.0
-    except (TypeError, ValueError):
-        return False
+    v = _primo(rt, *ELEC_RANGE_FIELDS)
+    return v == 0.0
 
 
 def _range_totale(rt: dict):
@@ -145,17 +171,31 @@ def _range_totale(rt: dict):
     # (visto il 30/07: 251 → 125 km per tutta la notte). Vedi _frame_batteria_degradato.
     if _frame_batteria_degradato(rt):
         return None
-    try:
-        return float(rt["pureElectricRange"]) + float(rt["mileageSurplus"])
-    except (TypeError, ValueError, KeyError):
+    elec = _primo(rt, *ELEC_RANGE_FIELDS)
+    fuel = _primo(rt, "mileageSurplus")
+    if elec is None or fuel is None:
         return None
+    return elec + fuel
+
+
+def _range_totale_bev(rt: dict):
+    """Autonomia totale su BEV CONFERMATO = solo la parte elettrica (non c'è serbatoio).
+
+    Sostituisce `_range_totale` unicamente quando il backend dichiara `powerType == 0`.
+    ⚠️ Non si ottiene lo stesso effetto trattando la benzina mancante come 0: su una PHEV
+    un `mileageSurplus` assente per un frame farebbe crollare il totale di ~150 km — è
+    esattamente il difetto corretto in v1.7.1. Qui la differenza la fa la capability
+    dichiarata, non l'assenza del campo."""
+    if _frame_batteria_degradato(rt):
+        return None
+    return _primo(rt, *ELEC_RANGE_FIELDS)
 
 
 _RT_SENSORS: list[_RtSpec] = [
     # ── P1 · autonomia / chilometri (valori km confermati dal vivo) ──
     # 0 km = segnaposto "alta tensione spenta", NON autonomia esaurita → tieni l'ultimo noto
     # invece di mostrare 0 km per ore ad auto carica (vedi _frame_batteria_degradato).
-    _RtSpec("range_elettrico", "Autonomia elettrica", "pureElectricRange",
+    _RtSpec("range_elettrico", "Autonomia elettrica", ELEC_RANGE_FIELDS,
             DIST, KM, MEAS, "mdi:map-marker-distance", invalid=(0.0,)),
     # mileageSurplus = autonomia a BENZINA (motore termico), NON il totale: verificato dal
     # vivo 2026-06-23 che resta 215 km mentre l'autonomia elettrica scende (60→27 km) e il
@@ -208,7 +248,9 @@ _RT_SENSORS: list[_RtSpec] = [
             None, "L/100 km", MEAS, "mdi:gas-station"),
     # avgHkPowerKwh50km=20.6 dal vivo → kWh/100km (il nome "50km" è fuorviante).
     # -100 = segnaposto "nessun dato" ad auto ferma (HV spenta) → tieni l'ultimo noto.
-    _RtSpec("consumo_elettrico", "Consumo medio elettrico", "avgHkPowerKwh50km",
+    # `avgHkPower` è il nome che usano le BEV per la stessa grandezza (es. 17.7 = 177 Wh/km).
+    _RtSpec("consumo_elettrico", "Consumo medio elettrico",
+            ("avgHkPowerKwh50km", "avgHkPower"),
             None, "kWh/100 km", MEAS, "mdi:lightning-bolt", invalid=(-100.0,)),
     # oilSurplus=23 dal vivo → LITRI (confermato dal calcolo autonomia benzina).
     _RtSpec("carburante_residuo", "Carburante residuo", "oilSurplus",
@@ -247,14 +289,46 @@ _RT_SENSORS: list[_RtSpec] = [
     # electricityCall/engineState/hVoltageState) sono binary_sensor → vedi binary_sensor.py.
 ]
 
+# ── Adattamento ai modelli SOLO ELETTRICI ────────────────────────────────────────────────
+# Regola: si cambia qualcosa SOLO con `powerType == 0` dichiarato dal backend. Capability
+# sconosciuta ⇒ tutto come su Omoda 9 / Jaecoo, entità comprese.
 
-def _rt(coord, field: str) -> str | None:
-    """Valore grezzo del campo realtime, o None se assente/vuoto."""
+# Sensori che parlano del motore termico: su una BEV confermata non vengono proprio creati,
+# invece di restare `unknown` per sempre. `range_combinato` è qui perché è `mileageSurplus`
+# in miglia — cioè benzina anche lui.
+_SENSORI_SOLO_TERMICO = frozenset({
+    "range_benzina", "range_combinato", "consumo_carburante", "carburante_residuo",
+    "km_ibrido",
+})
+
+# Campi che ESISTONO solo sulle BEV: la cattura live dei 91 campi del 2026-06-25 ha
+# dimostrato che questa vettura NON li manda, quindi si creano soltanto a BEV confermata
+# (altrimenti sarebbero tre entità `unknown` a vita).
+_RT_SENSORI_BEV: list[_RtSpec] = [
+    # potenza di ricarica istantanea: la mandano le BEV, la PHEV no
+    _RtSpec("potenza_ricarica", "Potenza di ricarica", "chargingPower",
+            POWER, KW, MEAS, "mdi:ev-station", volatile=True),
+    # autonomia omologata WLTP (valore fisso di targa, non una lettura) → diagnostica
+    _RtSpec("range_wltp", "Autonomia WLTP", "wltcPureElectricRange",
+            DIST, KM, MEAS, "mdi:map-marker-distance", diag=True),
+    # efficienza dichiarata dall'auto in miglia/kWh: serve a chi ha HA in unità imperiali,
+    # perché HA non sa convertire kWh/100 km (energia-per-distanza).
+    _RtSpec("efficienza_mi_kwh", "Efficienza elettrica (mi/kWh)", "avgHkPowerMikwh",
+            None, "mi/kWh", MEAS, "mdi:lightning-bolt", diag=True),
+]
+
+
+def _rt(coord, field: str | tuple[str, ...]) -> str | None:
+    """Valore grezzo del campo realtime, o None se assente/vuoto.
+
+    Con una tupla di nomi alternativi vince il PRIMO presente e valorizzato: serve ai
+    modelli che chiamano la stessa grandezza in modo diverso (BEV vs PHEV)."""
     rt = coord.data.get("realtime") or {}
-    v = rt.get(field)
-    if v is None or str(v).strip() in ("", "None"):
-        return None
-    return str(v)
+    for nome in ((field,) if isinstance(field, str) else field):
+        v = rt.get(nome)
+        if v is not None and str(v).strip() not in ("", "None"):
+            return str(v)
+    return None
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEntitiesCallback) -> None:
@@ -268,7 +342,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     ents.append(Omoda9Speed(coord))
     # — sensori "ricchi" dal canale realtime (Round B): autonomia, odometro, gomme,
     #   consumi, ricarica, clima target —
-    ents += [Omoda9RealtimeSensor(coord, s) for s in _RT_SENSORS]
+    # Su BEV CONFERMATA (powerType == 0) si tolgono i sensori del motore termico e si
+    # aggiungono i campi che mandano solo le elettriche. Capability sconosciuta ⇒ elenco
+    # invariato: su Omoda 9 / Jaecoo esce esattamente ciò che usciva prima.
+    bev = coord.is_pure_electric()
+    specs = [s for s in _RT_SENSORS if not (bev and s.suffix in _SENSORI_SOLO_TERMICO)]
+    if bev:
+        # senza serbatoio l'autonomia totale è quella elettrica: il calcolo a due addendi
+        # resterebbe a None per sempre (manca `mileageSurplus`).
+        specs = [replace(s, compute=_range_totale_bev) if s.suffix == "range_totale" else s
+                 for s in specs]
+        specs += _RT_SENSORI_BEV
+    ents += [Omoda9RealtimeSensor(coord, s) for s in specs]
     ents.append(Omoda9SessionStatus(coord))
     # — sensori diagnostici (parità col bridge) —
     ents.append(Omoda9TextSensor(coord, "Omoda9 Esito comando", "cmd_status", "cmd_status", "mdi:car-cog"))
@@ -384,6 +469,10 @@ class Omoda9Battery(_Omoda9RestoreSensor):
 
 
 class Omoda9Speed(_Omoda9RestoreSensor):
+    # device_class SPEED: senza, l'unità resta inchiodata a km/h. Con, Home Assistant
+    # converte secondo il sistema di unità dell'utente (mph per chi ha HA in imperiale) e
+    # permette l'override per-entità. Il valore nativo resta km/h → in Italia non cambia nulla.
+    _attr_device_class = SensorDeviceClass.SPEED
     _attr_native_unit_of_measurement = UnitOfSpeed.KILOMETERS_PER_HOUR
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:speedometer"

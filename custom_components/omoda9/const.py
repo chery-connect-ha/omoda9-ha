@@ -67,6 +67,66 @@ DATA_VEHICLE_BRAND = "vehicle_brand"
 # fallback quando il modello non è (ancora) noto
 DEFAULT_VEHICLE_NAME = "Omoda 9 / Jaecoo"
 
+# ── Capability per-veicolo (dalla stessa risposta `queryList` dell'identità) ──────────────
+# Il componente nasce su una Omoda 9 PHEV; il canale telemetria però è lo stesso per tutti i
+# modelli e i BEV (Omoda E5…) mandano un sottoinsieme diverso di campi. Queste chiavi servono
+# a NON indovinare: si adatta il comportamento solo quando il backend dichiara esplicitamente
+# la capability. Assente/illeggibile ⇒ ci si comporta come si è sempre fatto.
+#
+# ⚠️ REGOLA: `power_type` va usato SOLO tramite `Omoda9Coordinator.is_pure_electric()`, che è
+# vera unicamente per BEV CONFERMATO (powerType == 0). "Sconosciuto" non è "elettrica".
+DATA_POWER_TYPE = "power_type"        # 0 = solo elettrica (BEV); altro/None = ha un motore termico
+DATA_CLIMATE_MIN = "climate_min_temp"
+DATA_CLIMATE_MAX = "climate_max_temp"
+DATA_CLIMATE_STEP = "climate_temp_step"
+# Marcatore "capability già interrogate": distingue «mai chiesto» da «chiesto, backend muto».
+# Senza, un backend che non dichiara nulla farebbe rifare la queryList a ogni riavvio.
+DATA_CAPS_PROBED = "caps_probed"
+
+# Range clima di ripiego (OMODA): usati quando il backend non lo dichiara. Erano cablati
+# in climate.py; stanno qui perché ora li legge anche il coordinator.
+CLIMA_MIN_DEFAULT = 16.0
+CLIMA_MAX_DEFAULT = 30.0
+CLIMA_STEP_DEFAULT = 1.0
+
+# Limiti di sicurezza del range clima dichiarato dal backend. Un valore fuori da qui è un
+# dato sbagliato, non una vettura esotica: si scarta e si tengono i default (16-30 °C, 1°).
+_CLIMA_MIN_PLAUSIBILE = 14.0
+_CLIMA_MAX_PLAUSIBILE = 33.0
+_CLIMA_STEP_AMMESSI = (0.5, 1.0)
+
+
+def capabilities_from_item(item: dict) -> dict:
+    """Capability per-veicolo da un elemento di `queryList`, già validate.
+
+    Ritorna solo le chiavi che il backend ha dichiarato in modo *plausibile*: un campo
+    assente, non numerico o fuori scala semplicemente non compare nel dizionario, così
+    chi legge ricade sui default. Non solleva mai."""
+    out: dict = {}
+    if not isinstance(item, dict):
+        return out
+    try:
+        pt = item.get("powerType")
+        if pt is not None and str(pt).strip() != "":
+            out[DATA_POWER_TYPE] = int(float(pt))
+    except (TypeError, ValueError):
+        pass
+    try:
+        lo = float(item["minTemperature"])
+        hi = float(item["maxTemperature"])
+        if _CLIMA_MIN_PLAUSIBILE <= lo < hi <= _CLIMA_MAX_PLAUSIBILE:
+            out[DATA_CLIMATE_MIN] = lo
+            out[DATA_CLIMATE_MAX] = hi
+    except (TypeError, ValueError, KeyError):
+        pass
+    try:
+        step = float(item["temperatureStepLength"])
+        if step in _CLIMA_STEP_AMMESSI:
+            out[DATA_CLIMATE_STEP] = step
+    except (TypeError, ValueError, KeyError):
+        pass
+    return out
+
 # Parametri di REGIONE (default = Europa). Esposti come options per supportare altre regioni.
 CONF_BFF = "bff"
 CONF_TSP_HOST = "tsp_host"

@@ -40,6 +40,9 @@ from .const import (
     HV_ON_POLL_EVERY, HV_ON_POLL_MAX,
     CHARGING_POLL_EVERY, CHARGING_POLL_MAX, DRIVE_WATCH_EVERY,
     CONF_VEHICLE_NAME, DATA_VEHICLE_MODEL, DATA_VEHICLE_BRAND,
+    DATA_POWER_TYPE, DATA_CLIMATE_MIN, DATA_CLIMATE_MAX, DATA_CLIMATE_STEP,
+    DATA_CAPS_PROBED, capabilities_from_item,
+    CLIMA_MIN_DEFAULT, CLIMA_MAX_DEFAULT, CLIMA_STEP_DEFAULT,
     DEFAULTS, DIAG_SWITCH_FILE,
 )
 from .timers import (
@@ -1349,6 +1352,24 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         emit("Stato aggiornato con dati reali ✅" if got
              else "L'auto non si è accesa in tempo — riprova, o si aggiornerà al prossimo viaggio")
 
+    def is_pure_electric(self) -> bool:
+        """True SOLO per un BEV confermato dal backend (`powerType == 0`).
+
+        Deliberatamente falsa quando la capability è sconosciuta: si sopprime qualcosa
+        (i sensori benzina) solo se si è CERTI che l'auto non abbia un motore termico.
+        Su Omoda 9 / Jaecoo PHEV, e su ogni entry che non ha mai letto le capability,
+        il comportamento resta identico a prima."""
+        return self.entry.data.get(DATA_POWER_TYPE) == 0
+
+    def climate_limits(self) -> tuple[float, float, float]:
+        """(min, max, step) del clima: quelli dichiarati dal backend per QUESTA vettura,
+        altrimenti i default OMODA (16-30 °C, 1°). I valori sono già validati in
+        `capabilities_from_item`, qui non serve ricontrollarli."""
+        d = self.entry.data
+        return (float(d.get(DATA_CLIMATE_MIN, CLIMA_MIN_DEFAULT)),
+                float(d.get(DATA_CLIMATE_MAX, CLIMA_MAX_DEFAULT)),
+                float(d.get(DATA_CLIMATE_STEP, CLIMA_STEP_DEFAULT)))
+
     async def async_ensure_vehicle_identity(self) -> None:
         """Backfill best-effort dell'identità veicolo (nome/modello/marca) per il device HA.
 
@@ -1356,16 +1377,27 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         (e non c'è override manuale) la legge UNA volta da queryList e la persiste, così ai
         restart successivi è già in cache (niente nuove chiamate). Sola lettura, non blocca il
         setup: su errore resta il fallback "Omoda 9 / Jaecoo"."""
-        if str((self.entry.options or {}).get(CONF_VEHICLE_NAME) or "").strip():
-            return  # override manuale: non sovrascrivere
-        if self.entry.data.get(CONF_VEHICLE_NAME):
-            return  # già in cache
+        # Le capability (BEV/PHEV, range clima) arrivano dalla STESSA risposta: se mancano si
+        # rilegge anche quando il nome è già in cache — una volta sola, poi c'è il marcatore.
+        override = bool(str((self.entry.options or {}).get(CONF_VEHICLE_NAME) or "").strip())
+        nome_in_cache = bool(self.entry.data.get(CONF_VEHICLE_NAME))
+        caps_da_leggere = not self.entry.data.get(DATA_CAPS_PROBED)
+        if (override or nome_in_cache) and not caps_da_leggere:
+            return  # nulla da chiedere: nome deciso e capability già interrogate
         info = await self.hass.async_add_executor_job(self._fetch_vehicle_identity)
-        if not info or not info.get(CONF_VEHICLE_NAME):
+        if not info:
             return
-        self.vehicle_name = info.get(CONF_VEHICLE_NAME)
-        self.vehicle_model = info.get(DATA_VEHICLE_MODEL)
-        self.vehicle_brand = info.get(DATA_VEHICLE_BRAND)
+        # L'identità si scrive SOLO se non c'era: un override manuale (o un nome già in
+        # cache) non va mai sovrascritto solo perché siamo passati a leggere le capability.
+        if override or nome_in_cache or not info.get(CONF_VEHICLE_NAME):
+            for k in (CONF_VEHICLE_NAME, DATA_VEHICLE_MODEL, DATA_VEHICLE_BRAND):
+                info.pop(k, None)
+        else:
+            self.vehicle_name = info.get(CONF_VEHICLE_NAME)
+            self.vehicle_model = info.get(DATA_VEHICLE_MODEL)
+            self.vehicle_brand = info.get(DATA_VEHICLE_BRAND)
+        if not info:
+            return  # niente di nuovo da persistere
         self.hass.config_entries.async_update_entry(
             self.entry, data={**self.entry.data, **info})  # → un reload (poi è in cache)
 
@@ -1400,14 +1432,19 @@ class Omoda9Coordinator(DataUpdateCoordinator):
                 item = cands[0]
             if not item:
                 return None
+            # Capability dalla STESSA risposta: powerType (BEV/termico) e range clima reale
+            # della vettura. Il marcatore si scrive comunque, anche se il backend non le
+            # dichiara: «chiesto e non c'è» ≠ «mai chiesto» (altrimenti si richiede a ogni avvio).
+            caps: dict = {DATA_CAPS_PROBED: True, **capabilities_from_item(item)}
             nick = str(item.get("nickname") or "").strip()
             full = str(item.get("fullName") or "").strip()
             name = nick or (full.title() if full else "")
             if not name:
-                return None
+                return caps
             return {CONF_VEHICLE_NAME: name,
                     DATA_VEHICLE_MODEL: (full.title() if full else None),
-                    DATA_VEHICLE_BRAND: _derive_brand(full or nick)}
+                    DATA_VEHICLE_BRAND: _derive_brand(full or nick),
+                    **caps}
         except Exception as err:  # noqa: BLE001 — best-effort, non deve far fallire il setup
             _LOGGER.debug("[veicolo] identità non recuperata: %s", err)
             return None

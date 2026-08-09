@@ -28,11 +28,13 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN
+from .const import CLIMA_MAX_DEFAULT, CLIMA_MIN_DEFAULT, CLIMA_STEP_DEFAULT, DOMAIN
 from .entity import Omoda9Entity, field_on
 
-MIN_TEMP = 16.0
-MAX_TEMP = 30.0
+# Ripiego OMODA. Il range VERO della vettura, quando il backend lo dichiara in queryList,
+# arriva da `coordinator.climate_limits()` (una Jaecoo/PHEV può avere estremi diversi).
+MIN_TEMP = CLIMA_MIN_DEFAULT
+MAX_TEMP = CLIMA_MAX_DEFAULT
 DEFAULT_TEMP = 21.0
 
 
@@ -51,9 +53,11 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
+    # Valori di ripiego a livello di classe: le istanze li rimpiazzano con quelli dichiarati
+    # dal backend per la vettura (vedi __init__), quando li dichiara.
     _attr_min_temp = MIN_TEMP
     _attr_max_temp = MAX_TEMP
-    _attr_target_temperature_step = 1.0
+    _attr_target_temperature_step = CLIMA_STEP_DEFAULT
     _attr_icon = "mdi:air-conditioner"
     _enable_turn_on_off_backwards_compatibility = False
 
@@ -62,7 +66,11 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
         # altrimenti HA lo deriva "sporco" col nome device: climate.omoda_9_omoda9_clima).
         # unique_id distinto dal vecchio switch (suffix "climate") → entità nuova, non rename.
         super().__init__(coord, "Omoda9 Clima", "climate", entity_id_format=ENTITY_ID_FORMAT)
-        self._target = DEFAULT_TEMP
+        lo, hi, step = coord.climate_limits()
+        self._attr_min_temp = lo
+        self._attr_max_temp = hi
+        self._attr_target_temperature_step = step
+        self._target = min(hi, max(lo, DEFAULT_TEMP))
         self._opt_on: bool | None = None
         self._opt_anchor = None
 
@@ -73,7 +81,7 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
             t = last.attributes.get(ATTR_TEMPERATURE)
             try:
                 if t is not None:
-                    self._target = min(MAX_TEMP, max(MIN_TEMP, float(t)))
+                    self._target = min(self._attr_max_temp, max(self._attr_min_temp, float(t)))
             except (TypeError, ValueError):
                 pass
 
@@ -135,7 +143,7 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is None:
             return
-        self._target = min(MAX_TEMP, max(MIN_TEMP, float(temp)))
+        self._target = min(self._attr_max_temp, max(self._attr_min_temp, float(temp)))
         # se il clima è già acceso, riapplica subito il nuovo setpoint; altrimenti
         # memorizza soltanto (verrà usato alla prossima accensione).
         if self.hvac_mode != HVACMode.OFF:
