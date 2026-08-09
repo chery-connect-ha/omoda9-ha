@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.11.0 — 2026-08-10
+
 ### 🇮🇹 Italiano
 
 - **I comandi non si fermano più al primo ostacolo.** Ogni auto ha un elenco, deciso dal costruttore, di ciò che si può comandare a distanza — e cambia da modello a modello. Finora l'integrazione lo ignorava: se anche una sola delle funzioni che un comando porta con sé non era abilitata sulla tua auto, il costruttore rifiutava **tutto il comando**, comprese le parti che la tua auto sapeva fare benissimo. Premevi «Riscalda tutto» e non succedeva niente. Adesso l'integrazione chiede all'auto cosa le è permesso e **toglie dal comando solo i pezzi non abilitati**: il resto parte e funziona. Se qualcosa è stato saltato te lo dice, invece di lasciartelo credere fatto.
