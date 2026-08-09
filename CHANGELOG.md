@@ -6,6 +6,24 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.10.0 — 2026-08-09
+
+### 🇮🇹 Italiano
+
+- **Ora l'integrazione si adatta alle auto solo elettriche.** Fin qui era tarata sull'Omoda 9, che ha anche il motore a benzina: su un'auto puramente elettrica comparivano lo stesso i contatori del carburante, e restavano vuoti per sempre. Adesso l'integrazione chiede all'auto che tipo di motore ha, e si regola da sola: se è solo elettrica quei contatori non compaiono più, e al loro posto arrivano la **potenza di ricarica**, l'**autonomia dichiarata WLTP** e l'**efficienza**. L'autonomia totale, che sulle ibride è elettrica più benzina, su un'elettrica è semplicemente l'autonomia elettrica.
+- **La temperatura del clima usa i limiti veri della tua auto.** Prima il cursore era fisso da 16 a 30 gradi per tutti; ora, quando l'auto li dichiara, si usano i suoi (alcuni modelli hanno estremi diversi, o mezzo grado di scatto invece di uno).
+- **La velocità si può vedere in miglia orarie.** Per chi usa Home Assistant con le unità britanniche: prima era bloccata in km/h.
+- **Chi ha una Omoda 9 o una Jaecoo ibrida non nota alcuna differenza:** l'adattamento scatta solo quando l'auto dichiara esplicitamente di essere elettrica, mai per esclusione. In caso di dubbio resta tutto com'era.
+- Grazie a **JackRonan**, autore della versione inglese dell'integrazione ([omoda-jaecoo-ha](https://github.com/JackRonan/omoda-jaecoo-ha)), che ha portato avanti il lavoro sull'Omoda E5 e da cui arrivano queste migliorie.
+
+### 🇬🇧 English
+
+- **The integration now adapts to fully electric cars.** Until now it was tailored to the Omoda 9, which also has a petrol engine: on a pure EV the fuel gauges showed up anyway and stayed empty forever. The integration now asks the car what kind of engine it has and adjusts by itself: on a fully electric car those gauges are gone, and in their place you get **charging power**, the **official WLTP range** and **efficiency**. Total range, which on a hybrid is electric plus petrol, on an EV is simply the electric range.
+- **The climate temperature uses your car's real limits.** The slider used to be fixed at 16 to 30 degrees for everyone; now, when the car declares them, its own limits are used (some models have different ends, or half-degree steps instead of full ones).
+- **Speed can be shown in miles per hour.** For anyone running Home Assistant with imperial units: it used to be locked to km/h.
+- **If you have an Omoda 9 or a hybrid Jaecoo you will notice no difference:** the adaptation only kicks in when the car explicitly declares itself electric, never by assumption. When in doubt, everything stays as it was.
+- Thanks to **JackRonan**, author of the English version of this integration ([omoda-jaecoo-ha](https://github.com/JackRonan/omoda-jaecoo-ha)), who carried the work forward on the Omoda E5 and from whose fork these improvements come.
+
 ## v1.9.0 — 2026-08-02
 
 ### 🇮🇹 Italiano
