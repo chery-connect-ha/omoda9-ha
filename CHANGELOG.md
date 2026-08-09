@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.11.1 — 2026-08-10
+
 ### 🇮🇹 Italiano
 
 - **Correzione alla novità di ieri: su alcune auto non si attivava affatto.** Per decidere se cambiare strada, l'integrazione guardava solo la singola funzione e non l'intera categoria. Su un'auto il cui elenco dei permessi è più corto — cioè che non elenca le singole funzioni ma nega il gruppo intero — concludeva che la strada abituale fosse aperta e non provava quella alternativa: la funzione restava rotta **proprio sulle auto per cui questa novità era stata scritta**. Ora guarda tutte e due.
