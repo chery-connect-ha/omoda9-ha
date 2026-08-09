@@ -6,6 +6,16 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **Correzione alla novità di ieri: su alcune auto non si attivava affatto.** Per decidere se cambiare strada, l'integrazione guardava solo la singola funzione e non l'intera categoria. Su un'auto il cui elenco dei permessi è più corto — cioè che non elenca le singole funzioni ma nega il gruppo intero — concludeva che la strada abituale fosse aperta e non provava quella alternativa: la funzione restava rotta **proprio sulle auto per cui questa novità era stata scritta**. Ora guarda tutte e due.
+- **E quando non c'è nulla da fare, adesso te lo dice.** Se il costruttore non autorizza affatto una funzione sulla tua auto, non c'è niente da togliere e nessuna strada alternativa: prima ricevevi lo stesso errore di sempre, senza capire perché l'aggiornamento non avesse cambiato niente. Ora l'integrazione lo scrive chiaramente.
+
+### 🇬🇧 English
+
+- **A fix to yesterday's feature: on some cars it never kicked in at all.** To decide whether to change route, the integration looked only at the individual function and not at the whole category. On a car whose permission list is shorter — one that does not list the individual functions but denies the group as a whole — it concluded the usual road was open and never tried the alternative: the function stayed broken **on exactly the cars this feature was written for**. It now looks at both.
+- **And when nothing can be done, it now says so.** If the manufacturer does not authorise a function on your car at all, there is nothing to remove and no alternative road: you used to get the same error as always, with no way to tell why the update had changed nothing. The integration now says it plainly.
+
 ## v1.11.0 — 2026-08-10
 
 ### 🇮🇹 Italiano

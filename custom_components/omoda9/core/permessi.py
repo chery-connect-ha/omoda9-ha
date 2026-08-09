@@ -29,11 +29,13 @@ Documentazione e dati grezzi: `40_permessi/PROVA_AB_cycleData_20260809.md`,
    (il sedile sotto 214 *e* sotto 204) e i due veicoli sono configurati a specchio.
 
 **Non è un'invenzione nostra: è ciò che fa l'app ufficiale.** Nel decompilato,
-`RusPermissionsProvider` espone 34 funzioni `can*` che leggono questa stessa lista con una logica
-**OR** fra la voce sotto il clima e la categoria dedicata (`canRearWindowDefrosting` → `20411`
-oppure `232`), più due funzioni `isSeparate*` che guardano **solo** la categoria dedicata e
-decidono se usare l'endpoint dedicato o infilare il campo dentro `airControl`. Le tabelle qui
-sotto ricalcano quella mappa.
+`RusPermissionsProvider` espone **32** funzioni `can*` che leggono questa stessa lista con una
+logica **OR** fra la voce sotto il clima e la categoria dedicata (`canRearWindowDefrosting` →
+`20411` oppure `232`), più **2** funzioni `isSeparate*` che guardano **solo** la categoria dedicata
+e decidono se usare l'endpoint dedicato o infilare il campo dentro `airControl`. E in
+`RusCarCntrolViewModel::controlOneTouchHeatOrCool` ci sono **11** chiamate a `isShowByPermission`,
+una per ciascun figlio della macro (`2094`-`20910` per il caldo, `2104`-`2107` per il freddo): è
+l'app che pota il corpo campo per campo. Le tabelle qui sotto ricalcano quella mappa.
 
 ⚠️ **REGOLA NON NEGOZIABILE — FALLIMENTO PERMISSIVO.** Lista non letta, illeggibile, endpoint in
 timeout (osservato: due volte oltre i 60 s), categoria o voce sconosciuta ⇒ **ci si comporta
@@ -231,8 +233,24 @@ def pota(endpoint: str, body: dict, perms: dict) -> tuple[dict, list]:
 
 def base_negata(endpoint: str, perms: dict) -> bool:
     """Vero se è negato il cuore stesso della richiesta: qui la potatura non serve a nulla e
-    conviene dirlo invece di spedire una richiesta che sarà rifiutata comunque."""
+    conviene dirlo invece di lasciare l'utente a indovinare perché non è cambiato niente."""
     return not consentito(perms, VOCE_BASE.get(endpoint))
+
+
+def porta_chiusa(endpoint: str, perms: dict) -> bool:
+    """Vero se è negata l'INTERA categoria dell'endpoint (non una sua voce figlia).
+
+    ⚠️ Questa funzione esiste per un difetto reale della prima versione, che merita di restare
+    scritto. Il ripiego decideva guardando **solo la voce figlia**, e `consentito()` tratta una
+    voce sconosciuta come consentita (fallimento permissivo). Su un veicolo la cui lista è più
+    corta della nostra — quella dell'issue #1 ne ha ~200 contro le nostre 334 — i figli `2141`-`2148`
+    possono semplicemente non esserci, mentre è la **categoria** `214` a essere negata in blocco.
+    Risultato: la porta dedicata veniva giudicata aperta, il ripiego non scattava, e la funzione
+    restava rotta **proprio sul veicolo per cui era stata scritta**.
+
+    La categoria è il segnale più grossolano ma anche il più affidabile: c'è sempre, ed è quello
+    che i due `isSeparate*` dell'app guardano. Resta permissiva: categoria sconosciuta = aperta."""
+    return not consentito(perms, CATEGORIA.get(endpoint))
 
 
 def instrada(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, str | None]:
@@ -248,9 +266,12 @@ def instrada(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, str | N
         if not regola:
             continue
         dedicata, alternativa = regola
-        if consentito(perms, dedicata):
+        # Una porta è aperta se lo sono SIA la sua categoria SIA la voce figlia. Guardare solo
+        # la figlia era il difetto della prima versione: su una lista più corta della nostra la
+        # figlia manca, «sconosciuta» vale «consentita», e il ripiego non scattava mai.
+        if consentito(perms, dedicata) and not porta_chiusa(endpoint, perms):
             return endpoint, body, None          # la porta di sempre è aperta: non si tocca nulla
-        if not consentito(perms, alternativa):
+        if not consentito(perms, alternativa) or porta_chiusa("airControl", perms):
             return endpoint, body, None          # chiuse entrambe: si spedisce e si riporta il rifiuto vero
         acceso = str(body.get(campo, "0")).strip() not in ("0", "", "false", "False")
         nuovo = dict(BASE_AIRCONTROL)

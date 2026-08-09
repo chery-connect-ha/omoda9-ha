@@ -587,6 +587,13 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
             if saltati:
                 emit(f"{c['name']}: non autorizzate su questa auto, salto "
                      f"{nomi_saltati(saltati)}")
+            # Categoria negata in blocco: non c'è campo da togliere né porta alternativa, e il
+            # rifiuto che sta per arrivare NON è un difetto dell'integrazione. Dirlo prima evita
+            # che l'utente concluda «l'aggiornamento non ha funzionato»: senza questa riga, su un
+            # veicolo con la macro freddo negata l'esito è identico a prima e inspiegabile.
+            elif permessi.porta_chiusa(endpoint, ctx.permessi or {}):
+                emit(f"{c['name']}: il costruttore non autorizza affatto questa funzione su "
+                     f"questa auto — non c'è nulla da adattare")
         url = ctx.tsp_host + (c.get("path") or ("/asc/vehicleControl/" + endpoint))
 
         body.update({"clientType": "1", "seq": f"{ctx.vin}-{ts}",

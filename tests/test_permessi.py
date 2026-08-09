@@ -166,6 +166,40 @@ def test_base_negata_si_riconosce(P):
 
 # ───────────────────── 4. instradamento ─────────────────────
 
+def test_instradamento_scatta_anche_se_la_voce_figlia_MANCA(core, P):
+    """⚠️ Il caso che la prima versione sbagliava, ed è il caso reale dell'issue #1.
+
+    La lista di quel veicolo ha ~200 voci contro le nostre 334: i figli `2141`-`2148` possono
+    non esserci affatto, mentre è la **categoria** 214 a essere negata in blocco. Guardando solo
+    la figlia, `consentito()` la dava per consentita (sconosciuto = consentito) e il ripiego non
+    scattava: la funzione restava rotta proprio sull'auto per cui era stata scritta."""
+    commands = core["commands"]
+    corta = {204: 1, 2047: 1, 214: 0}          # categoria negata, NESSUN figlio 214x presente
+    c = commands.CMD_MAP["sedile_guida_caldo"]
+    ep, corpo, _s, nota = P.adatta(c["endpoint"], dict(c["body"]), corta)
+    assert ep == "airControl", "il ripiego non è scattato: si guardava solo la voce figlia"
+    assert corpo["mSeatHeating"] == "3" and nota
+
+
+def test_categoria_negata_si_riconosce(core, P):
+    """`porta_chiusa` è ciò che rende visibile all'utente il caso «non c'è nulla da adattare»."""
+    commands = core["commands"]
+    assert P.porta_chiusa("seatControl", {214: 0}) is True
+    assert P.porta_chiusa("seatControl", OMODA9) is False
+    assert P.porta_chiusa("chargeStartStopControl", OMODA9) is True   # 220 negata da noi
+    assert P.porta_chiusa("seatControl", {}) is False                 # ignoto = aperta
+    assert P.porta_chiusa("coolingControl", JAECOO) is False
+
+
+def test_non_si_ripiega_se_anche_il_clima_e_chiuso(core, P):
+    """Se pure la categoria 204 è negata, l'alternativa non esiste: non si cambia strada."""
+    commands = core["commands"]
+    chiuso = dict(JAECOO); chiuso[204] = 0
+    c = commands.CMD_MAP["sedile_guida_caldo"]
+    ep, corpo, _s, nota = P.adatta(c["endpoint"], dict(c["body"]), chiuso)
+    assert (ep, corpo, nota) == (c["endpoint"], c["body"], None)
+
+
 def test_instradamento_sedile_passa_dal_clima(core, P):
     """Il caso dell'issue #1. Categoria sedili negata, voce sotto il clima consentita ⇒ si
     cambia porta invece di sbattere contro quella chiusa."""
