@@ -6,6 +6,14 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **Il progetto si è trasferito in un'organizzazione condivisa su GitHub.** È cambiato l'indirizzo del progetto: i collegamenti alla documentazione e alla segnalazione dei problemi — quelli che trovi nella scheda dell'integrazione dentro Home Assistant — ora portano al nuovo indirizzo. Da parte tua non c'è niente da fare: l'aggiornamento da HACS continua a funzionare come sempre e la tua configurazione resta intatta.
+
+### 🇬🇧 English
+
+- **The project has moved to a shared organisation on GitHub.** The project address has changed: the links to the documentation and to issue reporting — the ones on the integration's page inside Home Assistant — now point to the new address. There is nothing for you to do: updating through HACS keeps working exactly as before and your setup is left untouched.
+
 ## v1.10.0 — 2026-08-09
 
 ### 🇮🇹 Italiano

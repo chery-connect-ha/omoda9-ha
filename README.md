@@ -1,8 +1,8 @@
 <!-- logo:inizio -->
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Caslinovich/omoda9-ha/master/custom_components/omoda9/brand/dark_logo.png">
-    <img src="https://raw.githubusercontent.com/Caslinovich/omoda9-ha/master/custom_components/omoda9/brand/logo.png" alt="OMODA | JAECOO" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/omoda9/brand/dark_logo.png">
+    <img src="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/omoda9/brand/logo.png" alt="OMODA | JAECOO" height="96">
   </picture>
 </p>
 <!-- logo:fine -->
@@ -136,7 +136,7 @@ its own**. If you want a **popup when a command to the car fails** (vehicle busy
 unreachable, expired session, command carried out only in part…), import the
 included blueprint:
 
-[![Import the blueprint into Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FCaslinovich%2Fomoda9-ha%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fomoda9%2Ffailed_command.yaml)
+[![Import the blueprint into Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fchery-connect-ha%2Fomoda9-ha%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fomoda9%2Ffailed_command.yaml)
 
 Then **Settings → Automations → Create automation → From blueprint → _Omoda 9 /
 Jaecoo — Failed command alert_**. It recognizes only real failures — successes
@@ -153,7 +153,7 @@ Home Assistant cannot translate a blueprint, so there is one file per language.)
    Jaecoo → ⋮ → Download diagnostics**. It is **already anonymized** (email,
    phone number, PIN, VIN, tUserId and GPS redacted; tokens/certificates show
    only "present: yes/no") → safe to share in an
-   [issue](https://github.com/Caslinovich/omoda9-ha/issues).
+   [issue](https://github.com/chery-connect-ha/omoda9-ha/issues).
 2. **Detailed logs:** same page → **⋮ → Enable debug logging** → reproduce the
    problem → **Disable debug logging**: HA downloads the log. PIN, OTP and tokens
    are **never written to the logs**, the phone number appears only masked

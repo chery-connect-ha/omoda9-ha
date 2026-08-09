@@ -1,8 +1,8 @@
 <!-- logo:inizio -->
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Caslinovich/omoda9-ha/master/custom_components/omoda9/brand/dark_logo.png">
-    <img src="https://raw.githubusercontent.com/Caslinovich/omoda9-ha/master/custom_components/omoda9/brand/logo.png" alt="OMODA | JAECOO" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/omoda9/brand/dark_logo.png">
+    <img src="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/omoda9/brand/logo.png" alt="OMODA | JAECOO" height="96">
   </picture>
 </p>
 <!-- logo:fine -->
@@ -142,7 +142,7 @@ un **popup quando un comando all'auto fallisce** (veicolo occupato, non
 raggiungibile, sessione scaduta, comando eseguito solo in parte…), importa il
 blueprint incluso:
 
-[![Importa il blueprint in Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FCaslinovich%2Fomoda9-ha%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fomoda9%2Fcomando_fallito.yaml)
+[![Importa il blueprint in Home Assistant](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fchery-connect-ha%2Fomoda9-ha%2Fblob%2Fmaster%2Fblueprints%2Fautomation%2Fomoda9%2Fcomando_fallito.yaml)
 
 Poi **Impostazioni → Automazioni → Crea automazione → Da blueprint → _Omoda 9 /
 Jaecoo — Avviso comando non riuscito_**. Riconosce solo i veri fallimenti — gli
@@ -160,7 +160,7 @@ Assistant non sa tradurre un blueprint, quindi c'è un file per lingua.)
    9 / Jaecoo → ⋮ → Scarica diagnostica**. È **già anonimizzata** (email, numero
    di telefono, PIN, VIN, tUserId e GPS oscurati; di token/certificati appare
    solo «presente: sì/no») → sicura da condividere in una
-   [issue](https://github.com/Caslinovich/omoda9-ha/issues).
+   [issue](https://github.com/chery-connect-ha/omoda9-ha/issues).
 2. **Log dettagliati:** stessa pagina → **⋮ → Abilita registrazione di debug** →
    riproduci il problema → **Disabilita registrazione di debug**: HA scarica il
    log. PIN, OTP e token **non vengono mai scritti nei log**, il numero di

@@ -3,10 +3,10 @@
   "name": "Omoda 9 / Jaecoo",
   "codeowners": ["@Caslinovich"],
   "config_flow": true,
-  "documentation": "https://github.com/Caslinovich/omoda9-ha",
+  "documentation": "https://github.com/chery-connect-ha/omoda9-ha",
   "integration_type": "device",
   "iot_class": "cloud_push",
-  "issue_tracker": "https://github.com/Caslinovich/omoda9-ha/issues",
+  "issue_tracker": "https://github.com/chery-connect-ha/omoda9-ha/issues",
   "requirements": [
     "paho-mqtt>=2.0",
     "requests>=2.28",
