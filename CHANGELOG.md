@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.12.1 — 2026-08-10
+
 ### 🇮🇹 Italiano
 
 - **Nuovo sensore: «Partenza programmata».** L'auto ci mandava già, a ogni collegamento, il piano di partenza impostato dall'app ufficiale — orario e giorni — e noi lo buttavamo via senza guardarlo. Ora lo vedi in Home Assistant: l'orario, i giorni della settimana e se il piano è attivo o spento. **È solo una lettura**: per cambiare il piano si usa ancora l'app. Non aggiunge nessuna richiesta ai server del costruttore, perché è un dato che arrivava già.
