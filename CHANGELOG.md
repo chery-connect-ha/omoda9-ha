@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.12.0 — 2026-08-10
+
 ### 🇮🇹 Italiano
 
 - **Nuovo interruttore: «Disappannamento parabrezza».** L'auto sa fare due cose diverse sul vetro davanti, e finora l'integrazione ne offriva una sola. Quella che c'era già, «Sbrinamento parabrezza», **scalda il vetro** con le resistenze elettriche. Questa nuova soffia invece **l'aria del climatizzatore sul parabrezza**, che è il modo rapido per togliere la condensa. Sono comandi distinti e l'auto li tiene separati.
