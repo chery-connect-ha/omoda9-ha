@@ -80,9 +80,27 @@ DATA_POWER_TYPE = "power_type"        # 0 = solo elettrica (BEV); altro/None = h
 DATA_CLIMATE_MIN = "climate_min_temp"
 DATA_CLIMATE_MAX = "climate_max_temp"
 DATA_CLIMATE_STEP = "climate_temp_step"
+# Estremi LO/HI: le posizioni oltre il range normale (sull'Omoda 9: 15.0 e 31.0, contro un
+# range 16-30). Sono i valori che le macro "Raffredda tutto"/"Riscalda tutto" spediscono per
+# dire «il massimo che questa vettura sa fare», e fino alla v1.12.1 erano cablati a mano.
+# Presenti SOLO se il backend dichiara `isHaveLoAndHi`: senza LO/HI gli estremi coincidono
+# con min/max e non serve una chiave in più.
+DATA_CLIMATE_LO = "climate_lo"
+DATA_CLIMATE_HI = "climate_hi"
+# Durate ammesse per il clima, in minuti (`maxAirDuration`, es. "5,10,15"). È un INSIEME, non
+# un massimo, malgrado il nome: spedire un valore fuori insieme è spedire un valore invalido.
+DATA_AIR_DURATIONS = "air_durations"
 # Marcatore "capability già interrogate": distingue «mai chiesto» da «chiesto, backend muto».
 # Senza, un backend che non dichiara nulla farebbe rifare la queryList a ogni riavvio.
-DATA_CAPS_PROBED = "caps_probed"
+#
+# ⚠️ È VERSIONATO, e la lezione costa cara: il marcatore v1 è in produzione dalla v1.10.0, e
+# quando la v1.13.0 ha aggiunto le chiavi LO/HI e le durate, ogni installazione esistente
+# aveva già `caps_probed: True` → `async_ensure_vehicle_identity` usciva subito e le chiavi
+# nuove non sarebbero MAI state lette: funzionalità nata morta su tutti tranne i nuovi
+# installati. Chi aggiunge una capability qui **deve** aggiungere un marcatore nuovo, così
+# gli entry esistenti rileggono `queryList` una volta sola e poi si fermano di nuovo.
+DATA_CAPS_PROBED = "caps_probed"          # v1.10.0: powerType + range clima
+DATA_CAPS_PROBED_V2 = "caps_probed_v2"    # v1.13.0: estremi LO/HI + durate ammesse
 
 # Range clima di ripiego (OMODA): usati quando il backend non lo dichiara. Erano cablati
 # in climate.py; stanno qui perché ora li legge anche il coordinator.
@@ -95,6 +113,17 @@ CLIMA_STEP_DEFAULT = 1.0
 _CLIMA_MIN_PLAUSIBILE = 14.0
 _CLIMA_MAX_PLAUSIBILE = 33.0
 _CLIMA_STEP_AMMESSI = (0.5, 1.0)
+# Gli estremi LO/HI stanno FUORI dal range normale (qui 15.0 e 31.0 contro 16-30), quindi la
+# banda di plausibilità dev'essere più larga di quella del range, non la stessa.
+_ESTREMO_MIN_PLAUSIBILE = 10.0
+_ESTREMO_MAX_PLAUSIBILE = 36.0
+# Una durata clima oltre l'ora non è una vettura esotica, è un dato sbagliato.
+_DURATA_MAX_PLAUSIBILE = 60
+
+
+def _vero(v) -> bool:
+    """Un flag del backend può arrivare come 1, "1", True o "true"."""
+    return str(v).strip().lower() in ("1", "true", "yes")
 
 
 def capabilities_from_item(item: dict) -> dict:
@@ -125,6 +154,38 @@ def capabilities_from_item(item: dict) -> dict:
         if step in _CLIMA_STEP_AMMESSI:
             out[DATA_CLIMATE_STEP] = step
     except (TypeError, ValueError, KeyError):
+        pass
+    # ── estremi LO/HI ────────────────────────────────────────────────────────────────────
+    # Solo se la vettura dichiara di averli: `isHaveLoAndHi` a 0 significa che gli estremi
+    # sono già min/max, e in quel caso una chiave in più direbbe solo la stessa cosa.
+    try:
+        if _vero(item.get("isHaveLoAndHi")):
+            lo = float(item["loValue"])
+            hi = float(item["hiValue"])
+            # Coerenza col range, quando il range c'è: LO sta sotto il minimo e HI sopra il
+            # massimo, per definizione. Se non è così i due campi sono invertiti o sbagliati
+            # e si preferisce non averli.
+            coerente = (
+                DATA_CLIMATE_MIN not in out
+                or (lo <= out[DATA_CLIMATE_MIN] and hi >= out[DATA_CLIMATE_MAX])
+            )
+            if _ESTREMO_MIN_PLAUSIBILE <= lo < hi <= _ESTREMO_MAX_PLAUSIBILE and coerente:
+                out[DATA_CLIMATE_LO] = lo
+                out[DATA_CLIMATE_HI] = hi
+    except (TypeError, ValueError, KeyError):
+        pass
+    # ── durate ammesse per il clima ──────────────────────────────────────────────────────
+    try:
+        durate = sorted({
+            int(float(p)) for p in str(item["maxAirDuration"]).split(",") if str(p).strip()
+        })
+        durate = [d for d in durate if 0 < d <= _DURATA_MAX_PLAUSIBILE]
+        if durate:
+            out[DATA_AIR_DURATIONS] = durate
+    # ArithmeticError: `int(float("inf"))` solleva OverflowError, che NON è un ValueError.
+    # Senza, un `maxAirDuration` assurdo faceva perdere l'intera identità del veicolo (il
+    # chiamante ha un except cieco) e il marcatore non veniva scritto → riletture a ogni avvio.
+    except (TypeError, ValueError, KeyError, ArithmeticError):
         pass
     return out
 
@@ -215,6 +276,13 @@ MACRO_WAKE_WAIT_AWAKE = 5
 # l'auto lo spegne da sola dopo questo tempo → lo switch macro torna OFF da solo per non
 # restare "acceso" a vuoto. +60s di margine.
 MACRO_PRESET_S = 15 * 60 + 60
+# ⚠️ LIMITE NOTO (v1.13.0, non risolto di proposito). Questi 15 minuti sono ancora una
+# costante, mentre la durata spedita alle macro ora la decide la vettura (`maxAirDuration`).
+# Su una vettura che ammetta solo 5′, l'auto chiude il preset dopo 5 minuti e l'interruttore
+# resta acceso altri 11: sfasatura cosmetica, nessun comando sbagliato. Sull'Omoda 9 non si
+# manifesta (durata dichiarata 15 = costante). Sistemarlo vuol dire derivare il timer dalla
+# durata effettivamente spedita, che oggi `switch.py` non conosce — va fatto, ma non di corsa
+# in una release che tocca già il corpo dei comandi comfort.
 
 # Coda comandi: l'auto esegue UN comando alla volta (A00082 = "veicolo occupato"), quindi i
 # comandi si serializzano. Un secondo comando (o un doppio-tap) ASPETTA il suo turno invece di

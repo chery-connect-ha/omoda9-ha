@@ -134,6 +134,15 @@ class CoreCtx:
     # È per-veicolo (anzi: per utente-su-veicolo), quindi vive nel contesto e non altrove.
     permessi: dict | None = None
 
+    # Scheda tecnica della vettura, letta da `queryList` (la stessa risposta da cui esce il
+    # nome del veicolo: nessuna chiamata in più). Chiavi NEUTRE, perché `core/` è autonomo e
+    # non importa `const.py`:
+    #   clima_lo / clima_hi  = massimo freddo e massimo caldo accettati dalla vettura
+    #   durate_aria          = elenco dei minuti ammessi per il clima (es. [5, 10, 15])
+    # Vuoto = backend che non dichiara nulla ⇒ si spedisce quello che il catalogo dice da
+    # sempre. Non sapere non autorizza a inventare.
+    caps: dict = field(default_factory=dict)
+
     # — stato per-veicolo —
     stato: _StatoVeicolo = field(default_factory=_StatoVeicolo)
 

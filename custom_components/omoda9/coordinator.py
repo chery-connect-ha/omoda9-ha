@@ -41,7 +41,8 @@ from .const import (
     CHARGING_POLL_EVERY, CHARGING_POLL_MAX, DRIVE_WATCH_EVERY,
     CONF_VEHICLE_NAME, DATA_VEHICLE_MODEL, DATA_VEHICLE_BRAND,
     DATA_POWER_TYPE, DATA_CLIMATE_MIN, DATA_CLIMATE_MAX, DATA_CLIMATE_STEP,
-    DATA_CAPS_PROBED, capabilities_from_item,
+    DATA_CLIMATE_LO, DATA_CLIMATE_HI, DATA_AIR_DURATIONS,
+    DATA_CAPS_PROBED, DATA_CAPS_PROBED_V2, capabilities_from_item,
     CLIMA_MIN_DEFAULT, CLIMA_MAX_DEFAULT, CLIMA_STEP_DEFAULT,
     DEFAULTS, DIAG_SWITCH_FILE,
 )
@@ -970,6 +971,9 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             bff=self.bff,
             channel_id=self.channel_id,
             mint_taskid=os.environ.get("OMODA_MINT_TASKID", "1") not in ("0", "", "false", "no"),
+            # Capability della vettura con nomi NEUTRI: `core/` è autonomo e non importa nulla
+            # dal package padre, quindi non può conoscere le chiavi `DATA_*` di const.py.
+            caps=self._caps_correnti(),
         )
 
     @property
@@ -1370,6 +1374,53 @@ class Omoda9Coordinator(DataUpdateCoordinator):
                 float(d.get(DATA_CLIMATE_MAX, CLIMA_MAX_DEFAULT)),
                 float(d.get(DATA_CLIMATE_STEP, CLIMA_STEP_DEFAULT)))
 
+    def climate_extremes(self) -> tuple[float | None, float | None]:
+        """(LO, HI) = il massimo freddo e il massimo caldo che QUESTA vettura accetta, o
+        `(None, None)` se il backend non li ha dichiarati.
+
+        Sono i valori che spediscono le macro «Raffredda tutto» / «Riscalda tutto»
+        (sull'Omoda 9: 15.0 e 31.0). Fino alla v1.12.1 erano due costanti cablate.
+
+        ⚠️ **`None` non va sostituito con i capi del range normale**, per quanto sembri
+        ragionevole («senza LO/HI gli estremi sono min e max»). Sarebbe una dichiarazione
+        inventata: il chiamante non potrebbe più distinguerla da una vera e spedirebbe
+        16.0/30.0 al posto dei 15.0/31.0 di sempre — cioè cambierebbe il comportamento di
+        utenti funzionanti sulla base di un dato che il backend non ha mai dato. La regola
+        del componente è l'opposto: si cambia SOLO su dichiarazione esplicita."""
+        d = self.entry.data
+        lo, hi = d.get(DATA_CLIMATE_LO), d.get(DATA_CLIMATE_HI)
+        if lo is None or hi is None:
+            return (None, None)
+        try:
+            return (float(lo), float(hi))
+        except (TypeError, ValueError):
+            return (None, None)
+
+    def air_durations(self) -> list[int]:
+        """Le durate del clima ammesse dalla vettura, in minuti. Vuota = non dichiarate,
+        e allora non si corregge niente (non sapere non autorizza a inventare)."""
+        v = self.entry.data.get(DATA_AIR_DURATIONS)
+        if not isinstance(v, (list, tuple)) or not v:
+            return []
+        try:
+            return [int(x) for x in v]
+        except (TypeError, ValueError):
+            return []
+
+    def _caps_correnti(self) -> dict:
+        """Le capability con i nomi NEUTRI che usa `core/` (che non importa `const.py`).
+
+        Le chiavi non dichiarate dal backend **non compaiono affatto**: `core/` distingue
+        «assente» da «dichiarato», e l'assenza vuol dire «spedisci quello che spedivi»."""
+        lo, hi = self.climate_extremes()
+        caps: dict = {}
+        if lo is not None and hi is not None:
+            caps["clima_lo"], caps["clima_hi"] = lo, hi
+        durate = self.air_durations()
+        if durate:
+            caps["durate_aria"] = durate
+        return caps
+
     async def async_ensure_vehicle_identity(self) -> None:
         """Backfill best-effort dell'identità veicolo (nome/modello/marca) per il device HA.
 
@@ -1381,7 +1432,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # rilegge anche quando il nome è già in cache — una volta sola, poi c'è il marcatore.
         override = bool(str((self.entry.options or {}).get(CONF_VEHICLE_NAME) or "").strip())
         nome_in_cache = bool(self.entry.data.get(CONF_VEHICLE_NAME))
-        caps_da_leggere = not self.entry.data.get(DATA_CAPS_PROBED)
+        # Il marcatore è VERSIONATO: chi ha già `caps_probed` (v1.10.0+) ma non `_v2` deve
+        # rileggere una volta sola, altrimenti le capability aggiunte dalla v1.13.0 non
+        # arriverebbero MAI a chi è già installato — la funzionalità nascerebbe morta.
+        caps_da_leggere = not self.entry.data.get(DATA_CAPS_PROBED_V2)
         if (override or nome_in_cache) and not caps_da_leggere:
             return  # nulla da chiedere: nome deciso e capability già interrogate
         info = await self.hass.async_add_executor_job(self._fetch_vehicle_identity)
@@ -1400,6 +1454,16 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             return  # niente di nuovo da persistere
         self.hass.config_entries.async_update_entry(
             self.entry, data={**self.entry.data, **info})  # → un reload (poi è in cache)
+        # ⚠️ Riallineare il contesto A MANO. Il `CoreCtx` è memoizzato e viene costruito
+        # PRIMA di questa lettura (lo costruisce `_fetch_vehicle_identity` stessa, per fare
+        # il login), quindi nasce con le capability che c'erano allora: nessuna, al primo
+        # avvio. E un cambio della sola `data` non fa ripartire l'entry — è una scelta
+        # voluta, altrimenti il backfill si ricaricherebbe addosso. Senza questa riga le
+        # capability appena lette resterebbero inutilizzate fino al riavvio di HA.
+        # Si aggiorna il CONTENUTO, non l'oggetto: `ctx` deve restare lo stesso per tutta la
+        # vita dell'entry, o l'anti-lockout del PIN si azzererebbe.
+        if self._ctx is not None:
+            self._ctx.caps = self._caps_correnti()
 
     def _fetch_vehicle_identity(self) -> dict | None:
         """queryList (sola lettura) → {vehicle_name, vehicle_model, vehicle_brand} per il VIN."""
@@ -1435,7 +1499,8 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             # Capability dalla STESSA risposta: powerType (BEV/termico) e range clima reale
             # della vettura. Il marcatore si scrive comunque, anche se il backend non le
             # dichiara: «chiesto e non c'è» ≠ «mai chiesto» (altrimenti si richiede a ogni avvio).
-            caps: dict = {DATA_CAPS_PROBED: True, **capabilities_from_item(item)}
+            caps: dict = {DATA_CAPS_PROBED: True, DATA_CAPS_PROBED_V2: True,
+                          **capabilities_from_item(item)}
             nick = str(item.get("nickname") or "").strip()
             full = str(item.get("fullName") or "").strip()
             name = nick or (full.title() if full else "")

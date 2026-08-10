@@ -549,6 +549,91 @@ def _coda_saltati(saltati, lunghezza: int, tetto: int = 255) -> str:
     return coda if lunghezza + len(coda) <= tetto else ""
 
 
+# ── adattamento alla scheda tecnica della vettura (`queryList`) ──────────────────────────
+# Fino alla v1.12.1 le macro «Raffredda tutto»/«Riscalda tutto» spedivano 15.0 e 31.0 e tutte
+# le durate erano 15: sono i valori dell'Omoda 9, cablati come se valessero per tutti. Il
+# backend li dichiara per-veicolo in `queryList` — risposta che leggiamo già, quindi il costo
+# è zero. Regola invariata in tutto il componente: si cambia qualcosa SOLO quando il backend
+# dichiara; se tace, si spedisce esattamente ciò che si spediva prima.
+_ESTREMO_PER_ENDPOINT = {"coolingControl": "clima_lo", "heatingControl": "clima_hi"}
+
+
+def adatta_capability(endpoint, body: dict, caps: dict | None) -> dict:
+    """Sostituisce nel corpo gli estremi del clima con quelli dichiarati dalla vettura.
+
+    Vale solo per `coolingControl`/`heatingControl`, che sono le macro «il massimo che
+    quest'auto sa fare»: lì `temperature` NON è una scelta dell'utente ma la posizione LO/HI.
+    `airControl` (l'interruttore del clima) è escluso di proposito — la sua temperatura è
+    parametrica e la decide l'utente dalla card."""
+    chiave = _ESTREMO_PER_ENDPOINT.get(endpoint)
+    if not chiave or not caps or "temperature" not in body:
+        return body
+    valore = caps.get(chiave)
+    if valore is None:
+        return body
+    try:
+        body["temperature"] = f"{float(valore):.1f}"
+    except (TypeError, ValueError):
+        pass
+    return body
+
+
+def durata_ammessa(minuti, durate) -> int | None:
+    """La durata da spedire davvero, dato l'insieme che la vettura ammette.
+
+    `maxAirDuration` è un **insieme** ("5,10,15"), non un massimo, malgrado il nome: chiedere
+    15 minuti a una vettura che ammette solo 5 e 10 non è chiedere «tanto», è spedire un
+    valore invalido. Si prende il più grande valore ammesso che non supera quello richiesto;
+    se sono tutti più grandi (si è chiesto meno del minimo) si prende il più piccolo, perché
+    non spedire non è un'opzione: l'utente ha premuto un pulsante.
+
+    Ritorna `None` quando non c'è nulla da correggere — nessuna dichiarazione, valore già
+    ammesso, o richiesta illeggibile — così chi chiama distingue «va bene così» da «cambiato»."""
+    if not durate:
+        return None
+    try:
+        voluta = int(float(minuti))
+    except (TypeError, ValueError):
+        return None
+    if voluta in durate:
+        return None
+    minori = [d for d in durate if d <= voluta]
+    return max(minori) if minori else min(durate)
+
+
+# `maxAirDuration` è la durata dell'**aria**: vale per il climatizzatore, non per tutto ciò
+# che ha un timer. Il campo `times` compare anche su `seatControl` (8 comandi), sulla
+# resistenza del parabrezza e su quella del lunotto: sono durate di riscaldatori elettrici,
+# che la scheda non governa con questo campo (ne ha altri, es. `maxEngineDuration`).
+# Correggerle contro l'insieme dell'aria accorcerebbe il sedile riscaldato per una regola
+# che non lo riguarda — invisibile sull'Omoda 9 (tutto 15), sbagliato su un'altra vettura.
+_ENDPOINT_ARIA = ("airControl", "coolingControl", "heatingControl")
+
+
+def _adatta_durata(endpoint, body: dict, caps: dict | None, emit=lambda m: None) -> None:
+    """Riporta la durata del clima dentro l'insieme ammesso. Modifica il corpo sul posto.
+
+    Due nomi per la stessa grandezza: `airControl` usa `times`, le macro cooling/heating
+    usano `duration` (ricostruito 1:1 dagli envelope dell'app).
+
+    La correzione si **dichiara**. Il cursore «Durata clima» arriva a 30 minuti mentre
+    l'Omoda 9 ne ammette 5, 10 o 15: chi imposta 30 vedrebbe 30 nell'interfaccia e l'auto
+    ne riceverebbe 15. Tutti gli altri adattamenti del componente (`permessi.adatta`) dicono
+    all'utente cosa hanno cambiato; tacere qui sarebbe l'unica eccezione, e la meno
+    giustificabile — è un numero che l'utente ha scelto con le sue mani."""
+    durate = (caps or {}).get("durate_aria")
+    if not durate or endpoint not in _ENDPOINT_ARIA:
+        return
+    for chiave in ("times", "duration"):
+        if chiave in body:
+            voluta = body[chiave]
+            corretta = durata_ammessa(voluta, durate)
+            if corretta is not None:
+                body[chiave] = str(corretta)
+                emit(f"durata {voluta}′ non ammessa da questa vettura "
+                     f"({'/'.join(str(d) for d in durate)}′) → uso {corretta}′")
+
+
 def send(ctx, cmd_key, emit=lambda m: None, params=None):
     """Invia un comando. emit(str) riceve i passaggi (per pubblicarli su HA).
        `params` (opzionale) = override/aggiunte al body del catalogo PRIMA dei campi
@@ -591,9 +676,14 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
                 reason="config")
 
         ts = int(time.time() * 1000)
-        body = dict(c["body"])
+        # Estremi del clima presi dalla SCHEDA della vettura, non da costanti. Va fatto
+        # PRIMA di `params`, così un valore scelto dall'utente resta l'ultima parola.
+        body = adatta_capability(c.get("endpoint"), dict(c["body"]), ctx.caps)
         if params:
             body.update(params)    # override parametrico (temperatura/durata/controlType/piano)
+        # La durata invece si controlla DOPO: `maxAirDuration` è un insieme di valori ammessi,
+        # e un valore fuori insieme è invalido da chiunque arrivi — catalogo o utente.
+        _adatta_durata(c.get("endpoint"), body, ctx.caps, emit)
 
         # ── adattamento al veicolo (permessi.py) ─────────────────────────────────────────
         # Il backend valida il corpo campo per campo contro le voci figlie della categoria
