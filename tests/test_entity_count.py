@@ -24,11 +24,16 @@ from custom_components.omoda9.const import (
 
 # Ripartizione attesa, verificata dal vivo (v1.5.24, 2026-07-06 → 105 entità, 0 unavailable).
 # Modificare questi numeri è una DECISIONE: va fatto insieme al changelog e alle note.
+#
+# 2026-08-10 → 106: aggiunto `switch.omoda9_disappannamento_parabrezza` (disappannamento del
+# parabrezza dal clima, campo `fWinHeatingState`, voce di permesso 2045). È una entità IN PIÙ e
+# non una sostituzione: il campo NON è stato promosso a "ricco", proprio per non far sparire
+# `binary_sensor.omoda9_riscaldamento_parabrezza` lasciando un orfano `unavailable`.
 ATTESO = {
     "binary_sensor": 26,
     "sensor": 38,
     "button": 14,
-    "switch": 17,
+    "switch": 18,
     "cover": 3,
     "number": 2,
     "climate": 1,
@@ -37,7 +42,7 @@ ATTESO = {
     "text": 1,
     "time": 1,
 }
-TOTALE_ATTESO = 105
+TOTALE_ATTESO = 106
 
 
 def test_totale_dichiarato_coerente():

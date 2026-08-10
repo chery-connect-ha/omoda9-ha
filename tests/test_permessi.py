@@ -343,3 +343,113 @@ def test_lista_in_errore_non_blocca_il_comando(core, cloud, ctx):
     inviato = cloud.calls_to("/asc/vehicleControl/")[0]["body"]
     assert "backDefrosting" in inviato          # nessuna potatura: non sappiamo nulla
     assert ctx.permessi == {}                   # e non si ritenta al prossimo comando
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2026-08-10 — tre buchi chiusi dopo la revisione avversariale del pacchetto
+# «funzioni inesplorate» (vedi 40_permessi/ e FUNZIONI_INESPLORATE_20260810.md).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_disappannamento_potato_dove_negato(core):
+    """`frontDefrosting` è accessorio: dove la voce 2045 è negata si toglie il campo e il
+    clima parte lo stesso, invece di far rifiutare tutta la richiesta per un campo solo."""
+    permessi = core["permessi"]
+    senza = {**OMODA9, 2045: 0}
+
+    corpo, saltati = permessi.pota("airControl",
+                                   {"airControlType": "1", "airType": "1",
+                                    "frontDefrosting": "1", "temperature": "21.0",
+                                    "times": "15"}, senza)
+
+    assert "frontDefrosting" not in corpo
+    assert saltati == ["frontDefrosting"]
+    # ciò che regge la richiesta resta: il clima si accende comunque
+    assert corpo["airControlType"] == "1" and corpo["temperature"] == "21.0"
+
+
+def test_disappannamento_intatto_sullomoda9(core):
+    """Sulla nostra auto (2045 consentita) la potatura non deve toccare nulla."""
+    permessi = core["permessi"]
+    corpo_in = {"airControlType": "1", "airType": "1", "frontDefrosting": "1",
+                "temperature": "21.0", "times": "15"}
+
+    corpo, saltati = permessi.pota("airControl", dict(corpo_in), OMODA9)
+
+    assert corpo == corpo_in and saltati == []
+
+
+def test_antifurto_avvisa_prima_del_rifiuto(core, cloud, ctx):
+    """L'antifurto usa `path` e non passa dalla potatura: fino alla v1.11.1 questo gli faceva
+    saltare anche l'AVVISO, e su un veicolo con la sicurezza negata l'utente vedeva un `A00084`
+    nudo — l'errore che la v1.10.1 aveva appena finito di correggere per gli altri comandi."""
+    commands = core["commands"]
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti({**OMODA9, 401: 0}))
+    cloud.on("/act/theftAlarm/setSwitch", code="A00084")
+    detti = []
+
+    # il rifiuto arriva comunque (non lo si può evitare: non c'è nulla da potare) e resta un
+    # fallimento vero → CommandError, così lo switch ottimistico torna indietro invece di
+    # mostrare un finto successo. La novità è l'avviso che lo PRECEDE.
+    with pytest.raises(commands.CommandError):
+        commands.send(ctx, "antifurto_on", emit=detti.append)
+
+    assert any("non autorizza affatto" in m for m in detti), detti
+    # …e il comando parte lo stesso: l'avviso spiega, non censura
+    assert cloud.count("/act/theftAlarm/setSwitch") == 1
+
+
+def test_antifurto_nessun_avviso_dove_consentito(core, cloud, ctx):
+    """Sulla nostra auto (401 consentita) l'avviso non deve comparire: sarebbe un allarme falso."""
+    commands = core["commands"]
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(OMODA9))
+    cloud.on("/act/theftAlarm/setSwitch", code="A00079")
+    detti = []
+
+    commands.send(ctx, "antifurto_on", emit=detti.append)
+
+    assert not any("non autorizza affatto" in m for m in detti), detti
+
+
+def test_ciclo_settimanale_negato_viene_annunciato(core):
+    """Su un veicolo che consente solo il ciclo su giorni scelti (2131) e nega la settimana
+    (2132), il nostro `cycleData` fisso a [1..7] verrà rifiutato: va detto PRIMA."""
+    permessi = core["permessi"]
+    invertito = {**OMODA9, 2131: 1, 2132: 0}
+    corpo = {"mainSwitch": 1, "chargeAppointPlans": [
+        {"cycleData": [1, 2, 3, 4, 5, 6, 7], "startTime": 480,
+         "switchStatus": 1, "timeConsuming": 720}]}
+
+    avviso = permessi.ciclo_non_autorizzato("chargeAppointControl", corpo, invertito)
+
+    assert avviso and "tutti i giorni" in avviso
+
+
+def test_ciclo_settimanale_ok_sullomoda9(core):
+    """Sulla nostra auto è consentito proprio il ciclo di 7 giorni: nessun avviso."""
+    permessi = core["permessi"]
+    corpo = {"mainSwitch": 1, "chargeAppointPlans": [
+        {"cycleData": [1, 2, 3, 4, 5, 6, 7], "startTime": 0,
+         "switchStatus": 1, "timeConsuming": 720}]}
+
+    assert permessi.ciclo_non_autorizzato("chargeAppointControl", corpo, OMODA9) is None
+
+
+def test_ciclo_non_inventa_giorni(core):
+    """⚠️ Il controllo deve solo AVVISARE. Correggere i giorni scelti dall'utente sarebbe peggio
+    del rifiuto: un piano che parte in giorni che nessuno ha chiesto è un danno silenzioso."""
+    permessi = core["permessi"]
+    invertito = {**OMODA9, 2131: 1, 2132: 0}
+    corpo = {"chargeAppointPlans": [{"cycleData": [1, 2, 3, 4, 5, 6, 7]}]}
+
+    permessi.ciclo_non_autorizzato("chargeAppointControl", corpo, invertito)
+
+    assert corpo["chargeAppointPlans"][0]["cycleData"] == [1, 2, 3, 4, 5, 6, 7]
+
+
+def test_ciclo_lista_non_letta_non_avvisa(core):
+    """Fallimento permissivo anche qui: senza lista non si spaventa l'utente."""
+    permessi = core["permessi"]
+    corpo = {"chargeAppointPlans": [{"cycleData": [1, 3, 5]}]}
+
+    assert permessi.ciclo_non_autorizzato("chargeAppointControl", corpo, {}) is None

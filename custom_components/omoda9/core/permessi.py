@@ -86,6 +86,12 @@ CATEGORIA = {
     "remoteStart": 231,
 }
 
+# ─────────────────────── categoria dei comandi fuori da /asc/vehicleControl ───────────────────
+# L'antifurto vive su `/act` e nel catalogo usa la chiave `path`: non passa da `adatta()` perché
+# non c'è nulla da potare né una porta alternativa. Gli serve però la categoria per l'AVVISO
+# preventivo, che fino alla v1.11.1 non riceveva: su un veicolo con la sicurezza negata l'utente
+# vedeva un `A00084` nudo. La categoria la dichiara la voce di catalogo (`"categoria": 401`).
+
 # ─────────────────────── voce figlia di ciascun campo ───────────────────────
 # Solo i campi ACCESSORI, quelli che si possono togliere lasciando una richiesta ancora sensata.
 # I campi che definiscono la richiesta stessa (accensione/temperatura/durata del clima) NON sono
@@ -109,6 +115,11 @@ POTABILI = {
     # li spediamo però quando ci ripieghiamo qui (vedi RIPIEGO), e allora vanno validati.
     "airControl": {
         "airPurControlType": 2046,
+        # `frontDefrosting` = disappannamento del parabrezza dal clima (voce 2045), il campo che
+        # alimenta lo switch omonimo. Sta qui perché è ACCESSORIO: toglierlo lascia una richiesta
+        # di clima ancora sensata, che è esattamente il comportamento voluto su un veicolo che
+        # non lo autorizza — il clima parte lo stesso, senza il disappannamento.
+        "frontDefrosting": 2045,
         "mSeatHeating": 2047, "pSeatHeating": 2048,
         "mSeatAiry": 2049, "pSeatAiry": 20410,
         "backDefrosting": 20411,
@@ -250,7 +261,63 @@ def porta_chiusa(endpoint: str, perms: dict) -> bool:
 
     La categoria è il segnale più grossolano ma anche il più affidabile: c'è sempre, ed è quello
     che i due `isSeparate*` dell'app guardano. Resta permissiva: categoria sconosciuta = aperta."""
-    return not consentito(perms, CATEGORIA.get(endpoint))
+    return categoria_chiusa(CATEGORIA.get(endpoint), perms)
+
+
+def categoria_chiusa(categoria: int | None, perms: dict) -> bool:
+    """Come `porta_chiusa`, ma partendo dal numero di categoria invece che dall'endpoint.
+
+    Serve ai comandi che non stanno su `/asc/vehicleControl` (l'antifurto, che usa `path` e
+    dichiara la categoria nel catalogo). Stessa regola permissiva: categoria ignota o lista non
+    letta ⇒ aperta, perché non si toglie mai una funzione per un dato che non abbiamo."""
+    return not consentito(perms, categoria)
+
+
+# ─────────────────────── ciclo dei piani programmati ───────────────────────
+# Ricarica e viaggio programmati portano una LISTA DI GIORNI, e il backend valida anche quella:
+# misurato su `chargeAppointControl` con un A/B a variabile singola — `cycleData` [1,3,5] (voce
+# 2131 «ciclo personalizzato», negata) → A00084; [1..7] (voce 2132, consentita) → A00079.
+# Per ogni endpoint: (voce del ciclo personalizzato, voce del ciclo di 7 giorni, nome del campo).
+# ⚠️ La polarità NON è la stessa fra le due funzioni: sulla nostra auto la 213 consente solo i
+# 7 giorni e la 212 solo il personalizzato. Per questo la tabella è per-endpoint e non una regola.
+CICLO = {
+    "chargeAppointControl": (2131, 2132, "cycleData"),
+    "appointmentTravel": (2121, 2122, "travelWeekday"),
+}
+
+
+def _giorni(body: dict, campo: str) -> list | None:
+    """Estrae la lista dei giorni dal corpo, sia se è in cima sia dentro il piano annidato."""
+    if isinstance(body.get(campo), list):
+        return body[campo]
+    for valore in body.values():
+        if isinstance(valore, list):
+            for voce in valore:
+                if isinstance(voce, dict) and isinstance(voce.get(campo), list):
+                    return voce[campo]
+    return None
+
+
+def ciclo_non_autorizzato(endpoint: str, body: dict, perms: dict) -> str | None:
+    """Messaggio da mostrare PRIMA dell'invio se il ciclo scelto non è autorizzato, altrimenti None.
+
+    Non corregge nulla di proposito: gli unici rimedi possibili sarebbero cambiare i giorni scelti
+    dall'utente o togliere la lista, e un piano che parte in giorni che nessuno ha chiesto è
+    peggio di un rifiuto onesto. Serve solo a far capire che il `A00084` che sta per arrivare non
+    è un difetto dell'integrazione."""
+    regola = CICLO.get(endpoint)
+    if not perms or not regola:
+        return None
+    voce_personalizzato, voce_settimana, campo = regola
+    giorni = _giorni(body, campo)
+    if not giorni:
+        return None
+    settimana = len(giorni) == 7
+    if consentito(perms, voce_settimana if settimana else voce_personalizzato):
+        return None
+    return ("questa auto non autorizza il ciclo "
+            + ("di tutti i giorni" if settimana else "su giorni scelti")
+            + " per questa programmazione")
 
 
 def instrada(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, str | None]:

@@ -34,6 +34,7 @@ COMMANDS_AS_RICH_ENTITY = {
     "tetto_apri", "tetto_chiudi",
     # comfort: ogni funzione è uno switch (ON+OFF) → niente pulsanti singoli
     "defrost_parabrezza", "defrost_parabrezza_off",
+    "disappanna_parabrezza", "disappanna_parabrezza_off",
     "defrost_lunotto", "defrost_lunotto_off",
     "volante_caldo", "volante_caldo_off",
     "sedile_guida_caldo", "sedile_guida_caldo_off",

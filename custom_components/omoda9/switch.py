@@ -41,6 +41,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     parabrezza = Omoda9ComfortSwitch(
         coord, "Omoda9 Sbrinamento parabrezza", "frontWindshieldHeat", "frontWindshieldHeat",
         "defrost_parabrezza", "defrost_parabrezza_off", "mdi:car-defrost-front")
+    # Disappannamento dal clima: funzione DIVERSA dallo sbrinamento elettrico qui sopra, e l'auto
+    # le distingue (campo di stato `fWinHeatingState` contro `frontWindshieldHeat`).
+    # ⚠️ Il suffisso NON è il nome del campo — è l'unica differenza dal modello degli altri
+    # comfort, ed è voluta: se `fWinHeatingState` diventasse un "campo ricco" sparirebbe
+    # `binary_sensor.omoda9_riscaldamento_parabrezza`, che esiste da giugno, lasciando un orfano
+    # `unavailable` nel registro e spezzandone lo storico. Meglio un'entità in più (105 → 106)
+    # che un'entità rotta.
+    disappanna = Omoda9ComfortSwitch(
+        coord, "Omoda9 Disappannamento parabrezza", "disappannamento_parabrezza", "fWinHeatingState",
+        "disappanna_parabrezza", "disappanna_parabrezza_off", "mdi:car-defrost-front")
     lunotto = Omoda9ComfortSwitch(
         coord, "Omoda9 Riscaldamento lunotto", "rWinHeatingState", "rWinHeatingState",
         "defrost_lunotto", "defrost_lunotto_off", "mdi:car-defrost-rear")
@@ -91,7 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     riscalda._exclusive = raffredda
     antifurto = Omoda9TheftAlarmSwitch(coord)
     polling = Omoda9PollingSwitch(coord)
-    add([ricarica, ricarica_prog, parabrezza, lunotto, volante,
+    add([ricarica, ricarica_prog, parabrezza, disappanna, lunotto, volante,
          sedile_caldo, sedile_aria, pass_caldo, pass_aria,
          psx_caldo, psx_aria, pdx_caldo, pdx_aria,
          raffredda, riscalda, antifurto, polling])
@@ -291,8 +301,14 @@ class Omoda9ScheduledChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEnt
 
     Quando si accende, costruisce il piano dalle preferenze (entità time "orario di
     inizio" + number "durata", tutti i giorni) e invia mainSwitch=1 + piano attivo;
-    spegnendo invia mainSwitch=0. startTime è in MINUTI dalla mezzanotte (verificato dal
-    vivo: 465 = 07:45). Lo stato reale arriva dalla telemetria `chargeAppointPlans`."""
+    spegnendo invia mainSwitch=0. Lo stato reale arriva dalla telemetria `chargeAppointPlans`.
+
+    `startTime` è in MINUTI dalla mezzanotte. ⚠️ Il commento precedente diceva «verificato dal
+    vivo: 465 = 07:45»: non lo era — 07:45 è 465/60, un'aritmetica, e nessuno aveva mai
+    confrontato quel numero con l'ora mostrata dall'app. Quella falsa sicurezza è costata una
+    notte di indagine sul sospetto (poi smentito) che spedissimo l'ora sfasata del fuso.
+    Il riferimento è l'ora LOCALE — misurato il 2026-08-10 leggendo nell'app il piano che
+    avevamo scritto noi con `startTime = 0`: mostra 00:00, non 02:00."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
     _attr_icon = "mdi:calendar-clock"

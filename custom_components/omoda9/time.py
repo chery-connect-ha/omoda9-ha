@@ -7,8 +7,9 @@ memorizzano una preferenza usata dagli altri controlli al momento dell'invio.
     usando questo valore.
 
 Perché un'entità `time` e non un number 0–23: l'auto accetta l'orario in MINUTI dalla
-mezzanotte (verificato dal vivo sulla ricarica programmata reale: startTime 465 = 07:45)
-→ con un selettore orario si può scegliere anche i minuti, non solo l'ora intera.
+mezzanotte → con un selettore orario si può scegliere anche i minuti, non solo l'ora intera.
+Il riferimento è la mezzanotte LOCALE: misurato il 2026-08-10 rileggendo nell'app il piano
+scritto da qui con `startTime = 0` (mostra 00:00; se il filo fosse UTC mostrerebbe 02:00).
 
 È RestoreEntity → al riavvio di HA ripristina l'ultimo orario impostato e lo riscrive
 sul coordinator (da cui lo switch lo legge come `charge_start_minutes`).

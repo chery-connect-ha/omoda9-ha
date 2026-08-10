@@ -6,6 +6,22 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **Nuovo interruttore: «Disappannamento parabrezza».** L'auto sa fare due cose diverse sul vetro davanti, e finora l'integrazione ne offriva una sola. Quella che c'era già, «Sbrinamento parabrezza», **scalda il vetro** con le resistenze elettriche. Questa nuova soffia invece **l'aria del climatizzatore sul parabrezza**, che è il modo rapido per togliere la condensa. Sono comandi distinti e l'auto li tiene separati.
+- ⚠️ **Da sapere prima di usarlo: accende anche il climatizzatore** per circa 15 minuti, perché è il climatizzatore stesso a soffiare l'aria sul vetro. Non è un difetto, è come funziona sull'auto. Per lo stesso motivo, spegnere il disappannamento spegne il clima.
+- **Antifurto: se la tua auto non lo autorizza, ora te lo dice prima.** Su alcune vetture il costruttore non abilita affatto i comandi dell'antifurto. Prima ricevevi solo un errore, identico a quello di un guasto. Ora l'integrazione ti avvisa che è il costruttore a non permettere quella funzione — così non perdi tempo a cercare un problema che non c'è.
+- **Ricarica programmata: avviso quando i giorni scelti non sono ammessi.** Alcune auto accettano solo la programmazione su tutti i giorni della settimana, altre solo su giorni scelti. Se la tua non ammette quella che l'integrazione sta per mandare, adesso lo dice prima invece di lasciarti davanti a un rifiuto senza spiegazione. **Non cambia i giorni al posto tuo**: una ricarica che parte in un giorno che non hai scelto sarebbe peggio di un errore onesto.
+- **Un chiarimento su una nostra vecchia nota, per chi legge il codice.** Una verifica approfondita ha fatto sospettare che l'orario della ricarica programmata partisse spostato di un'ora o due rispetto a quello impostato. **Il sospetto è stato controllato ed è infondato: l'orario era ed è corretto.** Nulla cambia nel funzionamento; abbiamo corretto la nota interna che aveva dato origine al dubbio.
+
+### 🇬🇧 English
+
+- **New switch: "Windshield defog".** The car can do two different things to the front glass, and until now the integration offered only one. The existing "Windshield defrost" **heats the glass** with its electric elements. This new one instead blows **the climate system's air onto the windshield**, which is the quick way to clear condensation. They are separate commands and the car keeps them apart.
+- ⚠️ **Worth knowing before you use it: it also switches the climate control on** for about 15 minutes, because it is the climate system itself that blows the air onto the glass. This is not a fault, it is how the car works. For the same reason, switching the defog off switches the climate off.
+- **Alarm: if your car does not authorise it, you are now told up front.** On some vehicles the manufacturer does not enable the alarm commands at all. You used to get only an error, indistinguishable from a malfunction. The integration now tells you it is the manufacturer withholding the function — so you do not go hunting for a problem that is not there.
+- **Scheduled charging: a warning when the chosen days are not allowed.** Some cars accept scheduling on every day of the week only, others only on selected days. If yours does not accept the one the integration is about to send, it now says so beforehand instead of leaving you with an unexplained refusal. **It does not change the days for you**: a charge starting on a day you did not pick would be worse than an honest error.
+- **A clarification on an old note of ours, for those who read the code.** A thorough review raised the suspicion that scheduled charging might start one or two hours away from the time you set. **The suspicion was checked and is unfounded: the time was and is correct.** Nothing changes in how it works; we corrected the internal note that caused the doubt.
+
 ## v1.11.1 — 2026-08-10
 
 ### 🇮🇹 Italiano

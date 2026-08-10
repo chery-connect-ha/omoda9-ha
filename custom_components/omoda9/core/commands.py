@@ -66,6 +66,26 @@ COMMANDS = [
     ("defrost_parabrezza_off", {"endpoint": "frontWindshieldControl",
                    "body": {"frontWindshieldHeat": "0"},
                    "name": "Sbrina parabrezza OFF", "icon": "mdi:car-defrost-front", "group": "Clima"}),
+    # Disappannamento parabrezza: NON è un doppione di `defrost_parabrezza`. Sono due funzioni che
+    # l'auto tiene distinte, con campo di stato proprio ciascuna:
+    #   frontWindshieldControl → `frontWindshieldHeat` (riscaldamento elettrico del vetro)
+    #   airControl frontDefrosting → `fWinHeatingState`  (aria del clima soffiata sul parabrezza)
+    # Catena MISURATA end-to-end nella cattura del 2026-06-20, accensione e spegnimento:
+    #   19:43:58 airControl {frontDefrosting:"1"} → push 1104 result 2 con fWinHeatingState "1"
+    #   19:45:32 airControl {airControlType:"0"}  → fWinHeatingState "0" nel 5A02 delle 19:45:35
+    # ⚠️ Passa dal clima, quindi ACCENDE ANCHE IL CLIMA per `times` minuti: effetto collaterale
+    # dichiarato, non un incidente. Per lo stesso motivo lo spegnimento è quello del clima —
+    # è l'unico misurato, e riporta davvero `fWinHeatingState` a 0.
+    # ⚠️ `temperature` è l'unico campo che si scosta dall'envelope misurato (l'app spediva 15.0):
+    # è una voce figlia consentita a sé (2043) che già variamo dalla climate entity, e 21° è il
+    # nostro default. Deviazione deliberata, non una svista.
+    ("disappanna_parabrezza", {"endpoint": "airControl",
+                   "body": {"airControlType": "1", "airType": "1", "frontDefrosting": "1",
+                            "temperature": "21.0", "times": "15"},
+                   "name": "Disappanna parabrezza", "icon": "mdi:car-defrost-front", "group": "Clima"}),
+    ("disappanna_parabrezza_off", {"endpoint": "airControl",
+                   "body": {"airControlType": "0", "airType": "1", "temperature": "21.0", "times": "15"},
+                   "name": "Disappanna parabrezza OFF", "icon": "mdi:car-defrost-front", "group": "Clima"}),
     ("defrost_lunotto", {"endpoint": "backDefrostingControl",
                    "body": {"backDefrosting": "1", "times": "15"},
                    "name": "Sbrina lunotto", "icon": "mdi:car-defrost-rear", "group": "Clima"}),
@@ -220,8 +240,10 @@ COMMANDS = [
     # 0/1; send() aggiunge clientType/seq/vin e il taskId coniato (il backend lo pretende:
     # A00643 senza). Stato leggibile via query_theft_switch() (/act/theftAlarm/querySwitch).
     ("antifurto_on",  {"path": "/act/theftAlarm/setSwitch", "body": {"theftAlarmSwitch": "1"},
+                   "categoria": 401,
                    "name": "Antifurto acceso", "icon": "mdi:shield-car", "group": "Sicurezza"}),
     ("antifurto_off", {"path": "/act/theftAlarm/setSwitch", "body": {"theftAlarmSwitch": "0"},
+                   "categoria": 401,
                    "name": "Antifurto spento", "icon": "mdi:shield-off-outline", "group": "Sicurezza"}),
 ]
 CMD_MAP = {k: v for k, v in COMMANDS}
@@ -503,6 +525,7 @@ def get_taskid(ctx, tuid, emit=lambda m: None, force_mint=False):
 NOMI_CAMPO = {
     "steerWheelHeatSwitch": "volante", "frontWindshieldHeat": "parabrezza",
     "backDefrosting": "lunotto", "airPurControlType": "purificatore",
+    "frontDefrosting": "disappannamento",
     "mSeatHeating": "sedile guida", "pSeatHeating": "sedile passeggero",
     "blSeatHeating": "sedile post. SX", "brSeatHeating": "sedile post. DX",
     "mSeatAiry": "aria sedile guida", "pSeatAiry": "aria sedile passeggero",
@@ -577,10 +600,19 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
         # dell'endpoint chiamato (misurato: due A/B a variabile singola su due endpoint).
         # Quindi: si sceglie la porta aperta su QUESTA auto e si tolgono i campi che non
         # ammette, invece di far rifiutare tutto per un solo campo. Sull'Omoda 9, dove è tutto
-        # consentito, non cambia nulla. I comandi con `path` esplicito (antifurto) restano
-        # fuori: non hanno una categoria in tabella.
+        # consentito, non cambia nulla.
+        #
+        # I comandi con `path` esplicito (antifurto) non hanno un corpo da potare né una porta
+        # alternativa — ma fino alla v1.11.1 saltavano anche l'AVVISO, e su un veicolo con la
+        # categoria sicurezza negata l'utente riceveva un `A00084` nudo: esattamente il caso che
+        # la v1.10.1 aveva appena finito di correggere per tutti gli altri comandi. Ora dichiarano
+        # la loro categoria in tabella e ricevono lo stesso avviso preventivo.
         endpoint, saltati, nota = c.get("endpoint"), [], None
-        if not c.get("path") and endpoint:
+        if c.get("path"):
+            if permessi.categoria_chiusa(c.get("categoria"), ctx.permessi or {}):
+                emit(f"{c['name']}: il costruttore non autorizza affatto questa funzione su "
+                     f"questa auto — non c'è nulla da adattare")
+        elif endpoint:
             endpoint, body, saltati, nota = permessi.adatta(endpoint, body, ctx.permessi or {})
             if nota:
                 emit(f"{c['name']}: {nota}")
@@ -594,6 +626,16 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
             elif permessi.porta_chiusa(endpoint, ctx.permessi or {}):
                 emit(f"{c['name']}: il costruttore non autorizza affatto questa funzione su "
                      f"questa auto — non c'è nulla da adattare")
+
+        # Ciclo dei piani programmati: il backend valida anche la FORMA della lista dei giorni,
+        # non solo la presenza dei campi (misurato: `cycleData` [1,3,5] → A00084 sotto la voce
+        # 2131 negata, [1..7] → A00079 sotto la 2132 consentita). Qui non c'è potatura possibile:
+        # inventare giorni che l'utente non ha scelto sarebbe peggio del rifiuto. Si può però
+        # dire prima perché il rifiuto arriverà.
+        avviso_ciclo = permessi.ciclo_non_autorizzato(endpoint, body, ctx.permessi or {})
+        if avviso_ciclo:
+            emit(f"{c['name']}: {avviso_ciclo}")
+
         url = ctx.tsp_host + (c.get("path") or ("/asc/vehicleControl/" + endpoint))
 
         body.update({"clientType": "1", "seq": f"{ctx.vin}-{ts}",
