@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import time
 
 from homeassistant.components.switch import (
     ENTITY_ID_FORMAT,
@@ -27,6 +28,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, MACRO_WAKE_WAIT, MACRO_WAKE_WAIT_AWAKE, MACRO_PRESET_S
 from .entity import Omoda9Entity, Omoda9OptimisticMixin, field_on
@@ -91,12 +93,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     # macro comfort "tutto" (coolingControl/heatingControl): clima + tutti i sedili (+ volante
     # e sbrinatori per il caldo) in un unico comando, come l'app. Funzionano a auto SPENTA.
     # Raffredda e riscalda si escludono a vicenda.
+    # Una sola generazione per veicolo, condivisa: le due macro agiscono sullo STESSO bus
+    # comfort dell'auto e si escludono a vicenda, quindi «l'ultima pressione» è l'ultima
+    # fra tutte e due, non l'ultima di ciascuna.
+    generazione = _GenerazioneMacro()
     raffredda = Omoda9ClimaMacroSwitch(
         coord, "Omoda9 Raffredda tutto", "raffredda_tutto",
-        "clima_raffredda_on", "clima_raffredda_off", "mdi:snowflake")
+        "clima_raffredda_on", "clima_raffredda_off", "mdi:snowflake", generazione)
     riscalda = Omoda9ClimaMacroSwitch(
         coord, "Omoda9 Riscalda tutto", "riscalda_tutto",
-        "clima_riscalda_on", "clima_riscalda_off", "mdi:heat-wave")
+        "clima_riscalda_on", "clima_riscalda_off", "mdi:heat-wave", generazione)
     raffredda._exclusive = riscalda
     riscalda._exclusive = raffredda
     antifurto = Omoda9TheftAlarmSwitch(coord)
@@ -185,6 +191,21 @@ class Omoda9ChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, Rest
         await self._run_command("ricarica_stop", False)
 
 
+class _GenerazioneMacro:
+    """Numero di sequenza condiviso dalle due macro comfort: vince l'ultima pressione.
+
+    Vive qui e non sul coordinator perché è stato dell'INTERFACCIA (quale tocco è il più
+    recente), non del veicolo. Una istanza per config entry → due veicoli non si disturbano.
+    """
+
+    def __init__(self) -> None:
+        self.n = 0
+
+    def avanza(self) -> int:
+        self.n += 1
+        return self.n
+
+
 class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, RestoreEntity):
     """Macro clima "tutto" (coolingControl/heatingControl): un preset che accende clima +
     TUTTI i sedili (+ sbrinatori parabrezza/lunotto e volante per il caldo) in un colpo solo,
@@ -199,28 +220,57 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
     Se però l'auto è GIÀ desta la sveglia si salta (vedi `_wake_then`): il bus comfort è già
     alimentato e quei 35 secondi sarebbero solo attesa a vuoto.
 
-    Stato: l'auto NON pubblica uno stato "preset attivo" dedicato → interruttore a stato
+    Stato: l'auto non pubblica un campo "preset attivo" dedicato → interruttore a stato
     proprio (ottimistico PERSISTENTE: non viene azzerato dai messaggi telemetria, altrimenti
-    non si potrebbe spegnere). Si auto-spegne da solo dopo MACRO_PRESET_S (l'auto chiude il
-    preset dopo ~15 min). Raffredda e Riscalda si escludono a vicenda."""
+    non si potrebbe spegnere). ⚠️ Questo NON vuol dire che l'auto taccia: le conferme della
+    macro riportano `frontHVACState` e i campi delle ventilazioni/riscaldamenti sedile, che
+    finiscono già in `fields` — sono gli stessi che fanno funzionare la card clima e i
+    singoli interruttori sedile. Usarli per SPEGNERE la macro quando l'auto ha chiuso il
+    preset (o quando lo spegne il guidatore dal cruscotto) è il passo successivo, non ancora
+    fatto: va scritto guardando i campi presenti nel MESSAGGIO appena arrivato e non lo stato
+    accumulato in `fields`, che è cumulativo e può portarsi dietro valori vecchi di giorni.
+    Si auto-spegne da solo dopo MACRO_PRESET_S (l'auto chiude il
+    preset dopo ~15 min), e la scadenza SOPRAVVIVE a un riavvio di Home Assistant (viene
+    riarmata sul tempo residuo, vedi `async_added_to_hass`): prima viveva solo in memoria,
+    quindi un riavvio durante un preset lasciava l'interruttore acceso per sempre.
+    Raffredda e Riscalda si escludono a vicenda."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
 
     def __init__(self, coord, name: str, suffix: str,
-                 on_cmd: str, off_cmd: str, icon: str) -> None:
+                 on_cmd: str, off_cmd: str, icon: str,
+                 generazione: _GenerazioneMacro) -> None:
         super().__init__(coord, name, suffix, entity_id_format=ENTITY_ID_FORMAT)
         self._on_cmd = on_cmd
         self._off_cmd = off_cmd
         self._attr_icon = icon
         self._restored: bool | None = None
         self._expire_unsub = None
+        self._expire_at: float | None = None   # scadenza monotona del preset in corso
+        self._gen = generazione
         self._exclusive: "Omoda9ClimaMacroSwitch | None" = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
-        if last is not None and last.state in ("on", "off"):
-            self._restored = last.state == "on"
+        if last is None or last.state not in ("on", "off"):
+            return
+        self._restored = last.state == "on"
+        if not self._restored:
+            return
+        # Il preset ha una fine, e quella fine non deve morire col riavvio. Ripristinare lo
+        # stato senza ripristinare il TEMPO era un mezzo ripristino: l'unico meccanismo che
+        # riporta la macro a OFF è la scadenza, e prima non veniva riarmata → dopo un riavvio
+        # (o un aggiornamento HACS) l'interruttore restava acceso a tempo indeterminato,
+        # annunciando un preset finito da un pezzo. `last_changed` è già in RestoreEntity.
+        # NB: `last_changed` è l'ultimo cambio di STATO, non l'ultimo invio — chi ripreme ON
+        # su una macro già accesa non lo fa avanzare, quindi la scadenza ripristinata può
+        # essere più corta del vero. L'errore è nella direzione sicura (si spegne prima).
+        resto = MACRO_PRESET_S - (dt_util.utcnow() - last.last_changed).total_seconds()
+        if resto <= 0:
+            self._restored = False      # il preset è finito mentre HA era spento
+        else:
+            self._arma_scadenza(resto)
 
     async def async_will_remove_from_hass(self) -> None:
         self._cancel_expire()
@@ -233,14 +283,57 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
         return bool(self._restored)
 
     def _handle_coordinator_update(self) -> None:
-        # macro SENZA stato reale dall'auto → NON azzerare lo stato sui messaggi telemetria
-        # (il mixin lo farebbe): manteniamo lo stato impostato, aggiorniamo solo la UI.
+        # NON azzerare lo stato sui messaggi telemetria (il mixin lo farebbe, ancorandosi a
+        # `last_seen`, che avanza a OGNI messaggio anche quando non contiene nulla di
+        # attinente): manteniamo lo stato impostato, aggiorniamo solo la UI. Il passo che
+        # manca non è riattivare il mixin ma leggere i campi del preset — vedi il docstring
+        # della classe: correzione a SENSO UNICO, la telemetria può spegnere, mai accendere.
         self.async_write_ha_state()
 
     def _cancel_expire(self) -> None:
         if self._expire_unsub is not None:
             self._expire_unsub()
             self._expire_unsub = None
+        self._expire_at = None
+
+    @callback
+    def _arma_scadenza(self, durata: float) -> None:
+        """Programma l'auto-spegnimento fra `durata` secondi, SOSTITUENDO il precedente.
+
+        Sostituire e non affiancare: due `async_call_later` sulla stessa entità sono due
+        spegnimenti, e il più vecchio scatta a metà del preset nuovo — succedeva con due
+        accensioni ravvicinate, dove il primo ciclo armava la scadenza e il secondo la
+        sovrascriveva senza cancellarla, lasciando in volo un timer che nessuno poteva più
+        fermare (nemmeno lo smontaggio dell'entità, che ne cancella uno solo)."""
+        self._cancel_expire()
+        self._expire_at = time.monotonic() + durata
+        self._expire_unsub = async_call_later(self.hass, durata, self._scaduto)
+
+    @callback
+    def _scaduto(self, _now) -> None:
+        """L'auto ha chiuso il preset da sola: l'interruttore la segue."""
+        self._expire_unsub = None
+        self._expire_at = None
+        self._set_state(False)
+
+    def _resto_scadenza(self) -> float | None:
+        """Secondi che mancano all'auto-spegnimento, o None se nessun preset è in corso."""
+        if self._expire_at is None:
+            return None
+        return max(0.0, self._expire_at - time.monotonic())
+
+    def _annuncia_attesa(self, secondi: float) -> None:
+        """Dice all'utente che l'attesa è voluta, mentre la macro sveglia l'auto.
+
+        È la parte che mancava: per ~35 secondi l'interfaccia non dava alcun segno di vita
+        (a differenza di ogni altro comando, che scrive i suoi passaggi su «Esito comando»),
+        e il silenzio faceva ripremere il tasto — cioè l'innesco della corsa fra due cicli.
+        Testo corto e bilingue di proposito: finisce nello stato di
+        `sensor.omoda9_esito_comando`, che Home Assistant tronca a 255 caratteri."""
+        s = int(secondi)
+        self.coordinator._update({
+            "cmd_status": f"Sveglio l'auto: il comando parte fra ~{s} s · "
+                          f"Waking the car: command goes out in ~{s} s"})
 
     @callback
     def _set_state(self, value: bool) -> None:
@@ -257,7 +350,26 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
         solo ritardo. Erano il vero motivo per cui la macro «non partiva»: 45-50 secondi fra
         il tocco e la conferma, con l'interruttore già acceso e nessun segno di vita → si
         ripremeva, i due cicli si accavallavano e l'auto rifiutava il secondo (A00082).
-        Ad auto desta il ciclo scende a ~10-15 secondi."""
+        Ad auto desta il ciclo scende a ~10-15 secondi.
+
+        ⚠️ **Vince l'ULTIMA pressione.** Proprio perché l'attesa qui sotto dura 35 secondi o
+        5 a seconda di come sta l'auto — e la scelta si fa al momento della pressione — due
+        tocchi ravvicinati producono due cicli concorrenti che possono raggiungere la coda
+        in ordine INVERTITO. E non è una coincidenza rara: è la prima pressione a svegliare
+        l'auto, quindi è lei stessa a spingere la seconda sul ramo corto. Riprodotto dal
+        vivo il 2026-08-10 con l'auto ferma: «spegni» premuto alle 16:54:38,8 (auto
+        dormiente → +35 s) è partito alle 16:55:15,8, mentre «accendi» premuto dieci secondi
+        dopo (auto ormai desta → +5 s) era già partito alle 16:54:54,2 — l'auto ha
+        raffreddato e poi si è spenta, l'interruttore è rimasto acceso. Con 30 secondi fra i
+        due comandi, invece, l'auto riparte regolarmente: non è lei a rifiutare.
+        Il rimedio è una generazione condivisa: chi si risveglia dall'attesa e scopre di
+        essere stato sorpassato NON spedisce. Così l'interfaccia e l'auto convergono sempre
+        sullo stesso tocco, ed è anche la cancellazione del ciclo della macro gemella."""
+        mia = self._gen.avanza()
+        # Stato da cui ripartire se il comando non riesce: NON si assume «spento» (vedi il
+        # ramo d'errore in fondo).
+        prima_on = bool(self.is_on)
+        prima_resto = self._resto_scadenza()
         self._cancel_expire()
         self._set_state(target)
         if self.coordinator.auto_sveglia:
@@ -269,27 +381,33 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
                 await self.coordinator.async_send_command("localizza")
             except Exception:  # noqa: BLE001
                 pass
+            self._annuncia_attesa(attesa)   # ← la finestra muta che faceva ripremere il tasto
         await asyncio.sleep(attesa)  # lascia accendere il bus comfort
+        if mia != self._gen.n:
+            return      # sorpassata da una pressione più recente: non si spedisce nulla
         try:
             await self.coordinator.async_send_command(cmd)
         except Exception as err:  # noqa: BLE001
-            self._set_state(False)
-            self.async_write_ha_state()
+            # Lo stato torna a com'era PRIMA della pressione, non a «spento». Metterlo sempre
+            # a spento sbagliava in entrambi i versi: uno spegnimento fallito lasciava
+            # l'interruttore su OFF mentre l'auto continuava il preset (e senza scadenza, già
+            # disarmata a inizio ciclo), e un'accensione fallita su una macro già accesa la
+            # spegneva in Home Assistant senza che l'auto ne sapesse nulla.
+            self._set_state(prima_on)
+            if prima_on and prima_resto:
+                self._arma_scadenza(prima_resto)
             raise HomeAssistantError(f"Comando «{cmd}» non riuscito: {err}") from err
         if target:
             # l'auto chiude il preset dopo ~15 min → riporta lo switch a OFF da solo
-            @callback
-            def _expire(_now) -> None:
-                self._expire_unsub = None
-                self._set_state(False)
-                self.async_write_ha_state()
-            self._expire_unsub = async_call_later(self.hass, MACRO_PRESET_S, _expire)
+            self._arma_scadenza(MACRO_PRESET_S)
 
     async def async_turn_on(self, **kwargs) -> None:
         if self._exclusive is not None:
+            # Il ciclo del gemello eventualmente in volo è già annullato dalla generazione
+            # condivisa (`_wake_then` qui sotto la fa avanzare): qui resta solo da spegnerne
+            # la carta nell'interfaccia.
             self._exclusive._cancel_expire()
             self._exclusive._set_state(False)
-            self._exclusive.async_write_ha_state()
         await self._wake_then(self._on_cmd, True)
 
     async def async_turn_off(self, **kwargs) -> None:

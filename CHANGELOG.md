@@ -6,6 +6,20 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **«Raffredda tutto» e «Riscalda tutto»: ora vale sempre l'ultima cosa che hai premuto.** Se spegnevi e subito riaccendevi (o il contrario), i due comandi potevano arrivare all'auto **in ordine invertito**: l'auto partiva e poi si spegneva da sola, mentre l'interruttore restava acceso — e riprovando sembrava che non ripartisse più. Il motivo: prima di mandare il comando l'integrazione deve svegliare l'auto, e l'attesa è molto più lunga se l'auto dorme; la prima pressione la sveglia, così la seconda faceva meno strada e arrivava per prima. Adesso il comando sorpassato viene semplicemente lasciato cadere: all'auto arriva solo l'ultima cosa che hai chiesto.
+- **Mentre l'auto si sveglia adesso te lo diciamo.** Per una mezza minuto buono, dopo aver premuto, non compariva nulla: era il silenzio a far ripremere il tasto, cioè proprio la causa del problema qui sopra. Ora nell'«Esito comando» compare *«Sveglio l'auto: il comando parte fra ~35 secondi»*.
+- **Dopo un riavvio di Home Assistant l'interruttore non resta più acceso a vuoto.** La preclimatizzazione dura un quarto d'ora e poi l'interruttore si spegne da solo; ma se nel frattempo Home Assistant veniva riavviato — o aggiornavi l'integrazione — quel promemoria andava perso e l'interruttore restava acceso a tempo indeterminato, annunciando qualcosa che l'auto aveva già finito. Ora riprende il conto da dove era rimasto, e se nel frattempo il quarto d'ora è passato si presenta già spento.
+- **Se lo spegnimento non riesce, l'interruttore non dice più «spento».** Quando il comando non riusciva a partire, l'interruttore si metteva comunque su spento mentre l'auto continuava tranquillamente a raffreddare. Adesso resta com'era, che è la verità.
+
+### 🇬🇧 English
+
+- **"Cool everything" and "Heat everything": the last thing you pressed now always wins.** If you switched off and straight back on (or the other way round), the two commands could reach the car **in reverse order**: the car started up and then shut itself down, while the switch stayed on — and trying again it looked as though it would not restart. The reason: before sending the command the integration has to wake the car, and the wait is far longer when the car is asleep; the first press woke it, so the second had less ground to cover and got there first. The overtaken command is now simply dropped: the car only ever receives the last thing you asked for.
+- **We now tell you while the car is being woken.** For a good half minute after pressing, nothing appeared: that silence is what made people press again, which is exactly what caused the problem above. "Command result" now shows *"Waking the car: command goes out in ~35 s"*.
+- **After a Home Assistant restart the switch no longer stays on for nothing.** Pre-conditioning runs for a quarter of an hour and then the switch turns itself off; but if Home Assistant was restarted in the meantime — or you updated the integration — that reminder was lost and the switch stayed on indefinitely, announcing something the car had already finished. It now picks the countdown up where it left off, and if the quarter of an hour has passed it comes back already off.
+- **If switching off fails, the switch no longer claims "off".** When the command could not go out, the switch went to off anyway while the car carried on cooling. It now stays as it was, which is the truth.
+
 ## v1.12.1 — 2026-08-10
 
 ### 🇮🇹 Italiano
