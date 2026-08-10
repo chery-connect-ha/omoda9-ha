@@ -44,7 +44,7 @@ from .const import (
     DATA_CLIMATE_LO, DATA_CLIMATE_HI, DATA_AIR_DURATIONS,
     DATA_CAPS_PROBED, DATA_CAPS_PROBED_V2, capabilities_from_item,
     CLIMA_MIN_DEFAULT, CLIMA_MAX_DEFAULT, CLIMA_STEP_DEFAULT,
-    DEFAULTS, DIAG_SWITCH_FILE,
+    DEFAULTS, DIAG_SWITCH_FILE, NOTE_COMANDO_S,
 )
 from .timers import (
     TimerRegistry, GRUPPO_POLL,
@@ -191,6 +191,55 @@ GEO_KEYS = ("lat", "lon", "latitude", "longitude", "speed", "vehicleSpeed",
             "direction", "heading", "altitude", "gpsTime", "positionTime")
 
 
+STATO_MAX = 255           # limite di Home Assistant sullo stato di un'entità
+_SEP_NOTE = " · "
+
+
+def unisci_esito_e_note(esito: str, note, limite: int = STATO_MAX) -> str:
+    """Riattacca all'esito di un comando gli avvisi che l'utente deve leggere.
+
+    Nasce da un difetto misurato il 2026-08-10: gli avvisi si pubblicavano su «Esito comando»
+    come ogni altro passaggio, e il passaggio successivo li copriva. «durata 25′ non ammessa da
+    questa vettura (5/10/15′) → uso 15′» è rimasto leggibile **12 millisecondi** — poi «invio
+    Clima acceso…». La correzione della durata funzionava (all'auto sono arrivati 15 minuti):
+    l'unica cosa che non funzionava era dirlo, che è però ciò che il changelog prometteva.
+    Vale per l'intera famiglia degli avvisi pre-invio, compresi quelli sui permessi delle
+    v1.11/1.12: sull'Omoda 9 se ne vede solo la durata perché gli altri non scattano.
+
+    ⚠️ **Il limite non è un dettaglio di formattazione.** Lo stato di un'entità in Home
+    Assistant non può superare 255 caratteri, e il componente tronca già a `[:255]` in sette
+    punti. Sommare l'esito e un numero qualsiasi di avvisi lo supera facilmente su un veicolo
+    che ne produce molti (la macro freddo dell'issue #1 ne genera due, uno dei quali elenca
+    quattro sedili). Qui il troncamento è **dichiarato**: gli avvisi che non entrano non
+    vengono tagliati a metà parola, si contano — un avviso mozzato è peggio di un avviso
+    assente, perché sembra completo. Il registro li ha comunque tutti e interi.
+
+    L'esito viene prima perché è ciò che l'utente sta cercando («è partito o no?»); gli avvisi
+    seguono nell'ordine in cui sono stati prodotti, che è quello in cui il comando li ha
+    incontrati."""
+    testo = (esito or "").strip()
+    pulite = [str(n).strip() for n in (note or []) if str(n).strip()]
+    if not pulite:
+        return testo[:limite]
+    fuori = 0
+    for i, n in enumerate(pulite):
+        cand = f"{testo}{_SEP_NOTE}{n}" if testo else n
+        if len(cand) <= limite:
+            testo = cand
+        else:
+            fuori = len(pulite) - i
+            break
+    if fuori:
+        # Quanti ne restano fuori si dice, e la coda che lo dice deve entrare a sua volta:
+        # se non c'è spazio nemmeno per lei si sacrifica la fine del testo, che a quel punto
+        # è già l'ultima informazione in ordine di importanza.
+        coda = f"{_SEP_NOTE}(+{fuori} nel registro)"
+        if len(testo) + len(coda) > limite:
+            testo = testo[:max(0, limite - len(coda))].rstrip()
+        testo += coda
+    return testo[:limite]
+
+
 def _is_unit_flag(key: str) -> bool:
     """True se il campo è un FLAG DI UNITÀ DI MISURA, non un valore.
 
@@ -286,6 +335,15 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # contatore dei push di CONFERMA comando (non della telemetria): è l'ancora di
         # `_settle_after_command`. Vedi lì perché non basta `last_seen`.
         self._confirm_n: int = 0
+        # Avvisi dell'ULTIMO comando (durata corretta, campi saltati, rifiuto annunciato) e
+        # l'istante in cui sono stati prodotti. Si riattaccano all'esito e alla conferma che
+        # lo sostituisce, altrimenti restano leggibili una manciata di millisecondi — vedi
+        # `unisci_esito_e_note`. Scritti dal thread dell'executor (`_send_command`) e letti dal
+        # thread paho (la conferma): l'assegnazione è di una lista NUOVA e mai una `append` sul
+        # posto, così chi legge vede o gli avvisi di prima o quelli di dopo, mai una lista a
+        # metà. Per due valori scritti insieme e letti insieme non serve un lock.
+        self._note_cmd: list[str] = []
+        self._note_cmd_at: float | None = None
         self.position: dict | None = None
         self.otp_code: str = ""   # impostato dall'entità text «Codice OTP», letto da confirm
         self.data = {"fields": {}, "msg_fields": {}, "position": None,
@@ -809,7 +867,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
 
         patch.update({"fields": fields_copy, "msg_fields": msg_fields, "awake": True})
         if is_confirmation:
-            patch["cmd_status"] = self._format_cmd_result(data)
+            patch["cmd_status"] = self._esito_con_note(self._format_cmd_result(data))
             # [H2] il contatore è l'ancora della pausa di coda → si tocca sotto lock, perché
             # lo legge il loop mentre qui siamo nel thread paho. Farlo avanzare SBLOCCA il
             # comando successivo: da qui in poi l'auto non è più occupata da questo.
@@ -901,6 +959,26 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             codici.append(f"{mid}:{voce.get('code', '?')}")
         elenco = ", ".join(f"{conteggio[n]}× {n}" if conteggio[n] > 1 else n for n in nomi)
         return f"{elenco} (codici {', '.join(codici)})"
+
+    def _esito_con_note(self, esito: str) -> str:
+        """L'esito della conferma dell'auto, con riattaccati gli avvisi del nostro comando.
+
+        Senza questo, riattaccarli all'esito dell'INVIO non servirebbe a nulla: la conferma
+        arriva pochi secondi dopo e riscrive lo stato da capo, portandosi via gli avvisi
+        insieme al resto. Il difetto tornerebbe identico, solo con qualche secondo di vita in
+        più invece di 12 millisecondi.
+
+        ⚠️ Solo se la conferma può ESSERE la risposta al nostro comando (`NOTE_COMANDO_S`).
+        Il canale dei push è condiviso con l'app ufficiale: senza la finestra, un comando dato
+        dal telefono mezz'ora dopo si vedrebbe attaccare i nostri avvisi, che parlano di
+        tutt'altro. Correlare davvero conferma e comando richiederebbe il `seq`, che spediamo
+        ma di cui non è mai stato misurato se l'auto lo rimandi indietro uguale — quindi qui si
+        usa il tempo, che è un'approssimazione ma dichiarata."""
+        if not self._note_cmd or self._note_cmd_at is None:
+            return esito
+        if (time.monotonic() - self._note_cmd_at) > NOTE_COMANDO_S:
+            return esito
+        return unisci_esito_e_note(esito, self._note_cmd)
 
     @staticmethod
     def _format_cmd_result(data: dict) -> str:
@@ -1140,14 +1218,41 @@ class Omoda9Coordinator(DataUpdateCoordinator):
     def _send_command(self, key: str, params: dict | None = None) -> str:
         from .core import commands as CMD
         msgs: list[str] = []
+        note: list[str] = []
 
         def emit(m):
             msgs.append(str(m))
             _LOGGER.info("[cmd] %s", m)
-            self._update({"cmd_status": str(m)[:255]})
+            self._update({"cmd_status": str(m)[:STATO_MAX]})
 
-        CMD.send(self.ctx, key, emit=emit, params=params)
-        return msgs[-1] if msgs else "inviato"
+        def avvisa(m):
+            """Avviso che l'utente deve poter LEGGERE, non solo un passaggio.
+
+            Passa comunque da `emit` — il registro e lo stato istantaneo restano come prima —
+            ma viene anche conservato, perché pubblicarlo e basta non lo faceva arrivare a
+            nessuno: il passaggio successivo lo copriva in millisecondi."""
+            note.append(str(m))
+            emit(m)
+
+        # Gli avvisi appartengono a QUESTO comando: si azzerano all'inizio, non alla fine.
+        # Azzerarli dopo lascerebbe scoperta la finestra in cui il comando è in volo, e una
+        # conferma in arrivo si porterebbe dietro gli avvisi del comando precedente.
+        self._note_cmd, self._note_cmd_at = [], time.monotonic()
+        try:
+            CMD.send(self.ctx, key, emit=emit, params=params, avvisa=avvisa)
+        finally:
+            # Anche su comando fallito: gli avvisi spiegano PERCHÉ è fallito, ed è lì che
+            # servono di più. `finally` per la stessa ragione del resto di questa release —
+            # un'eccezione, compresa una cancellazione, non deve far sparire l'informazione.
+            self._note_cmd = list(note)
+        esito = msgs[-1] if msgs else "inviato"
+        finale = unisci_esito_e_note(esito, note)
+        # L'ultimo `emit` ha già pubblicato l'esito NUDO: qui lo si riscrive con gli avvisi
+        # attaccati. Due aggiornamenti invece di uno, ma è l'unico modo per comporre una riga
+        # che `core/` non può conoscere (non sa nulla di Home Assistant né del limite dei 255).
+        if finale != esito:
+            self._update({"cmd_status": finale})
+        return finale
 
     def _instrada_rimedio(self, err: Exception, dal_loop: bool = True) -> str:
         """Errore di comando → azione di rimedio, decisa dalla tabella unica (P2-5).

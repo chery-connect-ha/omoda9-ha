@@ -332,6 +332,21 @@ CAMPO_CLIMA = "frontHVACState"
 # Sufficiente allo scopo, che è impedire una bugia perpetua, non garantire un istante.
 OPT_MAX_S = 15 * 60
 
+# Per quanto tempo gli avvisi di un comando (durata corretta, campi saltati, rifiuto già
+# annunciato) restano attaccati all'esito che l'utente legge su «Esito comando».
+#
+# Servono perché ogni passaggio del comando si pubblica sullo STESSO stato di Home Assistant:
+# l'avviso veniva coperto dal messaggio successivo in millisecondi (misurato il 2026-08-10:
+# «durata 25′ non ammessa → uso 15′» visibile 12 ms). Riattaccarli all'esito non basta però a
+# farli durare, perché l'esito viene a sua volta sostituito dalla CONFERMA dell'auto qualche
+# secondo dopo: gli avvisi vanno riattaccati anche a quella, ed è questa finestra a dire per
+# quanto tempo una conferma può ancora essere considerata la risposta al nostro comando.
+# Il valore è lo stesso di MACRO_GRAZIA_S e per la stessa ragione: la latenza misurata delle
+# conferme MQTT va da 8 a 38 secondi, quindi due minuti coprono con ampio margine. Oltre, la
+# conferma può benissimo essere di un comando dell'app ufficiale (che condivide il nostro
+# canale di push) e appiccicarle i nostri avvisi direbbe una cosa falsa su un'azione altrui.
+NOTE_COMANDO_S = 120
+
 # Coda comandi: l'auto esegue UN comando alla volta (A00082 = "veicolo occupato"), quindi i
 # comandi si serializzano. Un secondo comando (o un doppio-tap) ASPETTA il suo turno invece di
 # essere rifiutato. Dopo un invio si lascia respirare l'auto fino alla sua conferma MQTT o al

@@ -691,13 +691,26 @@ def _limita_temperatura(body: dict, caps: dict | None) -> None:
         return
 
 
-def send(ctx, cmd_key, emit=lambda m: None, params=None):
+def send(ctx, cmd_key, emit=lambda m: None, params=None, avvisa=None):
     """Invia un comando. emit(str) riceve i passaggi (per pubblicarli su HA).
        `params` (opzionale) = override/aggiunte al body del catalogo PRIMA dei campi
        comuni → permette i comandi parametrici (clima: temperature/times; ricarica
        immediata: controlType; ricarica programmata: mainSwitch + chargeAppointPlans).
        I campi di sistema (clientType/seq/taskId/vin) restano sempre quelli coniati qui.
-       Ritorna una stringa-esito leggibile."""
+       Ritorna una stringa-esito leggibile.
+
+       `avvisa(str)` è un SECONDO canale, per i soli messaggi che l'utente deve poter
+       **leggere**: una durata corretta, un campo saltato perché non autorizzato, un rifiuto
+       già annunciato. Esiste perché `emit` da solo non bastava a farli arrivare: chi lo
+       ascolta pubblica ogni passaggio sullo stesso stato di Home Assistant, quindi il
+       messaggio successivo — che arriva pochi millisecondi dopo — copre il precedente.
+       Misurato sul campo il 2026-08-10: «durata 25′ non ammessa → uso 15′» è rimasto
+       leggibile **12 millisecondi** prima di sparire sotto «invio Clima acceso…». Gli avvisi
+       passano da entrambi i canali (il chiamante inoltra ad `emit`), ma chi ascolta `avvisa`
+       può conservarli e riattaccarli all'esito finale, che è l'unica riga che resta.
+       Predefinito = `emit`: chi non distingue i due canali si comporta esattamente come prima."""
+    if avvisa is None:
+        avvisa = emit
     c = CMD_MAP.get(cmd_key)
     if not c:
         emit(f"comando sconosciuto: {cmd_key}")
@@ -740,7 +753,7 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
             body.update(params)    # override parametrico (temperatura/durata/controlType/piano)
         # La durata invece si controlla DOPO: `maxAirDuration` è un insieme di valori ammessi,
         # e un valore fuori insieme è invalido da chiunque arrivi — catalogo o utente.
-        _adatta_durata(c.get("endpoint"), body, ctx.caps, emit)
+        _adatta_durata(c.get("endpoint"), body, ctx.caps, avvisa)
 
         # ── adattamento al veicolo (permessi.py) ─────────────────────────────────────────
         # Il backend valida il corpo campo per campo contro le voci figlie della categoria
@@ -757,14 +770,14 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
         endpoint, saltati, nota = c.get("endpoint"), [], None
         if c.get("path"):
             if permessi.categoria_chiusa(c.get("categoria"), ctx.permessi or {}):
-                emit(f"{c['name']}: {permessi.MSG_CATEGORIA_NEGATA}")
+                avvisa(f"{c['name']}: {permessi.MSG_CATEGORIA_NEGATA}")
         elif endpoint:
             endpoint, body, saltati, nota = permessi.adatta(endpoint, body, ctx.permessi or {})
             if nota:
-                emit(f"{c['name']}: {nota}")
+                avvisa(f"{c['name']}: {nota}")
             if saltati:
-                emit(f"{c['name']}: non autorizzate su questa auto, salto "
-                     f"{nomi_saltati(saltati)}")
+                avvisa(f"{c['name']}: non autorizzate su questa auto, salto "
+                       f"{nomi_saltati(saltati)}")
             # Il comando è condannato comunque: non c'è campo da togliere né porta alternativa, e
             # il rifiuto che sta per arrivare NON è un difetto dell'integrazione. Dirlo prima
             # evita che l'utente concluda «l'aggiornamento non ha funzionato».
@@ -772,7 +785,7 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
             # #1 la macro freddo pota quattro sedili E ha la categoria negata — dire solo «salto
             # i sedili» gli fa credere che il clima partirà, e non parte.
             if (avviso := permessi.verdetto(endpoint, ctx.permessi or {})):
-                emit(f"{c['name']}: {avviso}")
+                avvisa(f"{c['name']}: {avviso}")
 
             # ── il corpo di ripiego non ha mai visto la scheda della vettura ────────────────
             # Quando l'instradamento cambia porta, il corpo non è più quello del catalogo: è
@@ -808,7 +821,7 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
         # dire prima perché il rifiuto arriverà.
         avviso_ciclo = permessi.ciclo_non_autorizzato(endpoint, body, ctx.permessi or {})
         if avviso_ciclo:
-            emit(f"{c['name']}: {avviso_ciclo}")
+            avvisa(f"{c['name']}: {avviso_ciclo}")
 
         url = ctx.tsp_host + (c.get("path") or ("/asc/vehicleControl/" + endpoint))
 
