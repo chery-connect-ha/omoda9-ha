@@ -12,6 +12,12 @@ blueprint:
     but **is** a failure — that command was not executed — so it is reported.
 
 
+    By default it does **not** warn you when a command only partly succeeded: with "Cool
+    everything" and "Heat everything" that happens almost every time on a parked car — the
+    climate control starts and the ventilated seats do not — so it would be an alert that
+    shows up always and asks nothing of you. Turn the dedicated option on if you want it.
+
+
     The popup uses a fixed id, so repeated failures update the same notification instead
     of stacking up, and it **dismisses itself** as soon as a command succeeds.
   domain: automation
@@ -46,6 +52,18 @@ blueprint:
       default: ""
       selector:
         text: {}
+    segnala_parziali:
+      name: Also alert when a command only partly succeeds
+      description: >
+        A command can go out and be carried out **only in part**: typically with "Cool
+        everything" and "Heat everything", where on a parked car the climate control starts
+        and the ventilated seats do not. That is not a fault, it is how the car normally
+        behaves, so by default it goes unmentioned: it used to be an alert that appeared on
+        every press without asking anything of the user. Turn this on only if you want to be
+        told about those cases too.
+      default: false
+      selector:
+        boolean: {}
 
 # "queued" rather than "single": during one command the sensor changes several times in
 # a row (send → result). With "single" a successful result arriving while the previous

@@ -13,6 +13,12 @@ blueprint:
     quindi viene segnalato.
 
 
+    Di norma **non** ti avvisa quando un comando è riuscito solo in parte: con «Raffredda
+    tutto» e «Riscalda tutto» succede quasi ogni volta ad auto ferma — il clima parte e i
+    sedili ventilati no — e sarebbe un avviso che compare sempre e non ti chiede di fare
+    nulla. Se lo vuoi, accendi l'apposita opzione.
+
+
     Il popup usa un id fisso, quindi più tentativi falliti aggiornano lo stesso avviso
     invece di impilarne tanti, e **si chiude da solo** al primo comando riuscito.
   domain: automation
@@ -47,6 +53,18 @@ blueprint:
       default: ""
       selector:
         text: {}
+    segnala_parziali:
+      name: Avvisa anche quando il comando riesce solo in parte
+      description: >
+        Un comando può partire e venire eseguito **solo in parte**: tipicamente con
+        «Raffredda tutto» e «Riscalda tutto», dove ad auto ferma il climatizzatore parte e
+        i sedili ventilati no. Non è un guasto ed è il comportamento normale dell'auto,
+        quindi di norma non se ne parla: era un avviso che compariva a ogni pressione
+        senza chiedere nulla all'utente. Accendi questa opzione solo se vuoi essere
+        avvisato anche di quei casi.
+      default: false
+      selector:
+        boolean: {}
 
 # «queued» e non «single»: durante un comando il sensore cambia più volte di fila
 # (invio → esito). Con «single» un esito riuscito che arrivasse mentre gira l'avviso
@@ -64,12 +82,21 @@ variables:
   # senza questa guardia il rendering delle variabili fallirebbe con un errore.
   esito: "{{ trigger.to_state.state if trigger is defined and trigger.to_state is defined else '' }}"
   riuscito: "{{ '✅' in esito }}"
-  # Un fallimento vero. L'elenco dei marcatori segue i messaggi che l'integrazione
-  # scrive davvero: «⚠️» è l'esecuzione solo PARZIALE (es. clima partito, sedili no),
-  # e senza di esso quel caso passava in silenzio.
+  segnala_parziali: !input segnala_parziali
+  # «⚠️» = comando partito ma eseguito solo IN PARTE. Era in elenco fra i fallimenti,
+  # e in teoria ha senso; alla prova dei fatti no. Su un'auto ferma «Raffredda tutto»
+  # lo produce a OGNI pressione — il clima parte, i sedili ventilati non possono — e il
+  # risultato era un avviso che compariva sempre, non chiedeva nulla a chi lo leggeva e
+  # per questo insegnava a ignorare anche gli avvisi veri. Ora è dietro un'opzione, spenta
+  # di norma: chi vuole quel dettaglio lo accende, e intanto lo trova sempre scritto in
+  # «Esito comando», che è il posto giusto per un'informazione che non richiede un'azione.
+  parziale: "{{ '⚠️' in esito }}"
+  # Un fallimento vero: il comando non è partito affatto, oppure l'auto/il backend l'hanno
+  # rifiutato. È l'unico caso in cui c'è qualcosa da fare.
   fallito: >
     {{ esito not in ['unknown', 'unavailable', ''] and not riuscito and (
-         '❌' in esito or '🚫' in esito or '⚠️' in esito
+         '❌' in esito or '🚫' in esito
+         or (parziale and segnala_parziali)
          or 'HTTP ' in esito
          or 'errore rete' in esito or 'net_error' in esito or 'fallit' in esito
          or 'nessun taskId' in esito or 'comando sconosciuto' in esito) }}
