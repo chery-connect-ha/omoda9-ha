@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.13.0 — 2026-08-10
+
 ### 🇮🇹 Italiano
 
 - **L'integrazione ora chiede alla tua auto com'è fatta, invece di darlo per scontato.** Alcuni valori erano scritti a mano nel programma perché era così che funzionava l'Omoda 9 su cui è nata: quanto freddo e quanto caldo chiedere con i pulsanti «Raffredda tutto» e «Riscalda tutto», e quanti minuti far durare il climatizzatore. Su un'altra vettura quei numeri possono essere diversi, e nessuno se ne sarebbe accorto. Adesso li legge dalla scheda tecnica che il costruttore invia **insieme al nome dell'auto**: è una risposta che l'integrazione si faceva già mandare, quindi non c'è nessun nuovo tipo di domanda ai server del costruttore.
