@@ -6,6 +6,18 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **Nuovo sensore: «Partenza programmata».** L'auto ci mandava già, a ogni collegamento, il piano di partenza impostato dall'app ufficiale — orario e giorni — e noi lo buttavamo via senza guardarlo. Ora lo vedi in Home Assistant: l'orario, i giorni della settimana e se il piano è attivo o spento. **È solo una lettura**: per cambiare il piano si usa ancora l'app. Non aggiunge nessuna richiesta ai server del costruttore, perché è un dato che arrivava già.
+- **La ricarica programmata mostra anche il piano che ha davvero l'auto.** Finora l'interruttore mostrava soltanto le preferenze impostate qui dentro: se cambiavi la programmazione dall'app ufficiale, Home Assistant non lo sapeva. Adesso, quando l'auto comunica il suo piano, trovi orario, durata e giorni **come li ha lei**. Compaiono quando l'auto li manda, cioè quando qualcosa cambia: se non ci sono, non vuol dire che non ci sia un piano.
+- **Una data che non ti mostriamo, di proposito.** Il piano di partenza arriva accompagnato da un «creato il» e un «modificato il» che sembrano dire quando l'hai impostato. Non lo dicono: il costruttore li riscrive a ogni interrogazione, e infatti risultano sempre di pochi secondi fa. Li abbiamo lasciati fuori, perché un dato inventato che sembra autorevole è peggio di un dato assente.
+
+### 🇬🇧 English
+
+- **New sensor: "Scheduled departure".** The car was already sending us, on every connection, the departure plan you set in the official app — time and days — and we were throwing it away without looking. You can now see it in Home Assistant: the time, the days of the week, and whether the plan is on or off. **It is read-only**: to change the plan you still use the app. It adds no request to the manufacturer's servers, because the data was already arriving.
+- **Scheduled charging also shows the plan the car actually holds.** Until now the switch showed only the preferences set in here: if you changed the schedule from the official app, Home Assistant never knew. Now, when the car reports its plan, you get time, duration and days **as the car has them**. They appear when the car sends them, that is when something changes: their absence does not mean there is no plan.
+- **One date we deliberately do not show you.** The departure plan arrives with a "created on" and a "modified on" that look like they say when you set it. They do not: the manufacturer rewrites them on every query, which is why they are always a few seconds old. We left them out, because an invented figure that looks authoritative is worse than a missing one.
+
 ## v1.12.0 — 2026-08-10
 
 ### 🇮🇹 Italiano

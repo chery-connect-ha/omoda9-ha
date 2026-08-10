@@ -29,9 +29,13 @@ from custom_components.omoda9.const import (
 # parabrezza dal clima, campo `fWinHeatingState`, voce di permesso 2045). È una entità IN PIÙ e
 # non una sostituzione: il campo NON è stato promosso a "ricco", proprio per non far sparire
 # `binary_sensor.omoda9_riscaldamento_parabrezza` lasciando un orfano `unavailable`.
+#
+# 2026-08-10 → 107: aggiunto `sensor.omoda9_partenza_programmata`, lettura del piano di partenza
+# che l'auto ci manda già a ogni sonda (`appointmentTravelSetVOS`) e che finora buttavamo via.
+# Nessuna chiamata nuova verso il cloud: solo un campo che smettevamo di ignorare.
 ATTESO = {
     "binary_sensor": 26,
-    "sensor": 38,
+    "sensor": 39,
     "button": 14,
     "switch": 18,
     "cover": 3,
@@ -42,7 +46,7 @@ ATTESO = {
     "text": 1,
     "time": 1,
 }
-TOTALE_ATTESO = 106
+TOTALE_ATTESO = 107
 
 
 def test_totale_dichiarato_coerente():

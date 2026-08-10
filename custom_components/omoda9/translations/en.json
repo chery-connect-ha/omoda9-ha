@@ -358,6 +358,9 @@
       "odometro": {
         "name": "Odometer"
       },
+      "partenza_programmata": {
+        "name": "Scheduled departure"
+      },
       "presa_ricarica_rapida": {
         "name": "Fast charging port"
       },

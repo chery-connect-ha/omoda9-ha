@@ -358,6 +358,9 @@
       "odometro": {
         "name": "Odometro"
       },
+      "partenza_programmata": {
+        "name": "Partenza programmata"
+      },
       "presa_ricarica_rapida": {
         "name": "Presa ricarica rapida"
       },

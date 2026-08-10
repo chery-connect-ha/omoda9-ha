@@ -343,6 +343,49 @@ class Omoda9ScheduledChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEnt
         live = self._live_on()
         return live if live is not None else self._restored
 
+    def _piano_auto(self) -> dict | None:
+        """Il piano come lo riporta l'AUTO, non come l'abbiamo scelto noi."""
+        raw = self.coordinator.data.get("fields", {}).get("chargeAppointPlans")
+        if not raw:
+            return None
+        try:
+            plans = ast.literal_eval(raw) if isinstance(raw, str) else raw
+            return plans[0] if plans and isinstance(plans[0], dict) else None
+        except (ValueError, SyntaxError, AttributeError, IndexError, TypeError):
+            return None
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Orario, durata e giorni **letti dall'auto**, quando li manda.
+
+        Finora l'interruttore mostrava solo acceso/spento e l'utente poteva vedere soltanto le
+        proprie preferenze locali (entità `time` e `number`): se il piano fosse stato cambiato
+        dall'app ufficiale, Home Assistant non l'avrebbe mai saputo.
+
+        ⚠️ Il canale 5A02 è un diario delle VARIAZIONI: questi attributi compaiono quando il
+        piano cambia e non a ogni giro. Assenti ≠ nessun piano. Il piano completo su richiesta
+        richiederebbe una chiamata nuova (`/asd/chargeAppointManage/chargeAppointQuery`), che
+        oggi non facciamo di proposito: sarebbe traffico verso il cloud del costruttore, e va
+        deciso, non aggiunto di nascosto."""
+        piano = self._piano_auto()
+        if piano is None:
+            return None
+        attrs: dict = {}
+        try:
+            minuti = int(piano["startTime"])
+            if 0 <= minuti < 1440:
+                attrs["orario_sull_auto"] = f"{minuti // 60:02d}:{minuti % 60:02d}"
+        except (KeyError, TypeError, ValueError):
+            pass
+        try:
+            attrs["durata_ore_sull_auto"] = round(int(piano["timeConsuming"]) / 60, 1)
+        except (KeyError, TypeError, ValueError):
+            pass
+        giorni = piano.get("cycleData")
+        if isinstance(giorni, list) and giorni:
+            attrs["giorni_sull_auto"] = giorni
+        return attrs or None
+
     def _plan(self, switch_status: int) -> dict:
         # orario di inizio in minuti-da-mezzanotte dall'entità time; fallback al vecchio
         # cursore ore (compat) e infine 08:00 se nessuna preferenza è ancora disponibile.

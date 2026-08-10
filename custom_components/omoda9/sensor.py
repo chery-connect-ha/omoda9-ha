@@ -340,6 +340,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     ]
     ents.append(Omoda9Battery(coord))
     ents.append(Omoda9Speed(coord))
+    # Piano di partenza programmata: dato che l'auto ci manda già a ogni sonda e che finora
+    # buttavamo via. Sola lettura — il comando `appointmentTravel` non è implementato.
+    ents.append(Omoda9DeparturePlan(coord))
     # — sensori "ricchi" dal canale realtime (Round B): autonomia, odometro, gomme,
     #   consumi, ricarica, clima target —
     # Su BEV CONFERMATA (powerType == 0) si tolgono i sensori del motore termico e si
@@ -603,3 +606,80 @@ class Omoda9TimestampSensor(_Omoda9RestoreSensor):
 
     def _live_value(self):
         return self.coordinator.data.get(self._data_key)
+
+
+# Giorni della settimana come li numera il backend (1 = lunedì … 7 = domenica), stessa
+# convenzione di `cycleData` nella ricarica programmata.
+GIORNI = {1: "lun", 2: "mar", 3: "mer", 4: "gio", 5: "ven", 6: "sab", 7: "dom"}
+
+
+def _orario(minuti) -> str | None:
+    """`minuti dalla mezzanotte` → "HH:MM", o None se il valore non è un orario valido."""
+    try:
+        m = int(minuti)
+    except (TypeError, ValueError):
+        return None
+    if not 0 <= m < 1440:
+        return None
+    return f"{m // 60:02d}:{m % 60:02d}"
+
+
+class Omoda9DeparturePlan(_Omoda9RestoreSensor):
+    """Piano di partenza programmata, letto dall'auto (`appointmentTravelSetVOS`).
+
+    **Non costa nulla:** il campo arriva già dentro il canale realtime a ogni sonda; finora lo
+    buttavamo via (0 occorrenze di `appointmentTravel` in tutto il package). Questa entità è
+    di sola LETTURA: il comando `appointmentTravel` non è implementato, quindi il piano si
+    imposta ancora dall'app ufficiale.
+
+    ⚠️ **`createTime`/`updateTime`/`id` NON vengono esposti, di proposito.** Sembrano dire
+    quando il piano è stato impostato e invece **il backend li rigenera a ogni interrogazione**:
+    misurato il 2026-08-10 confrontando due letture a 6 settimane e mezzo di distanza — il
+    contenuto (`travelTime` 350, `travelDate` [1-5], `travelAppointMainId` 63372) è rimasto
+    identico mentre `id`, `createTime` e `updateTime` erano cambiati e valevano l'istante
+    esatto della lettura. Mostrarli significherebbe dire all'utente «impostato oggi alle 09:31»
+    di un piano che non tocca da mesi.
+
+    ⚠️ `travelTime` è in minuti dalla mezzanotte **locale**, come `startTime` della ricarica
+    programmata (misurato il 2026-08-10: un piano scritto con `startTime = 0` l'app lo mostra
+    come 00:00, non 02:00). È l'unico anello dedotto per analogia fra le due funzioni, ed è
+    per questo che il collaudo prevede il confronto con l'ora mostrata dall'app."""
+
+    _attr_icon = "mdi:calendar-arrow-right"
+
+    def __init__(self, coord) -> None:
+        super().__init__(coord, "Omoda9 Partenza programmata", "rt_partenza_programmata")
+
+    def _piano(self) -> dict | None:
+        rt = self.coordinator.data.get("realtime") or {}
+        piani = rt.get("appointmentTravelSetVOS")
+        if isinstance(piani, list) and piani and isinstance(piani[0], dict):
+            return piani[0]
+        return None
+
+    def _live_value(self):
+        piano = self._piano()
+        if piano is None:
+            return None
+        # `switcher` 0 = piano memorizzato ma spento. Si dice "Disattivata" invece dell'orario:
+        # mostrare un'ora per un piano che non scatterà è peggio che non mostrarla.
+        # Stessa parola già usata da `APPT_CHARGE_STATE_MAP`, per non avere due vocabolari.
+        if str(piano.get("switcher", "0")).strip() in ("", "0", "None", "False"):
+            return "Disattivata"
+        return _orario(piano.get("travelTime"))
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        piano = self._piano()
+        if piano is None:
+            return None
+        giorni = piano.get("travelDate")
+        giorni = giorni if isinstance(giorni, list) else []
+        attrs: dict = {"attiva": str(piano.get("switcher", "0")).strip() not in ("", "0", "None", "False")}
+        orario = _orario(piano.get("travelTime"))
+        if orario:
+            attrs["orario"] = orario
+        if giorni:
+            attrs["giorni"] = giorni
+            attrs["giorni_testo"] = ", ".join(GIORNI.get(g, str(g)) for g in giorni)
+        return attrs
