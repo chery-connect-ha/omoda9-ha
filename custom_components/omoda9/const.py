@@ -283,6 +283,54 @@ MACRO_PRESET_S = 15 * 60 + 60
 # manifesta (durata dichiarata 15 = costante). Sistemarlo vuol dire derivare il timer dalla
 # durata effettivamente spedita, che oggi `switch.py` non conosce — va fatto, ma non di corsa
 # in una release che tocca già il corpo dei comandi comfort.
+# Quanto si aspetta, dopo aver spedito una macro, prima di credere alla TELEMETRIA SPONTANEA
+# che dice «preset spento». Serve perché fra il nostro invio e l'esecuzione l'auto continua a
+# pubblicare lo stato di PRIMA: un 5A02 già in volo arriva con il clima ancora a zero, e senza
+# questa finestra spegnerebbe l'interruttore un secondo dopo che l'utente l'ha acceso.
+# ⚠️ Si applica a TUTTI i messaggi, conferme comprese, e questo ha un costo dichiarato: gli
+# ack dell'auto arrivano in pochi secondi (mediana 8 s sul diario di agosto) e sono i messaggi
+# che portano i campi del preset in modo più sistematico, quindi finiscono quasi tutti dentro
+# la finestra e non vengono usati. Esentarli sembra ovvio ed è sbagliato finché non si sa
+# correlare l'ack col PROPRIO comando (vedi `switch._spento_dall_auto`): un ack può essere la
+# risposta a un comando PRECEDENTE, e in quel caso spegnerebbe un preset appena acceso.
+# ⚠️ Il valore è PRUDENZIALE, non misurato: quanto possa essere «vecchio» un frame spontaneo
+# che ci raggiunge dopo l'invio non è mai stato misurato, e non lo si deduce dalla latenza
+# degli ack, che misura invio→conferma ed è un'altra grandezza. Sbagliare in eccesso costa un
+# ritardo nella correzione; in difetto costa un comando annullato sotto gli occhi dell'utente.
+# ⚠️ La sveglia NON è più coperta da questa finestra ma da una guardia esplicita: finché il
+# comando non è partito la macro ignora tutto (vedi `_invio_in_corso` in `switch.py`).
+# ⚠️ Vale solo DENTRO la stessa esecuzione di Home Assistant. Dopo un riavvio non c'è alcun
+# invio da proteggere e la correzione si applica al primo messaggio utile: è proprio il caso
+# che il riarmo della scadenza da solo non copre (l'auto può aver chiuso il preset mentre HA
+# era spento, e allora l'interruttore deve nascere già spento).
+MACRO_GRAZIA_S = 120
+
+# Campo di STATO che l'auto pubblica per il climatizzatore. È il cuore di entrambe le macro
+# comfort e l'unico segnale che dice se una preclimatizzazione è in corso: compare nelle
+# conferme di `coolingControl`/`heatingControl` e nella telemetria 5A02, ed è lo stesso che
+# alimenta la card clima. Sta qui perché lo leggono due piattaforme diverse (`switch` e
+# `climate`) e nessuna delle due deve importare l'altra.
+CAMPO_CLIMA = "frontHVACState"
+
+# Durata massima dello stato ottimistico di un attuatore quando la verità non arriva mai
+# (vedi `entity.Omoda9OptimisticMixin`). Serve solo come rete: nel caso normale l'ottimismo
+# si chiude appena l'auto pubblica IL CAMPO di quell'entità, che ad auto desta è questione
+# di secondi.
+# Perché un quarto d'ora e non un valore qualsiasi: è l'orizzonte oltre il quale qualunque
+# azione comfort dell'utente è comunque finita per conto suo (l'auto chiude i preset dopo
+# ~15 minuti, MACRO_PRESET_S), quindi continuare a mostrare «acceso» dopo quel tempo è una
+# bugia in ogni caso. Scaduto il tetto l'entità torna sul suo ripiego: per gli attuatori con
+# telemetria è l'ultimo valore che l'auto ha davvero detto (vecchio, ma misurato); per quelli
+# che telemetria non ne hanno — «Ricarica» — è lo stato ripristinato all'avvio di Home
+# Assistant, che l'auto non ha mai confermato. In entrambi i casi è ciò che l'entità faceva
+# PRIMA di questa modifica, solo molto più tardi. Il caso che il tetto evita è l'opposto:
+# un'entità che resta per sempre su un valore che nessuno ha mai confermato, in silenzio.
+# ⚠️ Non è una sveglia: la scadenza si valuta solo quando il coordinator notifica le entità, e
+# questo coordinator non ha aggiornamenti a orologio (`update_interval=None`). Se non arriva
+# NULLA — auto dormiente, MQTT muto, aggiornamento automatico spento — il tetto scatta al
+# primo aggiornamento utile (in pratica il controllo di sessione), non al minuto esatto.
+# Sufficiente allo scopo, che è impedire una bugia perpetua, non garantire un istante.
+OPT_MAX_S = 15 * 60
 
 # Coda comandi: l'auto esegue UN comando alla volta (A00082 = "veicolo occupato"), quindi i
 # comandi si serializzano. Un secondo comando (o un doppio-tap) ASPETTA il suo turno invece di

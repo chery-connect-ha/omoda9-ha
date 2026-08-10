@@ -54,17 +54,15 @@ OMODA9 = {
     2149: 0, 21410: 0, 21411: 0, 21412: 0, 20419: 0, 20420: 0, 20421: 0, 20422: 0,
 }
 
-# Jaecoo 7 PHEV — profilo "a specchio" dell'issue #1: la categoria sedili dedicata è negata e i
-# sedili vivono sotto il clima. ⚠️ IPOTETICO: di quel veicolo non abbiamo ancora nessun dato
-# grezzo (lo "specchio" è una descrizione di seconda mano). Serve a fissare il comportamento
-# atteso, non a dichiarare come sia fatta quella macchina.
-JAECOO = dict(OMODA9)
-JAECOO.update({
-    214: 0, 2141: 0, 2142: 0, 2143: 0, 2144: 0, 2145: 0, 2146: 0, 2147: 0, 2148: 0,
-    2047: 1, 2048: 1, 2049: 1, 20410: 1, 20411: 1, 20416: 1,   # consentiti sotto il clima
-    232: 0, 2321: 0, 2322: 0,                                   # niente lunotto dedicato
-    20910: 0,                                                   # e nella macro il lunotto è negato
-})
+# Jaecoo 7 PHEV EU — ⚠️ NON è più un profilo inventato: dal 2026-08-10 è la lista **reale** di
+# quel veicolo (182 voci dei rami 2/3/4, vedi `fixtures.py`).
+#
+# Il profilo che stava qui prima era ipotetico e sbagliato **proprio nei due valori che
+# decidono**: dava `20411 = 1` (lunotto raggiungibile dal clima) e `2047 = 1` senza il resto del
+# quadro. Sul veicolo vero `20411 = 0` e il lunotto non ha alcuna via aperta. Tre test erano
+# verdi descrivendo comportamenti che su quell'auto non accadono — di qui la regola: un profilo
+# di prova inventato è peggio di nessun profilo, perché la suite certifica l'invenzione.
+JAECOO = FX.JAECOO7_PHEV_EU
 
 
 @pytest.fixture
@@ -137,16 +135,26 @@ def test_risposte_malformate_non_esplodono(P, payload):
 def test_potatura_toglie_solo_il_campo_negato(core, P):
     """Il cuore della cura: un campo negato non deve più far rifiutare tutta la macro.
 
-    Sul profilo Jaecoo il lunotto è negato sotto la macro riscaldamento: deve sparire quel
-    campo e **solo** quello, così il comando passa e fa le altre sei cose."""
+    ⚠️ Questo è l'unico test della suite ancorato a una **misura contro il backend vero su
+    un'auto che non possediamo**. Il 2026-08-10 l'utente dell'issue #1 ha rispedito la stessa
+    `heatingControl` togliendo a mano `backDefrosting`, `blSeatHeating` e `brSeatHeating`, e la
+    risposta è passata da `A00084` (rifiutato) ad `A00079` (accettato). Qui si verifica che la
+    nostra potatura, sul suo profilo permessi reale, produca **esattamente quel corpo**.
+
+    Non dimostra la corrispondenza dei singoli campi: i tre sono stati tolti insieme, quindi la
+    misura dice «almeno uno dei tre bloccava», non quale. Dimostra però che il corpo che
+    spediremmo è uno che il backend ha davvero accettato."""
     commands = core["commands"]
     c = commands.CMD_MAP["clima_riscalda_on"]
     corpo, saltati = P.pota("heatingControl", dict(c["body"]), JAECOO)
-    assert saltati == ["backDefrosting"]
-    assert "backDefrosting" not in corpo
-    for campo in ("mSeatHeating", "steerWheelHeatSwitch", "frontWindshieldHeat",
-                  "airControlType", "temperature"):
-        assert campo in corpo, f"{campo} tolto per errore: la potatura deve essere chirurgica"
+    assert sorted(saltati) == ["backDefrosting", "blSeatHeating", "brSeatHeating"]
+    # le otto chiavi del corpo che ha ottenuto A00079 (ISSUE1_commento_20260810.md)
+    assert set(corpo) == {"airControlType", "airType", "duration", "temperature",
+                          "frontWindshieldHeat", "mSeatHeating", "pSeatHeating",
+                          "steerWheelHeatSwitch"}
+    # `duration` e `temperature` non hanno alcuna voce figlia sotto la 209: le chiavi non
+    # mappate passano, e devono continuare a passare — potarle sarebbe un difetto.
+    assert corpo["duration"] and corpo["temperature"]
 
 
 def test_potatura_non_tocca_i_campi_base(P):
@@ -167,12 +175,17 @@ def test_base_negata_si_riconosce(P):
 # ───────────────────── 4. instradamento ─────────────────────
 
 def test_instradamento_scatta_anche_se_la_voce_figlia_MANCA(core, P):
-    """⚠️ Il caso che la prima versione sbagliava, ed è il caso reale dell'issue #1.
+    """⚠️ Il caso che la prima versione sbagliava: una lista in cui la **categoria** è negata
+    in blocco ma i figli non compaiono. Guardando solo la figlia, `consentito()` la dava per
+    consentita (sconosciuto = consentito) e il ripiego non scattava.
 
-    La lista di quel veicolo ha ~200 voci contro le nostre 334: i figli `2141`-`2148` possono
-    non esserci affatto, mentre è la **categoria** 214 a essere negata in blocco. Guardando solo
-    la figlia, `consentito()` la dava per consentita (sconosciuto = consentito) e il ripiego non
-    scattava: la funzione restava rotta proprio sull'auto per cui era stata scritta."""
+    ⚠️ Il profilo `corta` qui sotto è **sintetico**, e va tenuto tale. La motivazione scritta
+    qui fino al 2026-08-10 diceva che era il caso dell'auto dell'issue #1, «~200 voci contro le
+    nostre 334, i figli 2141-2148 possono non esserci»: il dato grezzo arrivato quel giorno l'ha
+    smentita: quella lista ha **280** voci e gli otto figli **ci sono tutti, tutti a 0** (vedi la
+    docstring di `permessi.porta_chiusa`, e `FX.JAECOO7_PHEV_EU`). Il difetto era reale, ma per
+    un'altra strada. Questo test resta perché copre il caso «figlio assente», che sui due
+    profili reali non si presenta più e che nessun altro test esercita."""
     commands = core["commands"]
     corta = {204: 1, 2047: 1, 214: 0}          # categoria negata, NESSUN figlio 214x presente
     c = commands.CMD_MAP["sedile_guida_caldo"]
@@ -188,7 +201,10 @@ def test_categoria_negata_si_riconosce(core, P):
     assert P.porta_chiusa("seatControl", OMODA9) is False
     assert P.porta_chiusa("chargeStartStopControl", OMODA9) is True   # 220 negata da noi
     assert P.porta_chiusa("seatControl", {}) is False                 # ignoto = aperta
-    assert P.porta_chiusa("coolingControl", JAECOO) is False
+    # Sul veicolo vero dell'issue #1 la macro freddo è negata in blocco (210 = 0): il comando
+    # partirà e verrà rifiutato, e l'utente ha diritto di saperlo prima. Il vecchio profilo
+    # inventato diceva il contrario.
+    assert P.porta_chiusa("coolingControl", JAECOO) is True
 
 
 def test_non_si_ripiega_se_anche_il_clima_e_chiuso(core, P):
@@ -213,21 +229,34 @@ def test_instradamento_sedile_passa_dal_clima(core, P):
     assert nota and "clima" in nota            # e all'utente lo si dice
 
 
-def test_instradamento_spegnimento_non_accende_il_clima(core, P):
-    """Spegnere un sedile passando dal clima non deve **accendere** il clima."""
+def test_ripiego_off_spegne_anche_il_clima(core, P):
+    """Spegnere il sedile per la via del clima **spegne anche il clima**, e va detto.
+
+    Il nome precedente (`..._non_accende_il_clima`) era vero alla lettera e fuorviante nella
+    sostanza: nascondeva l'effetto invece di dichiararlo. Il corpo resta questo — è simmetrico
+    all'accensione e non inventiamo forme che nessuno ha visto accettare — ma la nota
+    all'utente deve dire *spegne*, non *accende*."""
     commands = core["commands"]
     c = commands.CMD_MAP["sedile_guida_caldo_off"]
-    _ep, corpo, _s, _n = P.adatta(c["endpoint"], dict(c["body"]), JAECOO)
+    _ep, corpo, _s, nota = P.adatta(c["endpoint"], dict(c["body"]), JAECOO)
     assert corpo["airControlType"] == "0"
+    assert nota and "spegne" in nota and "accende" not in nota
 
 
-def test_instradamento_lunotto(core, P):
-    """Stessa regola per lo sbrinamento lunotto: `isSeparateRearWindowDefrosting` nell'app
-    guarda solo la categoria dedicata (232) per scegliere la via."""
+def test_lunotto_sul_veicolo_vero_non_ha_nessuna_via(core, P):
+    """Il lunotto dell'issue #1 non si ripiega: **non ha una porta alternativa aperta**.
+
+    Questo test prima asseriva il contrario, e lo faceva su un profilo inventato che dava
+    `20411 = 1`. Sul veicolo vero sono negate sia la categoria dedicata (232) sia la voce sotto
+    il clima (20411): non esiste una via da preferire, quindi si spedisce come sempre e si
+    riporta il rifiuto vero del backend. Inventare un ripiego qui significherebbe accendere il
+    climatizzatore di casa d'altri per una funzione che comunque non partirebbe."""
     commands = core["commands"]
     c = commands.CMD_MAP["defrost_lunotto"]
-    ep, corpo, _s, nota = P.adatta(c["endpoint"], dict(c["body"]), JAECOO)
-    assert ep == "airControl" and corpo["backDefrosting"] == "1" and nota
+    ep, corpo, saltati, nota = P.adatta(c["endpoint"], dict(c["body"]), JAECOO)
+    assert (ep, corpo, saltati, nota) == (c["endpoint"], c["body"], [], None)
+    # ma all'utente si dice perché arriverà un rifiuto, invece di lasciarlo indovinare
+    assert P.verdetto(ep, JAECOO)
 
 
 def test_porta_dedicata_aperta_si_resta(core, P):
@@ -453,3 +482,452 @@ def test_ciclo_lista_non_letta_non_avvisa(core):
     corpo = {"chargeAppointPlans": [{"cycleData": [1, 3, 5]}]}
 
     assert permessi.ciclo_non_autorizzato("chargeAppointControl", corpo, {}) is None
+
+
+# ───────────────────── 6. il verdetto preventivo: dire perché arriverà un rifiuto ─────────────────────
+
+def test_verdetto_e_potatura_convivono(core, P, cloud, ctx):
+    """I due fatti non si escludono, ed è il difetto che questo verdetto viene a chiudere.
+
+    Sul veicolo vero dell'issue #1 la macro freddo pota quattro sedili **e** ha la categoria 210
+    negata. Finché i due rami erano alternativi, l'utente leggeva solo «salto i quattro sedili»,
+    ne deduceva che il clima si sarebbe acceso, e non si accendeva.
+
+    ⚠️ Si misura su ciò che l'utente **legge davvero**, cioè su `send()`. La prima stesura di
+    questo test chiamava le due funzioni pure una dopo l'altra e verificava che entrambe avessero
+    qualcosa da dire: verissimo, e del tutto inutile — rimettere l'`elif` in `send()` la lasciava
+    verde, perché la convivenza dei due messaggi non sta nelle funzioni ma nel loro chiamante."""
+    commands = core["commands"]
+    c = commands.CMD_MAP["clima_raffredda_on"]
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(JAECOO))
+    cloud.on("/asc/vehicleControl/", code="A00084")
+    detti = []
+
+    # la premessa: su questo profilo c'è davvero sia da potare sia da avvisare
+    ep, _corpo, saltati, _nota = P.adatta(c["endpoint"], dict(c["body"]), JAECOO)
+    assert saltati and P.verdetto(ep, JAECOO)
+
+    # il comando parte lo stesso e il backend lo rifiuta: il verdetto informa, non sopprime
+    with pytest.raises(commands.CommandError):
+        commands.send(ctx, "clima_raffredda_on", emit=detti.append)
+
+    assert any("salto" in m for m in detti), f"manca l'elenco dei campi potati: {detti}"
+    assert any("non autorizza affatto" in m for m in detti), (
+        f"manca l'avviso che il comando è condannato comunque: {detti}")
+    # ⚠️ …e i due messaggi devono REGGERE INSIEME. Non basta che ci siano entrambi: la prima
+    # stesura li faceva convivere e poi diceva «non c'è nulla da adattare» subito dopo aver
+    # elencato quattro campi adattati. Due righe vere una alla volta, che affiancate mentono.
+    assert not any("nulla da adattare" in m for m in detti), (
+        f"il verdetto nega l'elenco dei campi potati che lo precede: {detti}")
+
+
+def test_i_due_avvisi_non_si_contraddicono(core, P):
+    """La guardia sul TESTO, non sulla logica.
+
+    Il verdetto esce accanto all'elenco dei campi potati, quindi non può contenere frasi che
+    presuppongano di essere solo: «non c'è nulla da adattare» è vera nel ramo `path` (dove
+    davvero non c'è corpo) e falsa accanto a una potatura. Se un domani qualcuno riscrive il
+    messaggio dimenticandosene, questo test lo ferma prima dell'utente."""
+    for messaggio in (P.MSG_CATEGORIA_NEGATA, P.MSG_BASE_NEGATA):
+        assert "nulla da adattare" not in messaggio, (
+            f"il messaggio presuppone che non ci sia stata potatura: {messaggio!r}")
+
+
+def test_verdetto_dice_il_cuore_negato(core, P):
+    """Il secondo ramo di `verdetto` — la voce BASE negata mentre la categoria è aperta.
+
+    Serve perché `base_negata()` era codice morto e la Fase C lo resuscita: senza un test che
+    lo inchiodi, si può cancellare il ramo e la suite resta verde (verificato per mutazione).
+
+    ⚠️ Su nessuno dei due profili reali questo caso si presenta: quando la voce base è negata
+    lo è anche la categoria, e vince `porta_chiusa`. Il profilo qui sotto è quindi **sintetico**
+    e costruito apposta — prova che il ramo funziona, NON che esista un veicolo che lo produce."""
+    solo_cuore_negato = {**OMODA9, 210: 1, 2103: 0}
+    avviso = P.verdetto("coolingControl", solo_cuore_negato)
+    assert avviso == P.MSG_BASE_NEGATA, (
+        f"il ramo della voce base non parla: {avviso!r}")
+    # e non si confonde col ramo della categoria, che ha la precedenza quando scatta
+    assert P.verdetto("coolingControl", {**OMODA9, 210: 0, 2103: 0}) == P.MSG_CATEGORIA_NEGATA
+
+
+def test_verdetto_muto_sullomoda9(core, P):
+    """Il rumore nuovo per chi il componente ce l'ha già installato dev'essere **zero**.
+
+    Sul nostro profilo il verdetto tace su tutto il catalogo tranne la ricarica immediata, dove
+    la categoria 220 è negata anche da noi — e lì l'avviso usciva già prima di questa modifica."""
+    commands = core["commands"]
+    parlanti = set()
+    for chiave, c in commands.CMD_MAP.items():
+        if c.get("path") or not c.get("endpoint"):
+            continue
+        ep, _corpo, _s, _n = P.adatta(c["endpoint"], dict(c["body"]), OMODA9)
+        if P.verdetto(ep, OMODA9):
+            parlanti.add(chiave)
+    assert parlanti == {"ricarica_start", "ricarica_stop"}, (
+        f"messaggi nuovi non previsti sull'Omoda 9: {parlanti}")
+
+
+def test_verdetto_senza_lista_tace(P):
+    """Fallimento permissivo, la regola che ogni funzione nuova deve superare: senza lista
+    permessi il componente si comporta esattamente come prima, quindi non avvisa di nulla."""
+    assert P.verdetto("coolingControl", {}) is None
+    assert P.verdetto("coolingControl", None) is None
+    assert P.verdetto("", JAECOO) is None
+    assert P.verdetto("endpointMaiVisto", JAECOO) is None      # ignoto = aperto
+
+
+def test_verdetto_sta_nello_stato_di_home_assistant(core, P):
+    """Lo stato di un'entità HA è troncato a 255 caratteri: un avviso tagliato a metà parola è
+    peggio del non dirlo. Si misura col prefisso peggiore del catalogo, non a occhio."""
+    commands = core["commands"]
+    prefisso = max(len(c["name"]) for c in commands.CMD_MAP.values()) + 2   # "nome: "
+
+    # ⚠️ La nota del ripiego è il messaggio PIÙ LUNGO dei tre e fino al 2026-08-10 era l'unico
+    # non misurato da nessun test: si guardava solo `verdetto`. Si misura sul ramo peggiore
+    # («accende» è più lungo di «spegne») ricavandola dal codice, non ricopiandola qui.
+    c = commands.CMD_MAP["sedile_guida_caldo"]
+    _ep, _corpo, nota = P.instrada(c["endpoint"], dict(c["body"]), JAECOO)
+    assert nota, "premessa del test: su questo profilo il ripiego scatta davvero"
+    assert prefisso + len(nota) <= 255, f"nota del ripiego: {prefisso + len(nota)} caratteri"
+    for perms in (JAECOO, {**OMODA9, 214: 0, 2103: 0}):
+        for ep in ("coolingControl", "seatControl", "heatingControl", "chargeStartStopControl"):
+            avviso = P.verdetto(ep, perms)
+            if avviso:
+                assert prefisso + len(avviso) <= 255, f"{ep}: {prefisso + len(avviso)} caratteri"
+
+
+def test_tabelle_senza_voci_morte(core, P):
+    """Ogni riga delle tabelle deve corrispondere a un comando che esiste davvero.
+
+    Una voce irraggiungibile non è innocua: il prossimo manutentore la legge come informazione
+    sul backend, e non lo è. `remoteStart` e `appointmentTravel` erano rimaste così."""
+    commands = core["commands"]
+    endpoint_veri = {c["endpoint"] for c in commands.CMD_MAP.values() if c.get("endpoint")}
+    assert set(P.CATEGORIA) <= endpoint_veri, (
+        f"voci morte in CATEGORIA: {set(P.CATEGORIA) - endpoint_veri}")
+    assert set(P.CICLO) <= endpoint_veri, (
+        f"voci morte in CICLO: {set(P.CICLO) - endpoint_veri}")
+
+
+# ───────────────────── 7. il corpo di ripiego incontra la scheda della vettura ─────────────────
+#
+# ⚠️ AVVERTENZA, da leggere prima di fidarsi di questi test.
+# Il percorso di ripiego **non è mai stato eseguito da nessuno contro un backend vero**, e
+# sull'Omoda 9 non è nemmeno raggiungibile (tutte le voci `204xx` di ripiego sono negate: lo
+# dimostra `test_omoda9_nessun_comando_viene_toccato`). Quel che segue prova che il COMPONENTE
+# costruisce il corpo che intendiamo — endpoint, campi, valori, messaggi. Non prova, e non può
+# provare, che il backend Chery accetti quel corpo, né che la vettura esegua: quello sarebbe uno
+# strato 2 che nessuna misura di questo filone ha mai raggiunto. Il primo a esercitarlo davvero
+# sarà l'utente dell'issue #1.
+
+# Scheda di una vettura PLAUSIBILE e più stretta della nostra: clima da 22 a 30 °C, solo 5 o 10
+# minuti. ⚠️ La prima stesura di questi test dichiarava invece `clima_lo: 18 / clima_hi: 20`, e
+# con quei numeri il test era verde perché misurava il vincolo sbagliato — vedi
+# `test_limita_temperatura_usa_il_range_impostabile`. Quella scheda è implausibile perché un HI
+# a 20 °C vorrebbe dire una vettura che al massimo del caldo fa 20°.
+# ⚠️ Implausibile, NON impossibile: `const.capabilities_from_item` impone `lo <= min` e
+# `hi >= max` **solo se il range impostabile è stato dichiarato e ritenuto plausibile**; senza
+# `minTemperature`/`maxTemperature` quella coppia passerebbe senza alcun controllo di coerenza.
+# L'argomento che regge è la vettura, non il filtro.
+_SCHEDA_STRETTA = {"durate_aria": [5, 10], "clima_min": 22.0, "clima_max": 30.0}
+
+
+def test_ripiego_rispetta_la_scheda_della_vettura(core, cloud, ctx):
+    """Il difetto: il corpo di ripiego nasce DOPO gli adattatori alla scheda, quindi non li
+    incontrava mai. `permessi.py` non conosce la vettura e mette 21.0 e 15 — i valori
+    dell'Omoda 9 — su un'auto che magari ammette solo 5 e 10 minuti e non scende sotto i 22 °C.
+
+    Si misura sul corpo che atterra davvero sull'URL, non sulla funzione pura: è l'unico punto
+    in cui l'ordine delle chiamate dentro `send()` è osservabile."""
+    commands = core["commands"]
+    ctx.caps = dict(_SCHEDA_STRETTA)
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(JAECOO))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+
+    commands.send(ctx, "sedile_guida_caldo")
+
+    inviato = cloud.calls_to("/asc/vehicleControl/")[0]
+    assert inviato["path"].endswith("/airControl"), "il ripiego deve essere scattato"
+    assert inviato["body"]["times"] == "10", (
+        f"durata non riportata nell'insieme ammesso: {inviato['body']['times']}")
+    assert inviato["body"]["temperature"] == "22.0", (
+        f"temperatura fuori dal range impostabile dichiarato: {inviato['body']['temperature']}")
+    assert inviato["body"]["mSeatHeating"] == "3"   # il campo dell'utente resta intatto
+
+
+def test_ripiego_non_annuncia_una_durata_che_l_utente_non_ha_scelto(core, cloud, ctx):
+    """Correggere il corpo è giusto; annunciarlo qui non lo è.
+
+    `_adatta_durata` dichiara sempre la correzione, e ha ragione a farlo quando il numero l'ha
+    scelto l'utente col cursore «Durata clima». Nel ripiego il numero l'abbiamo messo noi: chi
+    preme «Sedile guida riscaldato» leggerebbe «durata 15′ non ammessa da questa vettura → uso
+    10′» senza aver mai visto una durata. Sarebbe lo stesso difetto — dire all'utente cose che
+    non corrispondono a ciò che ha fatto — che questa versione toglie di mezzo altrove."""
+    commands = core["commands"]
+    ctx.caps = dict(_SCHEDA_STRETTA)
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(JAECOO))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+    detti = []
+
+    commands.send(ctx, "sedile_guida_caldo", emit=detti.append)
+
+    assert not any("durata" in m for m in detti), (
+        f"annunciata una durata che l'utente non ha mai scelto: {detti}")
+    # …e il corpo è stato corretto lo stesso: silenzio non vuol dire inerzia
+    assert cloud.calls_to("/asc/vehicleControl/")[0]["body"]["times"] == "10"
+    # l'avviso che invece SERVE resta: l'utente deve sapere che parte anche il clima
+    assert any("tramite il clima" in m for m in detti), detti
+
+
+def test_la_durata_scelta_dall_utente_resta_annunciata(core, cloud, ctx):
+    """Il rovescio del test precedente, che ne fissa il confine: il silenzio vale SOLO per il
+    corpo di ripiego. Sul clima vero, dove il numero esce da un cursore, l'utente deve continuare
+    a sapere che gliel'abbiamo cambiato — altrimenti vede 30 nell'interfaccia e l'auto ne fa 10."""
+    commands = core["commands"]
+    ctx.caps = dict(_SCHEDA_STRETTA)
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(OMODA9))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+    detti = []
+
+    commands.send(ctx, "clima_on", emit=detti.append, params={"times": "30"})
+
+    assert any("durata" in m and "30" in m for m in detti), detti
+    assert cloud.calls_to("/asc/vehicleControl/")[0]["body"]["times"] == "10"
+
+
+def test_ripiego_senza_scheda_spedisce_come_prima(core, cloud, ctx):
+    """La regola invariata di tutto il componente: se il backend non dichiara nulla, non si
+    inventa nulla. Senza scheda tecnica il corpo di ripiego resta quello di `BASE_AIRCONTROL`."""
+    commands = core["commands"]
+    ctx.caps = {}
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(JAECOO))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+
+    commands.send(ctx, "sedile_guida_caldo")
+
+    corpo = cloud.calls_to("/asc/vehicleControl/")[0]["body"]
+    assert (corpo["times"], corpo["temperature"]) == ("15", "21.0")
+
+
+@pytest.mark.parametrize("caps,times,temperatura", [
+    ({"durate_aria": [5, 10]}, "10", "21.0"),                     # solo le durate dichiarate
+    ({"clima_min": 22.0, "clima_max": 30.0}, "15", "22.0"),       # solo il range impostabile
+    ({"clima_lo": 15.0, "clima_hi": 31.0}, "15", "21.0"),         # solo gli estremi: 21° ci sta
+], ids=["solo-durate", "solo-range", "solo-estremi"])
+def test_ripiego_con_scheda_parziale(core, cloud, ctx, caps, times, temperatura):
+    """Una vettura può dichiarare una cosa e tacere l'altra: `_caps_correnti` scrive le durate,
+    il range e gli estremi in modo indipendente. Ciò che è dichiarato si rispetta, il resto resta
+    com'era — non si deduce un range da una durata né viceversa.
+
+    La riga «solo-estremi» porta i valori VERI dell'Omoda 9 (LO 15 / HI 31) e per questo non
+    corregge nulla: è il caso normale, e serve a ricordare che LO/HI da soli quasi mai mordono —
+    per questo non possono essere il vincolo principale."""
+    commands = core["commands"]
+    ctx.caps = dict(caps)
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(JAECOO))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+
+    commands.send(ctx, "sedile_guida_caldo")
+
+    corpo = cloud.calls_to("/asc/vehicleControl/")[0]["body"]
+    assert (corpo["times"], corpo["temperature"]) == (times, temperatura)
+
+
+@pytest.mark.parametrize("valore,caps,atteso", [
+    ("21.0", {"clima_min": 16, "clima_max": 20}, "20.0"),      # sopra il massimo impostabile
+    ("21.0", {"clima_min": 22, "clima_max": 30}, "22.0"),      # sotto il minimo impostabile
+    ("21.0", {"clima_min": 16, "clima_max": 30}, "21.0"),      # già dentro: non si tocca
+    ("21.0", {"clima_min": 22}, "21.0"),                       # dichiarazione incompleta
+    ("21.0", {}, "21.0"),                                      # nessuna dichiarazione
+    ("21.0", {"clima_lo": 15, "clima_hi": 20}, "20.0"),        # niente range: ripiego su LO/HI
+    # entrambi dichiarati: vince min/max, che è il PRIMO della lista di precedenza — non il più
+    # stretto. Oggi i due criteri coincidono (`lo <= min`, `hi >= max` quando il filtro di
+    # `const` è attivo), quindi questo caso da solo non li distingue: a distinguerli è il caso
+    # qui sotto, dove LO/HI sarebbe più stretto e non deve comunque vincere.
+    ("21.0", {"clima_min": 22, "clima_max": 30,
+              "clima_lo": 15, "clima_hi": 31}, "22.0"),
+    ("17.0", {"clima_min": 16, "clima_max": 30,
+              "clima_lo": 18, "clima_hi": 28}, "17.0"),        # LO/HI più stretto: NON vince
+    ("21.0", {"clima_min": 30, "clima_max": 18}, "21.0"),      # range rovesciato: non si sceglie
+    ("non un numero", {"clima_min": 16, "clima_max": 20}, "non un numero"),
+])
+def test_limita_temperatura(core, valore, caps, atteso):
+    """Ogni forma inattesa deve valere «non toccare».
+
+    ⚠️ Onestà su che cosa prova: le ultime due righe (range rovesciato, valore non numerico)
+    sono difesa in profondità, **non** percorsi raggiungibili oggi. `coordinator._caps_correnti`
+    scrive `clima_min`/`clima_max` solo insieme e solo dopo averli convertiti in `float`, e
+    `const.capabilities_from_item` li rifiuta se non sono crescenti. Restano perché questa
+    funzione è pubblica dentro il modulo e il prossimo chiamante potrebbe non sapere da dove
+    arrivano quei valori."""
+    commands = core["commands"]
+    corpo = {"temperature": valore}
+    commands._limita_temperatura(corpo, caps)
+    assert corpo["temperature"] == atteso
+
+
+def test_limita_temperatura_usa_il_range_impostabile(core):
+    """Il difetto che questa revisione ha trovato, isolato in un test che lo fa fallire.
+
+    La prima stesura limitava su `clima_lo`/`clima_hi`. Sembrava corretto, ma quelli sono le
+    posizioni ESTREME LO/HI, che `const.capabilities_from_item` accetta solo se stanno **fuori**
+    dal range impostabile (`lo <= min`, `hi >= max`). Quindi su una vettura vera che parte da
+    22 °C — l'esempio con cui la funzione si presentava — il 21.0 del corpo di ripiego cadeva
+    dentro LO..HI e restava intatto: la cura non curava il caso che dichiarava di curare.
+
+    Qui la scheda è quella di una vettura possibile: range 22-30, estremi 15/31."""
+    commands = core["commands"]
+    scheda_realistica = {"clima_min": 22.0, "clima_max": 30.0,
+                         "clima_lo": 15.0, "clima_hi": 31.0}
+    corpo = {"temperature": "21.0"}
+    commands._limita_temperatura(corpo, scheda_realistica)
+    assert corpo["temperature"] == "22.0", (
+        "limitato sugli estremi LO/HI invece che sul range impostabile: su questa scheda "
+        "quel vincolo non morde mai")
+
+
+def test_temperatura_corretta_ha_la_forma_dell_envelope(core):
+    """Un decimale, sempre — `"22.0"`, non `"22"` né `"22.25"`.
+
+    È l'unico punto in cui il componente **conia** un valore per il corpo invece di inoltrarne
+    uno del catalogo o dell'utente, e la forma osservata negli envelope dell'app è `21.0`. Un
+    `str(float)` nudo passerebbe tutti gli altri test — i valori in gioco sono interi — e
+    divergerebbe solo su una scheda con mezzo grado, cioè sull'auto di qualcun altro."""
+    commands = core["commands"]
+    for minimo, atteso in ((22, "22.0"), (22.25, "22.2"), (18.5, "18.5")):
+        corpo = {"temperature": "16.0"}
+        commands._limita_temperatura(corpo, {"clima_min": minimo, "clima_max": 30})
+        assert corpo["temperature"] == atteso
+
+
+def test_limita_temperatura_non_inventa_il_campo(core):
+    """Su un corpo senza `temperature` non se ne aggiunge una: spedire un campo che il comando
+    non prevede è un modo per farsi rifiutare tutto."""
+    commands = core["commands"]
+    corpo = {"mSeatHeating": "3"}
+    commands._limita_temperatura(corpo, {"clima_min": 22, "clima_max": 30})
+    assert corpo == {"mSeatHeating": "3"}
+
+
+def test_adatta_capability_non_tocca_il_ripiego(core):
+    """Perché `adatta_capability` NON compare fra gli adattatori richiamati dopo il ripiego.
+
+    Non è una scelta di stile: su `airControl` — l'unica destinazione possibile del ripiego —
+    quella funzione è esclusa di proposito, perché lì `temperature` è una scelta dell'utente e
+    non la posizione LO/HI di una macro. Chiamarla lì sarebbe una riga che non fa mai nulla,
+    presentata come parte della cura. Questo test la inchioda: se un domani `airControl` entrasse
+    in `_ESTREMO_PER_ENDPOINT`, il ripiego avrebbe due padroni sulla stessa chiave.
+
+    La prima riga fissa anche la premessa di tutto il ragionamento — «airControl è l'unica
+    destinazione possibile del ripiego» — che tre commenti danno per buona e nessuno verificava:
+    se domani si aggiungesse una seconda destinazione, gli adattatori richiamati in `send()`
+    dopo il cambio di porta andrebbero ripensati per quella."""
+    commands = core["commands"]
+    P = core["permessi"]
+    destinazioni = set()
+    for (endpoint, campo), (dedicata, alternativa) in P.RIPIEGO.items():
+        # profilo costruito apposta: porta dedicata sbarrata, alternativa aperta
+        perms = {P.CATEGORIA[endpoint]: 0, dedicata: 0, P.CATEGORIA["airControl"]: 1,
+                 alternativa: 1}
+        nuovo, _corpo, nota = P.instrada(endpoint, {campo: "3"}, perms)
+        assert nota, f"{endpoint}/{campo}: il ripiego doveva scattare"
+        destinazioni.add(nuovo)
+    assert destinazioni == {"airControl"}, f"seconda destinazione di ripiego: {destinazioni}"
+    assert "airControl" not in commands._ESTREMO_PER_ENDPOINT
+    corpo = {"temperature": "21.0"}
+    assert commands.adatta_capability("airControl", corpo,
+                                      {"clima_lo": 18, "clima_hi": 30}) == {"temperature": "21.0"}
+
+
+def test_omoda9_il_ripiego_non_e_nemmeno_raggiungibile(core, cloud, ctx):
+    """L'invariante che protegge chi il componente ce l'ha già installato, misurata attraverso
+    `send()` e non sulla funzione pura: sulla nostra auto nessun comando cambia porta, quindi
+    tutto il codice della fase C resta materialmente irraggiungibile — comprese le due
+    correzioni silenziose, che non possono toccare un corpo che non passa di lì."""
+    commands = core["commands"]
+    ctx.caps = dict(_SCHEDA_STRETTA)        # scheda stretta apposta: se scattasse, si vedrebbe
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(OMODA9))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+
+    attesi = [(c["endpoint"], c["body"].get("temperature")) for c in commands.CMD_MAP.values()
+              if c.get("endpoint") and not c.get("path")]
+    for chiave, c in commands.CMD_MAP.items():
+        if c.get("path") or not c.get("endpoint"):
+            continue
+        commands.send(ctx, chiave)
+
+    inviati = [(ch["path"].rsplit("/", 1)[-1], ch["body"].get("temperature"))
+               for ch in cloud.calls_to("/asc/vehicleControl/")]
+    # Endpoint **e** temperatura: il solo endpoint non basterebbe a smascherare una chiamata a
+    # `_limita_temperatura` fuori dal ripiego. Con questa scheda il clima parte da 22 °C, quindi
+    # una limitazione che sfuggisse trasformerebbe il 21.0 del catalogo in 22.0 — visibile qui e
+    # invisibile a un confronto sui soli endpoint. (`times`, invece, è corretto per davvero anche
+    # sull'Omoda 9: quella è la correzione dichiarata di `_adatta_durata`, e ci deve essere.)
+    assert inviati == attesi, "un comando ha cambiato porta o temperatura sull'Omoda 9"
+
+
+# ───────────────────── 8. i sospetti: quello che non sappiamo, detto come tale ─────────────────
+
+def test_sospetti_non_toccano_il_corpo(core, P):
+    """`times` somiglia alla voce 2044, ma somigliare non è mappare. La somiglianza sta in un
+    log; il corpo parte intero. In questo progetto una mappatura per nome ha già prodotto un
+    errore (`timeConsuming` → 2134), e su un veicolo dove 2044 è negata potare `times`
+    romperebbe il clima per un'ipotesi."""
+    commands = core["commands"]
+    c = commands.CMD_MAP["clima_on"]
+    _ep, corpo, saltati, _nota = P.adatta(c["endpoint"], dict(c["body"]), JAECOO)
+
+    # la cifra citata nel commento di `SOSPETTI_NON_MAPPATI`: un numero scritto in un commento e
+    # controllato da nessuno diventa falso al primo comando aggiunto.
+    assert sum(1 for v in commands.CMD_MAP.values() if "times" in v.get("body", {})) == 14
+    assert JAECOO[2044] == 0, "il profilo reale nega davvero quella voce"
+    assert "times" in corpo, "il corpo non si tocca: la corrispondenza non è provata"
+    assert "times" not in saltati
+    assert P.sospetti(corpo, JAECOO) == [("times", 2044)], "…ma il dubbio va registrato"
+
+
+def test_send_registra_il_sospetto_senza_toccare_il_corpo(core, cloud, ctx, caplog):
+    """Il ponte fra `sospetti()` e il mondo reale, che altrimenti nessuno esercita.
+
+    Senza questo test si potrebbe cancellare il giro di log dentro `send()` e la suite resterebbe
+    verde: la funzione pura sarebbe provata, il suo unico chiamante no — cioè lo stesso difetto
+    (una riga che nessuno verifica) che questa fase è venuta a chiudere altrove. Qui si guarda
+    che la riga esca **e** che il `times` parta intatto: il sospetto è una nota, non una potatura."""
+    import logging
+
+    commands = core["commands"]
+    cloud.on("/tsp/v1/app/vmc/queryVehicleAuthority", _permessi_finti(JAECOO))
+    cloud.on("/asc/vehicleControl/", code="A00079")
+
+    with caplog.at_level(logging.DEBUG):
+        commands.send(ctx, "clima_on")
+
+    righe = [r.getMessage() for r in caplog.records if "permessi" in r.getMessage()]
+    assert any("times" in r and "2044" in r for r in righe), righe
+    assert cloud.calls_to("/asc/vehicleControl/")[0]["body"]["times"] == "15"
+
+
+def test_sospetti_muti_sullomoda9(core, P):
+    """Sul nostro profilo la voce 2044 è consentita: nessun sospetto, nessuna riga di log."""
+    commands = core["commands"]
+    for c in commands.CMD_MAP.values():
+        if not c.get("endpoint"):
+            continue
+        assert P.sospetti(dict(c["body"]), OMODA9) == []
+
+
+def test_sospetti_senza_lista_tacciono(P):
+    """Fallimento permissivo, la regola che ogni funzione nuova deve superare."""
+    assert P.sospetti({"times": "15"}, {}) == []
+    assert P.sospetti({"times": "15"}, None) == []
+    assert P.sospetti({}, JAECOO) == []
+
+
+def test_sospetti_restano_fuori_dalle_tabelle_che_decidono(core, P):
+    """La guardia strutturale: finché una corrispondenza è solo sospetta non può stare dove il
+    codice pota o instrada. Se qualcuno spostasse `times` in `POTABILI` per «completezza», il
+    corpo del clima cambierebbe su un'auto vera sulla base di un'ipotesi mai verificata."""
+    sospette = set(P.SOSPETTI_NON_MAPPATI)
+    for endpoint, tabella in P.POTABILI.items():
+        assert sospette.isdisjoint(tabella), f"{endpoint}: una chiave sospetta è diventata potabile"
+    assert sospette.isdisjoint({campo for _ep, campo in P.RIPIEGO})

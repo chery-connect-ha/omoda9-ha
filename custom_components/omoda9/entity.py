@@ -9,12 +9,14 @@ HA slugifica il solo nome). Dove il bridge usa un id non derivabile dal nome
 """
 from __future__ import annotations
 
+import time
+
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DEFAULT_VEHICLE_NAME, DOMAIN
+from .const import DEFAULT_VEHICLE_NAME, DOMAIN, OPT_MAX_S
 from .coordinator import Omoda9Coordinator
 
 
@@ -83,20 +85,52 @@ class Omoda9OptimisticMixin:
     Un comando ATTUA subito sull'auto, ma lo stato reale torna SOLO via MQTT a
     auto sveglia: l'ultimo valore "live" può restare fermo per ore. Dopo un'azione
     mostriamo immediatamente lo stato target (ottimistico) e lo teniamo finché non
-    arriva un NUOVO messaggio dall'auto (avanza `last_seen`), che diventa la verità.
-    Da usare come PRIMA classe base (precede Omoda9Entity nell'MRO)."""
+    arriva la verità sul CAMPO di questa entità.
+    Da usare come PRIMA classe base (precede Omoda9Entity nell'MRO).
+
+    ⚠️ **Il campo, non un messaggio qualsiasi.** L'ottimismo si annullava al primo
+    aggiornamento che facesse avanzare `last_seen`, cioè a QUALUNQUE messaggio dell'auto.
+    Ma molti messaggi non portano un solo campo di stato: le conferme dei comandi sedile
+    (`110F`) e i push di posizione (`1301`) contengono soltanto `result`/`seq`/`hasAsy`,
+    che sono meta e vengono scartati. Effetto misurato: si accendeva il sedile ventilato,
+    ~10 secondi dopo arrivava la conferma del comando stesso — vuota di stato — e
+    l'interruttore tornava OFF, perché `fields` conserva ancora il valore PRECEDENTE al
+    comando. L'entità mostrava il contrario di ciò che aveva appena fatto, e se l'auto si
+    riaddormentava senza ripubblicare quel campo ci restava.
+    La domanda giusta è «è arrivato un valore nuovo per il MIO campo?», e la risposta sta
+    in `data["msg_fields"]` — i soli campi del messaggio appena arrivato.
+
+    ⚠️ **E un tetto temporale, senza il quale si scambia un difetto con uno peggiore.**
+    Se il proprio campo non arrivasse mai più — auto che si riaddormenta, preset riuscito a
+    metà, campo che quel modello non pubblica — l'entità resterebbe sul valore comandato
+    **per sempre**, e in silenzio: una bugia senza scadenza è più difficile da diagnosticare
+    di una che torna sull'ultimo valore misurato. Il tetto è `OPT_MAX_S`.
+
+    ⚠️ Resta scoperto un caso, ed è di proposito: un messaggio che porta il mio campo ma
+    che l'auto ha pubblicato PRIMA di eseguire il comando (un 5A02 già in volo) annulla
+    l'ottimismo con il valore vecchio. Chiuderlo richiede di correlare la conferma col
+    `seq` del comando spedito, che oggi non è dimostrato che l'auto rimandi indietro. Fino
+    ad allora questa resta comunque una finestra molto più stretta di «qualunque
+    messaggio»."""
 
     _opt_value = None
     _opt_anchor = None
+    _opt_at: float | None = None
+    # Campi di telemetria che questa entità legge come stato reale. Vuoto = l'entità non ha
+    # uno stato reale da attendere (ricarica, antifurto): lì l'ottimismo lo chiude solo il
+    # tetto temporale. Va valorizzato da chi eredita il mixin.
+    _opt_keys: tuple[str, ...] = ()
 
     def _set_optimistic(self, value) -> None:
         self._opt_value = value
         self._opt_anchor = self.coordinator.data.get("last_seen")
+        self._opt_at = time.monotonic()
         self.async_write_ha_state()
 
     def _clear_optimistic(self) -> None:
         self._opt_value = None
         self._opt_anchor = None
+        self._opt_at = None
 
     async def _run_command(self, key: str, target, params: dict | None = None) -> None:
         """Attua un comando mostrando subito lo stato target (ottimistico).
@@ -110,16 +144,39 @@ class Omoda9OptimisticMixin:
         viene rifiutato ma ASPETTA il suo turno nella coda del coordinator, che lo invia appena
         l'auto ha confermato il precedente."""
         self._set_optimistic(target)
+        # La bandiera + `finally` copre anche la CANCELLAZIONE del task (`CancelledError`
+        # deriva da `BaseException` e non passa da `except Exception`): senza, un'automazione
+        # in `mode: restart` che si ri-attivi mentre il comando è in volo lasciava l'entità
+        # appesa allo stato ottimistico, cioè a mostrare un'azione che nessuno può più
+        # confermare. Stesso motivo per cui il lucchetto della coda si rilascia in `finally`.
+        inviato = False
         try:
             await self.coordinator.async_send_command(key, params)
+            inviato = True
         except Exception as err:  # noqa: BLE001 — qualunque fallimento del comando
-            self._clear_optimistic()
-            self.async_write_ha_state()
             raise HomeAssistantError(f"Comando «{key}» non riuscito: {err}") from err
+        finally:
+            if not inviato:
+                self._clear_optimistic()
+                self.async_write_ha_state()
+
+    def _verita_arrivata(self) -> bool:
+        """Vero se il messaggio appena arrivato porta un valore per il MIO campo.
+
+        Si guarda `msg_fields` (solo questo messaggio) e non `fields`, che è cumulativo:
+        lì il campo c'è sempre, anche se l'ultima volta che l'auto l'ha detto era ieri."""
+        if not self._opt_keys:
+            return False
+        if self.coordinator.data.get("last_seen") == self._opt_anchor:
+            return False                    # nessun messaggio nuovo da quando ho comandato
+        msg = self.coordinator.data.get("msg_fields") or {}
+        return any(k in msg for k in self._opt_keys)
+
+    def _ottimismo_scaduto(self) -> bool:
+        """Vero se l'ottimismo dura da troppo: la verità non è mai arrivata."""
+        return self._opt_at is not None and (time.monotonic() - self._opt_at) > OPT_MAX_S
 
     def _handle_coordinator_update(self) -> None:
-        # un nuovo messaggio dall'auto (last_seen cambiato) invalida l'ottimismo
-        if self._opt_value is not None and \
-                self.coordinator.data.get("last_seen") != self._opt_anchor:
+        if self._opt_value is not None and (self._verita_arrivata() or self._ottimismo_scaduto()):
             self._clear_optimistic()
         super()._handle_coordinator_update()

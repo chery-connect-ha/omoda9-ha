@@ -165,3 +165,44 @@ REALTIME_LIVE = {
 
 # auto a riposo: il cloud non ha un frame da restituire
 REALTIME_ASLEEP = {"code": "A07900"}
+
+
+# ───────────────────── profilo permessi di un veicolo NON nostro ─────────────────────
+# Jaecoo 7 PHEV, account EU — mappa `id → state` estratta con uno script dalla lista permessi
+# REALE che l'utente dell'issue #1 ha pubblicato il 2026-08-10 (280 voci, 126 negate).
+#
+# Perché sta qui e non come JSON committato: il file grezzo arriva da un terzo e il gate
+# `check_secrets.sh` scansiona tutta la history. Qui restano i soli numeri — nessun VIN, nessun
+# `tUserId`, nessun identificativo (verificato sul contenuto). I `name` sono deliberatamente
+# esclusi: il backend li localizza (quella lista torna in tedesco) e **nessuna logica del
+# componente deve mai guardarli**.
+#
+# Sono omesse le 98 voci FIGLIE del ramo 1 (stato veicolo, `parentId` 101): verificate tutte a 1,
+# e nessun comando le tocca. Restano le altre 182 — i comandi dei rami 2/3/4 più le cinque radici,
+# fra cui il 101 stesso — che sono quelle che decidono.
+# Fonte grezza: /root/omoda9-project/45_capability/permessi_jaecoo7_phev_eu.json
+JAECOO7_PHEV_EU = {
+    1: 1, 2: 1, 3: 1, 4: 1, 101: 1, 201: 0, 202: 1, 203: 1,
+    204: 1, 205: 1, 206: 1, 207: 1, 208: 1, 209: 1, 210: 0, 211: 1,
+    212: 1, 213: 1, 214: 0, 215: 1, 216: 0, 220: 0, 222: 0, 230: 0,
+    231: 0, 232: 0, 233: 0, 234: 0, 235: 0, 236: 0, 237: 0, 301: 1,
+    401: 1, 2011: 0, 2012: 0, 2013: 0, 2021: 1, 2022: 0, 2031: 1, 2032: 0,
+    2033: 1, 2041: 1, 2042: 1, 2043: 1, 2044: 0, 2045: 1, 2046: 1, 2047: 1,
+    2048: 1, 2049: 1, 2051: 1, 2052: 1, 2061: 1, 2062: 1, 2063: 1, 2071: 1,
+    2072: 1, 2073: 1, 2081: 1, 2082: 1, 2093: 1, 2094: 1, 2095: 1, 2096: 1,
+    2097: 1, 2098: 0, 2099: 0, 2103: 0, 2104: 0, 2105: 0, 2106: 0, 2107: 0,
+    2111: 1, 2121: 1, 2122: 0, 2123: 1, 2131: 0, 2132: 1, 2133: 1, 2134: 0,
+    2141: 0, 2142: 0, 2143: 0, 2144: 0, 2145: 0, 2146: 0, 2147: 0, 2148: 0,
+    2149: 0, 2151: 1, 2152: 1, 2161: 0, 2162: 0, 2201: 0, 2202: 0, 2203: 0,
+    2221: 0, 2222: 0, 2301: 0, 2302: 0, 2303: 0, 2304: 0, 2305: 0, 2306: 0,
+    2307: 0, 2308: 0, 2309: 0, 2311: 0, 2321: 0, 2322: 0, 2331: 0, 2332: 0,
+    2333: 0, 2334: 0, 2335: 0, 2336: 0, 2337: 0, 2338: 0, 2339: 0, 2341: 0,
+    2342: 0, 2343: 0, 2344: 0, 2345: 0, 2351: 0, 2352: 0, 2353: 0, 2354: 0,
+    2355: 0, 2356: 0, 2357: 0, 2361: 0, 2362: 0, 2363: 0, 2364: 0, 2365: 0,
+    2366: 0, 2367: 0, 2368: 0, 2369: 0, 2371: 0, 2372: 0, 2373: 0, 3011: 1,
+    3012: 1, 4011: 1, 20410: 1, 20411: 0, 20412: 0, 20413: 0, 20414: 0, 20415: 0,
+    20416: 0, 20417: 0, 20418: 0, 20419: 0, 20420: 0, 20421: 0, 20422: 0, 20910: 0,
+    21410: 0, 21411: 0, 21412: 0, 23010: 0, 23011: 0, 23012: 0, 23013: 0, 23014: 0,
+    23015: 0, 23310: 0, 23311: 0, 23312: 0, 23313: 0, 23314: 0, 23315: 0, 23610: 0,
+    23611: 0, 23612: 0, 23613: 0, 23614: 0, 23615: 0, 23616: 0,
+}

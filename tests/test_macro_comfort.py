@@ -274,3 +274,333 @@ async def test_pausa_di_coda_ha_comunque_un_tetto(hass, integrazione_avviata,
     monkeypatch.setattr(coord_mod, "COMMAND_SETTLE_S", 1)
 
     await asyncio.wait_for(coord._settle_after_command(), timeout=5)
+
+
+async def test_telemetria_spegne_la_macro(hass, integrazione_avviata, comandi_inviati,
+                                          monkeypatch):
+    """L'auto dice «clima spento» → l'interruttore la segue, anche fuori dalla scadenza.
+
+    È l'altra metà del sintomo del 2026-08-10: alle 16:55:17,8 l'auto ha pubblicato clima e
+    ventilazioni tutti a zero, i binary_sensor sedile si sono corretti, e la macro no — per
+    costruzione, perché rifiutava di guardare la telemetria. Restava accesa fino alla
+    scadenza in memoria, cioè per un quarto d'ora, annunciando un preset finito."""
+    monkeypatch.setattr(switch_mod, "MACRO_GRAZIA_S", 0)   # niente finestra: si crede subito
+    coord = _coordinator(hass, integrazione_avviata)
+    coord._last_msg_ts = time.time()                       # auto desta: nessuna sveglia
+
+    await hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True)
+    assert hass.states.get(MACRO).state == "on"
+
+    await _consegna(hass, coord, FX.telemetry_5a02(
+        frontHVACState="0", dSeatVentilateState="0", pSeatVentilateState="0"))
+
+    assert hass.states.get(MACRO).state == "off", (
+        "l'auto ha chiuso il preset: l'interruttore deve spegnersi senza aspettare i 15 min")
+    assert _entita(hass, MACRO)._resto_scadenza() is None, "e la scadenza va disarmata"
+
+
+async def test_telemetria_non_accende_la_macro(hass, integrazione_avviata,
+                                               comandi_inviati):
+    """Il clima acceso da altri NON deve accendere la macro: la correzione è a senso unico.
+
+    `frontHVACState=1` non distingue «preset macro» da «clima acceso dalla card, dall'app
+    ufficiale o dal guidatore». Accendere da qui farebbe comparire un «Raffredda tutto» che
+    nessuno ha chiesto — e con esso una scadenza che spegnerebbe il clima altrui."""
+    coord = _coordinator(hass, integrazione_avviata)
+    assert hass.states.get(MACRO).state == "off"
+
+    await _consegna(hass, coord, FX.telemetry_5a02(
+        frontHVACState="1", dSeatVentilateState="3", pSeatVentilateState="3"))
+
+    assert hass.states.get(MACRO).state == "off"
+
+
+async def test_grazia_dopo_linvio(hass, integrazione_avviata, comandi_inviati,
+                                  monkeypatch):
+    """Subito dopo l'invio la telemetria NON viene creduta: l'auto non ha ancora agito.
+
+    Fra il nostro comando e la sua esecuzione l'auto continua a pubblicare lo stato di
+    prima — un 5A02 già in volo, o la risposta alla sveglia — con il clima a zero. Senza
+    finestra di grazia l'interruttore si spegnerebbe un secondo dopo essere stato acceso,
+    cioè si sostituirebbe un difetto con uno più visibile."""
+    monkeypatch.setattr(switch_mod, "MACRO_GRAZIA_S", 300)
+    coord = _coordinator(hass, integrazione_avviata)
+    coord._last_msg_ts = time.time()
+
+    await hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True)
+    await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))
+
+    assert hass.states.get(MACRO).state == "on", (
+        "entro la finestra di grazia la telemetria stantia non deve spegnere la macro")
+
+
+async def test_un_solo_sedile_spento_non_spegne_la_macro(hass, integrazione_avviata,
+                                                         comandi_inviati, monkeypatch):
+    """Un campo del preset a zero, senza notizie del clima: il preset non è finito.
+
+    Il criterio è ancorato al clima, che è il cuore di entrambe le macro e compare in ogni
+    conferma. Senza quell'ancora basterebbe un messaggio con il solo sedile a zero — il
+    guidatore che lo spegne dal cruscotto — per spegnere l'interruttore mentre l'abitacolo
+    continua a raffreddare: cioè per sostituire il difetto con il suo opposto.
+
+    ⚠️ Il messaggio NON deve contenere `frontHVACState`: con il clima presente e acceso il
+    caso passerebbe anche senza ancora, e il test non proverebbe nulla."""
+    monkeypatch.setattr(switch_mod, "MACRO_GRAZIA_S", 0)
+    coord = _coordinator(hass, integrazione_avviata)
+    coord._last_msg_ts = time.time()
+
+    await hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True)
+    await _consegna(hass, coord, FX.envelope("5A02", {"dSeatVentilateState": "0",
+                                                      "time": "1721390002000"}))
+    assert hass.states.get(MACRO).state == "on", (
+        "un sedile spento non è il preset finito: manca la notizia sul clima")
+
+    # ...e con il clima ancora acceso vale lo stesso, per la strada opposta.
+    await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="1",
+                                                   dSeatVentilateState="0"))
+    assert hass.states.get(MACRO).state == "on"
+
+
+async def test_riavvio_con_preset_gia_chiuso_dallauto(hass, config_entry, cloud,
+                                                      monkeypatch):
+    """Dopo un riavvio la correzione si applica SUBITO, senza finestra di grazia.
+
+    È il caso che il riarmo della scadenza da solo non copre: HA riparte, l'interruttore
+    si ripristina acceso con dieci minuti ancora da correre, ma l'auto nel frattempo ha già
+    chiuso tutto. Nella nuova esecuzione non c'è alcun invio da proteggere, quindi il primo
+    messaggio che dice «clima spento» vale."""
+    from pytest_homeassistant_custom_component.common import mock_restore_cache
+
+    acceso_da = dt_util.utcnow() - timedelta(seconds=60)
+    mock_restore_cache(hass, (State(MACRO, "on", last_changed=acceso_da,
+                                    last_updated=acceso_da),))
+    await _avvia(hass, config_entry, monkeypatch)
+    assert hass.states.get(MACRO).state == "on"
+
+    coord = _coordinator(hass, config_entry)
+    await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))
+
+    assert hass.states.get(MACRO).state == "off"
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_la_coda_si_libera_anche_se_il_task_viene_annullato(hass,
+                                                                  integrazione_avviata,
+                                                                  monkeypatch):
+    """Comando annullato a metà: lo slot della coda deve tornare libero.
+
+    `asyncio.CancelledError` deriva da `BaseException` e non passava dal `except Exception`
+    che rilasciava lo slot: il lucchetto restava chiuso PER SEMPRE e da lì in poi ogni
+    comando — compresi quelli del poll — falliva dopo 30 s con «L'auto è ancora impegnata»,
+    fino al riavvio di Home Assistant. Basta un'automazione in `mode: restart` che si
+    ri-attivi mentre l'invio è in volo."""
+    coord = _coordinator(hass, integrazione_avviata)
+
+    def _lento(key, params=None):
+        time.sleep(2)
+        return "inviato (test)"
+
+    monkeypatch.setattr(coord, "_send_command", _lento)
+
+    task = asyncio.create_task(coord.async_send_command("localizza"))
+    await asyncio.sleep(0.2)
+    assert coord._cmd_gate.locked(), "premessa del test: lo slot è occupato"
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert not coord._cmd_gate.locked(), (
+        "annullamento del task: lo slot va restituito, o l'integrazione resta inerte")
+
+
+async def test_una_sola_sveglia_condivisa(hass, integrazione_avviata, monkeypatch):
+    """Due richieste di sveglia in contemporanea → UN solo `localizza`.
+
+    La macro comfort e il ciclo di poll svegliano l'auto per due motivi diversi e senza
+    sapere l'uno dell'altro. Nel diario diagnostico ci sono 13 coppie di `localizza` a meno
+    di 60 secondi, 6 delle quali finite in A00082: il secondo non aggiunge nulla (l'auto o si
+    è svegliata col primo, o non si sveglia) e occupa uno slot della coda più la pausa che lo
+    segue, proprio mentre il comando vero aspetta di partire."""
+    coord = _coordinator(hass, integrazione_avviata)
+    inviati: list[str] = []
+
+    async def _finto(self, key, params=None):
+        inviati.append(key)
+        await asyncio.sleep(0.2)          # l'invio dura: le due richieste si sovrappongono
+        return "inviato (test)"
+
+    monkeypatch.setattr(coord_mod.Omoda9Coordinator, "async_send_command", _finto)
+
+    await asyncio.gather(coord.async_assicura_sveglia(), coord.async_assicura_sveglia())
+    assert inviati == ["localizza"], "due richieste contemporanee = una sola sveglia"
+
+    # ...ma una richiesta successiva, a sveglia conclusa, deve poter svegliare di nuovo:
+    # coalescere non vuol dire svegliare una volta sola per sempre.
+    await coord.async_assicura_sveglia()
+    assert inviati == ["localizza", "localizza"]
+
+
+async def test_la_sveglia_condivisa_non_propaga_lerrore(hass, integrazione_avviata,
+                                                        monkeypatch):
+    """Sveglia fallita (tipicamente A00082) → chi la aspettava prosegue lo stesso.
+
+    È il comportamento che macro e poll avevano già ciascuno per conto suo, e va conservato:
+    la sveglia è un mezzo, non il fine. Se propagasse, un `localizza` rifiutato farebbe
+    fallire la macro invece di farla proseguire con i suoi 35 secondi d'attesa."""
+    coord = _coordinator(hass, integrazione_avviata)
+
+    async def _finto(self, key, params=None):
+        raise RuntimeError("A00082 veicolo occupato (test)")
+
+    monkeypatch.setattr(coord_mod.Omoda9Coordinator, "async_send_command", _finto)
+    await coord.async_assicura_sveglia()     # non deve sollevare
+
+
+async def test_un_messaggio_vecchio_non_spegne_una_macro_appena_accesa(
+        hass, integrazione_avviata, comandi_inviati, monkeypatch):
+    """Il caso che il difetto del 10/08 avrebbe prodotto AL CONTRARIO, ed è più frequente.
+
+    L'auto pubblica il suo stato (clima spento, ovviamente: è ferma). L'utente preme
+    «Raffredda tutto». Nessun messaggio nuovo arriva, ma le entità vengono notificate lo
+    stesso, perché l'invio scrive i suoi passaggi in «Esito comando» e quello è un
+    aggiornamento del coordinator. Se il messaggio vecchio non è stato consumato PRIMA —
+    mentre la macro era ancora spenta — viene letto adesso come se fosse appena arrivato e
+    spegne l'interruttore un istante dopo che l'utente l'ha acceso, con il comando già in
+    viaggio verso l'auto. È il difetto del 10/08 rovesciato, e non richiede due pressioni:
+    ne basta una."""
+    monkeypatch.setattr(switch_mod, "MACRO_GRAZIA_S", 0)   # nessuna finestra a coprire l'errore
+    coord = _coordinator(hass, integrazione_avviata)
+
+    # L'auto parla (clima spento: è ferma) e resta desta, così la macro non passa dalla
+    # sveglia e fra la pressione e l'invio non c'è nessun aggiornamento del coordinator:
+    # il messaggio vecchio va consumato PRIMA, mentre la macro è ancora spenta.
+    macro = _entita(hass, MACRO)
+    await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))
+    # L'invariante, asserita direttamente perché è quella che regge tutto il resto: un
+    # messaggio è «già visto» anche se è arrivato mentre la macro era spenta. Verificarla
+    # solo attraverso lo stato finale renderebbe il test dipendente da quali notifiche
+    # capitano dopo la pressione, che è proprio ciò che non si deve dare per scontato.
+    assert macro._msg_visto == coord.data["last_seen"], (
+        "il messaggio va consumato anche a macro spenta, altrimenti alla prima accensione "
+        "viene riletto come se fosse appena arrivato")
+
+    await hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True)
+    # Un aggiornamento del coordinator che NON viene dall'auto: nella realtà lo produce
+    # l'invio stesso, che scrive i suoi passaggi in «Esito comando». Le entità vengono
+    # notificate, ma nessun messaggio nuovo è arrivato.
+    coord._update({"cmd_status": "Comando inviato (test)"})
+    await hass.async_block_till_done()
+
+    assert comandi_inviati == ["clima_raffredda_on"]
+    assert hass.states.get(MACRO).state == "on", (
+        "un messaggio anteriore alla pressione non può spegnere ciò che l'utente ha appena acceso")
+
+
+async def test_la_conferma_di_un_comando_precedente_non_spegne(hass, integrazione_avviata,
+                                                                comandi_inviati, monkeypatch):
+    """Una conferma dell'auto NON viene creduta subito, e la ragione è una sequenza reale.
+
+    Sembrerebbe ovvio fidarsi delle conferme: sono la risposta a un comando che l'auto ha già
+    ricevuto, quindi non possono essere anteriori all'esecuzione. È vero per il comando che le
+    ha generate, ma noi non sappiamo QUALE comando sia — l'auto rimanda indietro il `seq` che
+    le abbiamo spedito, ma nessuno ha ancora misurato che sia lo stesso, quindi non si può
+    correlare. Qui l'ack che arriva è quello di uno spegnimento partito prima, e porta tutti i
+    campi a zero: crederci vorrebbe dire spegnere l'interruttore mentre l'auto sta raffreddando
+    per via dell'accensione appena inviata — cioè rifare il difetto del 10/08 al contrario.
+
+    Il caso che così si perde (l'auto conferma «tutto spento» e poi si riaddormenta senza dire
+    altro) resta coperto dalla scadenza, come prima."""
+    coord = _coordinator(hass, integrazione_avviata)
+    coord._last_msg_ts = time.time()
+
+    await hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True)
+    assert hass.states.get(MACRO).state == "on"
+
+    # ack di un comando PRECEDENTE (uno spegnimento), in ritardo: preset tutto a zero
+    await _consegna(hass, coord, FX.envelope("110C", {
+        "result": "2", "resultTime": "1721390002000", "seq": "X-1",
+        "frontHVACState": "0", "dSeatVentilateState": "0", "pSeatVentilateState": "0",
+        "lSeatVentilateState2": "0", "rSeatVentilateState2": "0"}))
+
+    assert hass.states.get(MACRO).state == "on", (
+        "non sappiamo di quale comando sia quella conferma: non può spegnere ciò che abbiamo "
+        "appena acceso")
+
+
+async def test_lo_stato_cumulativo_non_basta_a_spegnere(hass, integrazione_avviata,
+                                                        comandi_inviati, monkeypatch):
+    """Si guarda il messaggio, non lo storico: `fields` è cumulativo e mescola le epoche.
+
+    Qui l'auto manda un messaggio che NON parla del clima (solo la spina di ricarica), mentre
+    in `fields` resta un `frontHVACState=0` di prima. Leggendo lo stato accumulato la macro si
+    spegnerebbe su un messaggio che non ha detto niente sul clima."""
+    monkeypatch.setattr(switch_mod, "MACRO_GRAZIA_S", 0)
+    coord = _coordinator(hass, integrazione_avviata)
+
+    await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))   # entra nei `fields`
+    coord._last_msg_ts = time.time()
+    await hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True)
+    assert hass.states.get(MACRO).state == "on"
+
+    await _consegna(hass, coord, FX.envelope("5A02", {"chargeGunState": "1",
+                                                      "time": "1721390003000"}))
+    assert coord.data["fields"].get("frontHVACState") == "0", "premessa: lo storico dice spento"
+    assert hass.states.get(MACRO).state == "on", (
+        "questo messaggio non parla del clima: non può dire che il preset è finito")
+
+
+async def test_la_telemetria_della_sveglia_non_spegne_la_macro(hass, integrazione_avviata,
+                                                               comandi_inviati, monkeypatch):
+    """Durante i 35 secondi di sveglia l'auto pubblica lo stato di PRIMA: non conta.
+
+    È la sequenza normale, non un caso di scuola: la macro sveglia l'auto proprio perché
+    dormiva, l'auto si desta e la prima cosa che fa è raccontare com'è messa adesso — cioè
+    col clima spento, visto che il nostro comando non è ancora partito. Quel messaggio è
+    posteriore alla pressione ma anteriore al comando, quindi non dice niente sul preset."""
+    monkeypatch.setattr(switch_mod, "MACRO_GRAZIA_S", 0)   # solo la guardia del ciclo in volo
+    monkeypatch.setattr(switch_mod, "MACRO_WAKE_WAIT", 0.4)
+    coord = _coordinator(hass, integrazione_avviata)
+    coord._last_msg_ts = 0.0                               # l'auto dorme → ramo lungo
+
+    accendi = asyncio.create_task(
+        hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True))
+    await asyncio.sleep(0.05)
+    await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))   # si sveglia e parla
+    assert hass.states.get(MACRO).state == "on", (
+        "la telemetria arrivata mentre il comando è ancora in coda parla di prima")
+    await accendi
+    assert comandi_inviati == ["localizza", "clima_raffredda_on"]
+
+
+async def test_un_ciclo_annullato_non_ceca_la_macro(hass, integrazione_avviata,
+                                                    comandi_inviati, monkeypatch):
+    """Ciclo annullato durante l'attesa: si torna com'era, e la correzione resta viva.
+
+    Fra la pressione e l'invio ci sono fino a 35 secondi, ed è la finestra più larga del
+    componente: un'automazione in `mode: restart` che si ri-attivi lì dentro annulla il task.
+    `CancelledError` deriva da `BaseException` e non passa da `except Exception` — senza un
+    `finally` lasciava l'interruttore acceso, senza scadenza (già disarmata a inizio ciclo) e
+    con la correzione dalla telemetria disattivata: tutte e tre le uscite spente insieme, cioè
+    di nuovo «acceso a tempo indeterminato»."""
+    monkeypatch.setattr(switch_mod, "MACRO_WAKE_WAIT", 5)
+    coord = _coordinator(hass, integrazione_avviata)
+    coord._last_msg_ts = 0.0                       # l'auto dorme → attesa lunga
+    macro = _entita(hass, MACRO)
+
+    ciclo = asyncio.create_task(
+        hass.services.async_call("switch", "turn_on", {"entity_id": MACRO}, blocking=True))
+    await asyncio.sleep(0.05)
+    assert macro._invio_in_corso is True, "premessa: il ciclo è in volo"
+
+    ciclo.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await ciclo
+    await hass.async_block_till_done()
+
+    assert macro._invio_in_corso is False, (
+        "ciclo annullato: la macro deve tornare a farsi correggere dalla telemetria")
+    assert hass.states.get(MACRO).state == "off", (
+        "il comando non è mai partito: l'interruttore torna com'era")
+    assert comandi_inviati == ["localizza"], "nessun comando comfort è stato spedito"

@@ -30,7 +30,8 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, MACRO_WAKE_WAIT, MACRO_WAKE_WAIT_AWAKE, MACRO_PRESET_S
+from .const import (CAMPO_CLIMA, DOMAIN, MACRO_GRAZIA_S, MACRO_WAKE_WAIT,
+                    MACRO_WAKE_WAIT_AWAKE, MACRO_PRESET_S)
 from .entity import Omoda9Entity, Omoda9OptimisticMixin, field_on
 
 
@@ -126,6 +127,8 @@ class Omoda9ComfortSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, Res
                  on_cmd: str, off_cmd: str, icon: str) -> None:
         super().__init__(coord, name, suffix, entity_id_format=ENTITY_ID_FORMAT)
         self._field = field
+        # il campo che questa entità legge: è ciò che chiude l'ottimismo (vedi il mixin)
+        self._opt_keys = (field,)
         self._on_cmd = on_cmd
         self._off_cmd = off_cmd
         self._attr_icon = icon
@@ -191,6 +194,25 @@ class Omoda9ChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, Rest
         await self._run_command("ricarica_stop", False)
 
 
+# Per ogni macro, i campi di STATO che l'auto pubblica quando il preset è attivo.
+# ⚠️ Sono i nomi dello STATO, NON quelli del corpo del comando: il comando spedisce `mSeatAiry`,
+# l'auto risponde `dSeatVentilateState`. Dedurre gli uni dagli altri è impossibile e la mappa va
+# tenuta a mano; sono tutti in `META` (coordinator.py), cioè sono gli stessi campi che fanno
+# funzionare i singoli interruttori sedile.
+# Il freddo è MISURATO: 22 ack `110C` su 31 portano tutti e cinque i campi (riconteggio
+# della validazione avversariale del 10/08; gli altri 9 sono preset riusciti a metà, con il
+# solo `frontHVACState`). Il caldo è in parte dedotto: dei
+# suoi ack ne abbiamo osservati due, con `frontHVACState` e `rWinHeatingState`. Elencare in più
+# un campo che l'auto non manda è innocuo — si guardano solo i campi PRESENTI nel messaggio.
+CAMPI_PRESET = {
+    "clima_raffredda_on": (CAMPO_CLIMA, "dSeatVentilateState", "pSeatVentilateState",
+                           "lSeatVentilateState2", "rSeatVentilateState2"),
+    "clima_riscalda_on": (CAMPO_CLIMA, "rWinHeatingState", "frontWindshieldHeat",
+                          "steerWheelHeating", "dSeatHeatingState", "pSeatHeatingState",
+                          "lSeatHeatingState2", "rSeatHeatingState2"),
+}
+
+
 class _GenerazioneMacro:
     """Numero di sequenza condiviso dalle due macro comfort: vince l'ultima pressione.
 
@@ -224,16 +246,18 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
     proprio (ottimistico PERSISTENTE: non viene azzerato dai messaggi telemetria, altrimenti
     non si potrebbe spegnere). ⚠️ Questo NON vuol dire che l'auto taccia: le conferme della
     macro riportano `frontHVACState` e i campi delle ventilazioni/riscaldamenti sedile, che
-    finiscono già in `fields` — sono gli stessi che fanno funzionare la card clima e i
-    singoli interruttori sedile. Usarli per SPEGNERE la macro quando l'auto ha chiuso il
-    preset (o quando lo spegne il guidatore dal cruscotto) è il passo successivo, non ancora
-    fatto: va scritto guardando i campi presenti nel MESSAGGIO appena arrivato e non lo stato
-    accumulato in `fields`, che è cumulativo e può portarsi dietro valori vecchi di giorni.
-    Si auto-spegne da solo dopo MACRO_PRESET_S (l'auto chiude il
-    preset dopo ~15 min), e la scadenza SOPRAVVIVE a un riavvio di Home Assistant (viene
-    riarmata sul tempo residuo, vedi `async_added_to_hass`): prima viveva solo in memoria,
-    quindi un riavvio durante un preset lasciava l'interruttore acceso per sempre.
-    Raffredda e Riscalda si escludono a vicenda."""
+    sono gli stessi che fanno funzionare la card clima e i singoli interruttori sedile.
+    Quei campi vengono usati per SPEGNERE l'interruttore — mai per accenderlo (vedi
+    `_spento_dall_auto`), e guardando i campi presenti nel MESSAGGIO appena arrivato, non lo
+    stato accumulato in `fields`, che è cumulativo e si porta dietro valori vecchi di giorni.
+    Prima di questa correzione ogni disallineamento fra interruttore e auto era permanente.
+
+    Ci sono quindi tre uscite, e ognuna copre ciò che le altre non vedono: la telemetria
+    (l'auto dice che il clima è spento), la scadenza MACRO_PRESET_S (l'auto chiude il preset
+    dopo ~15 min e potrebbe non pubblicare nulla mentre si riaddormenta) e, dopo un riavvio di
+    Home Assistant, il riarmo della scadenza sul tempo residuo (`async_added_to_hass`): prima
+    viveva solo in memoria, quindi un riavvio durante un preset lasciava l'interruttore acceso
+    per sempre. Raffredda e Riscalda si escludono a vicenda."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
 
@@ -247,6 +271,9 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
         self._restored: bool | None = None
         self._expire_unsub = None
         self._expire_at: float | None = None   # scadenza monotona del preset in corso
+        self._msg_visto = None                 # `last_seen` dell'ultimo messaggio già valutato
+        self._inviato_a: float | None = None   # quando è partito l'ultimo comando di questa macro
+        self._invio_in_corso = False           # pressione accolta, comando non ancora spedito
         self._gen = generazione
         self._exclusive: "Omoda9ClimaMacroSwitch | None" = None
 
@@ -283,12 +310,102 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
         return bool(self._restored)
 
     def _handle_coordinator_update(self) -> None:
-        # NON azzerare lo stato sui messaggi telemetria (il mixin lo farebbe, ancorandosi a
+        # NON si azzera lo stato sui messaggi telemetria (il mixin lo farebbe, ancorandosi a
         # `last_seen`, che avanza a OGNI messaggio anche quando non contiene nulla di
-        # attinente): manteniamo lo stato impostato, aggiorniamo solo la UI. Il passo che
-        # manca non è riattivare il mixin ma leggere i campi del preset — vedi il docstring
-        # della classe: correzione a SENSO UNICO, la telemetria può spegnere, mai accendere.
+        # attinente): lo stato impostato si mantiene. Ciò che si guarda sono i campi del
+        # preset, e solo per SPEGNERE — vedi `_spento_dall_auto`.
+        self._spento_dall_auto()
         self.async_write_ha_state()
+
+    def _preset_finito(self, msg: dict) -> bool:
+        """Vero se QUESTO messaggio dell'auto dice che il preset non è più attivo.
+
+        Si guarda il messaggio appena arrivato e mai `fields`, che è cumulativo: lì dentro un
+        `frontWindshieldHeat` acceso settimane fa da un altro interruttore basterebbe a
+        impedire per sempre lo spegnimento della macro calda.
+
+        Due condizioni, non una. La prima è che il messaggio parli del clima e lo dia SPENTO:
+        è il cuore di entrambi i preset e senza di lui non si conclude niente (un messaggio
+        che porta solo un sedile a zero non dice che il preset è finito — dice che è finito
+        un sedile, e spegnere la macro per quello sarebbe una bugia nell'altro verso). La
+        seconda è che nessun altro campo del preset presente nel messaggio risulti acceso.
+
+        Su una vettura che non pubblichi `frontHVACState` questa funzione è sempre falsa:
+        nessuna correzione, comportamento identico a prima. È voluto — non sapere non deve
+        mai produrre un'azione."""
+        if field_on(msg.get(CAMPO_CLIMA)) is not False:
+            return False        # campo assente, o clima ancora acceso
+        return not any(field_on(msg.get(k)) is True
+                       for k in CAMPI_PRESET.get(self._on_cmd, ()))
+
+    @callback
+    def _spento_dall_auto(self) -> None:
+        """Correzione dalla telemetria, **a senso unico**: può solo SPEGNERE la macro.
+
+        Perché a senso unico: `frontHVACState=1` non distingue «preset macro» da «clima acceso
+        dalla card o dall'app», quindi accendere la macro da qui farebbe comparire un
+        «Raffredda tutto» che nessuno ha chiesto. Spegnere, invece, è sempre difendibile: se
+        il clima è spento il preset non è in corso, qualunque cosa l'abbia chiuso — la
+        scadenza dei 15 minuti, il guidatore dal cruscotto, l'app ufficiale, o un nostro
+        comando andato in porto mentre l'interruttore era rimasto indietro.
+
+        Senza questa correzione ogni disallineamento era PERMANENTE: nulla poteva riportare
+        l'interruttore sulla realtà prima della scadenza in memoria, e il valore lo si vedeva
+        proprio nel caso in cui l'auto pubblicava la verità (2026-08-10, 16:55:17,8: telemetria
+        tutto spento, interruttore acceso ancora per un quarto d'ora)."""
+        dati = self.coordinator.data or {}
+        marcatore = dati.get("last_seen")
+        # `last_seen` avanza SOLO all'arrivo di un messaggio dell'auto, mentre le entità
+        # vengono notificate anche per aggiornamenti nostri (esito comando, sonda realtime,
+        # stato sessione). Senza questo confronto lo stesso messaggio verrebbe rivalutato a
+        # ogni notifica.
+        if marcatore is None or marcatore == self._msg_visto:
+            return
+        # ⚠️ Il messaggio si consuma SEMPRE, anche a macro spenta. Consumarlo solo da accesa
+        # sembra un'ottimizzazione e invece è un difetto: `msg_fields` resta in `data` finché
+        # non arriva il messaggio successivo, quindi alla PRIMA accensione ci si troverebbe
+        # davanti un messaggio vecchio — con il clima a zero, ovviamente, visto che l'auto era
+        # ferma — e lo si leggerebbe come appena arrivato, spegnendo la macro un istante dopo
+        # che l'utente l'ha accesa. E basta pochissimo a scatenarlo: il nostro stesso
+        # «Sveglio l'auto…» è un aggiornamento del coordinator e fa rileggere tutto.
+        self._msg_visto = marcatore
+        if not self.is_on:
+            return
+        # Finché il nostro comando non è partito, nessun messaggio può parlare del preset che
+        # stiamo per chiedere: la pressione dell'utente è più recente di qualunque cosa l'auto
+        # abbia detto finora. Vale soprattutto durante i 35 secondi di sveglia, che è proprio
+        # quando l'auto si sveglia e pubblica il suo stato di PRIMA.
+        if self._invio_in_corso:
+            return
+        # Dopo l'invio si aspetta prima di credere alla telemetria: l'auto continua a
+        # pubblicare lo stato vecchio finché non esegue.
+        #
+        # ⚠️ Qui c'era un'eccezione per le CONFERME dell'auto — «una conferma è la risposta a
+        # un comando già ricevuto, quindi non può essere anteriore all'esecuzione» — ed è
+        # stata TOLTA perché è vera per il comando che l'ha generata e falsa per il NOSTRO
+        # ultimo comando. Sequenza reale: si preme OFF ad auto dormiente (parte a +35 s), poi
+        # ON pochi secondi dopo (parte subito, l'auto ormai è desta); l'ack dell'OFF arriva
+        # dopo — la latenza misurata va da 8 a 38 secondi — con tutti i campi a zero, e
+        # spegnerebbe l'interruttore mentre l'auto sta raffreddando per via dell'ON. Cioè
+        # esattamente il sintomo da cui è nata questa release, per una strada nuova. Lo stesso
+        # vale per gli ack dei comandi dell'app ufficiale, che condivide il nostro flusso di
+        # push, e per il `clima_off` che manda «Aggiorna stato completo».
+        # Distinguere «l'ack del MIO comando» dagli altri richiede di correlare il `seq`, che
+        # spediamo e che l'auto rimanda indietro, ma non è ancora stato misurato che sia lo
+        # STESSO `seq` (nella diagnostica il valore è redatto). Finché non lo è, non sapere
+        # non deve produrre un'azione: si aspetta, e il caso «l'auto conferma tutto spento e
+        # poi si riaddormenta» resta coperto dalla scadenza, come prima.
+        if self._entro_la_grazia():
+            return
+        if not self._preset_finito(dati.get("msg_fields") or {}):
+            return
+        self._cancel_expire()
+        self._set_state(False)
+
+    def _entro_la_grazia(self) -> bool:
+        """Vero se il nostro ultimo comando è troppo recente perché l'auto abbia già agito."""
+        return (self._inviato_a is not None
+                and (time.monotonic() - self._inviato_a) < MACRO_GRAZIA_S)
 
     def _cancel_expire(self) -> None:
         if self._expire_unsub is not None:
@@ -366,40 +483,66 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
         essere stato sorpassato NON spedisce. Così l'interfaccia e l'auto convergono sempre
         sullo stesso tocco, ed è anche la cancellazione del ciclo della macro gemella."""
         mia = self._gen.avanza()
-        # Stato da cui ripartire se il comando non riesce: NON si assume «spento» (vedi il
-        # ramo d'errore in fondo).
+        # Da qui il ciclo è «in volo»: la telemetria che arriva parla ancora di PRIMA della
+        # pressione, e non deve correggere niente (vedi `_spento_dall_auto`).
+        self._invio_in_corso = True
+        # Stato da cui ripartire se il comando non parte: NON si assume «spento» (vedi il
+        # `finally` in fondo).
         prima_on = bool(self.is_on)
         prima_resto = self._resto_scadenza()
         self._cancel_expire()
         self._set_state(target)
-        if self.coordinator.auto_sveglia:
-            attesa = MACRO_WAKE_WAIT_AWAKE
-        else:
-            attesa = MACRO_WAKE_WAIT
-            # sveglia (vehicleLocation = sveglia + GPS, benigno); non bloccare la macro se fallisce
-            try:
-                await self.coordinator.async_send_command("localizza")
-            except Exception:  # noqa: BLE001
-                pass
-            self._annuncia_attesa(attesa)   # ← la finestra muta che faceva ripremere il tasto
-        await asyncio.sleep(attesa)  # lascia accendere il bus comfort
-        if mia != self._gen.n:
-            return      # sorpassata da una pressione più recente: non si spedisce nulla
+        spedito = False
         try:
-            await self.coordinator.async_send_command(cmd)
-        except Exception as err:  # noqa: BLE001
-            # Lo stato torna a com'era PRIMA della pressione, non a «spento». Metterlo sempre
-            # a spento sbagliava in entrambi i versi: uno spegnimento fallito lasciava
-            # l'interruttore su OFF mentre l'auto continuava il preset (e senza scadenza, già
-            # disarmata a inizio ciclo), e un'accensione fallita su una macro già accesa la
-            # spegneva in Home Assistant senza che l'auto ne sapesse nulla.
-            self._set_state(prima_on)
-            if prima_on and prima_resto:
-                self._arma_scadenza(prima_resto)
-            raise HomeAssistantError(f"Comando «{cmd}» non riuscito: {err}") from err
-        if target:
-            # l'auto chiude il preset dopo ~15 min → riporta lo switch a OFF da solo
-            self._arma_scadenza(MACRO_PRESET_S)
+            if self.coordinator.auto_sveglia:
+                attesa = MACRO_WAKE_WAIT_AWAKE
+            else:
+                attesa = MACRO_WAKE_WAIT
+                # sveglia CONDIVISA con il ciclo di poll: se ce n'è già una in volo si aspetta
+                # quella invece di spedirne un'altra (che si prenderebbe un «veicolo occupato»).
+                # Non blocca la macro se fallisce — la decisione di proseguire comunque è la
+                # stessa di prima, solo che ora sta dentro al metodo condiviso.
+                await self.coordinator.async_assicura_sveglia()
+                self._annuncia_attesa(attesa)   # ← la finestra muta che faceva ripremere il tasto
+            await asyncio.sleep(attesa)  # lascia accendere il bus comfort
+            if mia != self._gen.n:
+                return      # sorpassata da una pressione più recente: non si spedisce nulla
+            try:
+                await self.coordinator.async_send_command(cmd)
+            except Exception as err:  # noqa: BLE001
+                raise HomeAssistantError(f"Comando «{cmd}» non riuscito: {err}") from err
+            spedito = True
+            # Da qui parte la finestra in cui la telemetria non viene creduta: l'auto continua
+            # a pubblicare lo stato di PRIMA finché non esegue (vedi `_spento_dall_auto`).
+            self._inviato_a = time.monotonic()
+            if target:
+                # l'auto chiude il preset dopo ~15 min → riporta lo switch a OFF da solo
+                self._arma_scadenza(MACRO_PRESET_S)
+        finally:
+            # ⚠️ `finally` e non tre `return`: fra la pressione e l'invio ci sono fino a 35
+            # secondi di attesa, ed è la finestra più larga del componente. Un task annullato
+            # lì dentro (automazione in `mode: restart`, chiamata di servizio interrotta,
+            # reload dell'entry) solleva `CancelledError`, che deriva da `BaseException` e non
+            # passa né da `except Exception` né da un `return`. Lasciava l'interruttore
+            # ACCESO, senza scadenza (già disarmata a inizio ciclo) e con `_invio_in_corso`
+            # alzato, cioè con la correzione dalla telemetria disattivata: tutte e tre le
+            # uscite spente insieme, che è esattamente il difetto da cui è nata questa
+            # release. È lo stesso buco già tappato in `coordinator.async_send_command` e in
+            # `entity._run_command`, ed è la ragione per cui lì si usa una bandiera.
+            #
+            # Il ripristino si fa solo se il ciclo è ancora l'ULTIMO: se una pressione più
+            # recente ha preso il comando, lo stato è cosa sua e riscriverlo lo corromperebbe.
+            if mia == self._gen.n:
+                self._invio_in_corso = False
+                if not spedito:
+                    # comando mai partito → si torna a com'era PRIMA della pressione. Metterlo
+                    # sempre a «spento» sbagliava in entrambi i versi: uno spegnimento fallito
+                    # lasciava l'interruttore su OFF mentre l'auto continuava il preset, e
+                    # un'accensione fallita su una macro già accesa la spegneva in Home
+                    # Assistant senza che l'auto ne sapesse nulla.
+                    self._set_state(prima_on)
+                    if prima_on and prima_resto:
+                        self._arma_scadenza(prima_resto)
 
     async def async_turn_on(self, **kwargs) -> None:
         if self._exclusive is not None:
@@ -434,6 +577,11 @@ class Omoda9ScheduledChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEnt
     def __init__(self, coord) -> None:
         super().__init__(coord, "Omoda9 Ricarica programmata", "ricarica_programmata",
                          entity_id_format=ENTITY_ID_FORMAT)
+        # ⚠️ Questo interruttore uno stato reale CE L'HA, a differenza di «Ricarica»: il piano
+        # arriva in telemetria dentro `chargeAppointPlans` (vedi `_live_on`). Dimenticarlo qui
+        # significherebbe tenere lo stato ottimistico per tutti i 15 minuti del tetto anche
+        # quando l'auto ha già detto che il piano è spento.
+        self._opt_keys = ("chargeAppointPlans",)
         self._restored: bool | None = None
 
     async def async_added_to_hass(self) -> None:
@@ -599,8 +747,46 @@ class Omoda9TheftAlarmSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
             return self._real
         return self._restored
 
+    async def _rileggi_stato_reale(self) -> None:
+        """Ricontrolla col backend com'è messo davvero l'antifurto (REST, sola lettura).
+
+        ⚠️ Serve perché questa entità NON ha telemetria: senza una rilettura, `_real` resterebbe
+        il valore letto all'avvio di Home Assistant e l'unica altra fonte sarebbe lo stato
+        ottimistico, che decade da solo dopo `OPT_MAX_S`. Su una funzione di SICUREZZA
+        significherebbe passare da «mente dopo il primo messaggio» a «mente per un quarto d'ora
+        e poi ricade su un valore di stamattina»: entrambe brutte, la seconda pure silenziosa.
+        È una lettura gratuita (nessun PIN, nessun taskId) e si fa solo dopo un comando andato
+        a buon fine, non a ogni aggiornamento.
+
+        ⚠️ **NON annulla lo stato ottimistico**, e non è una dimenticanza. `async_send_command`
+        torna quando il backend ha ACCETTATO il comando, non quando l'auto l'ha eseguito: sul
+        canale MQTT la conferma arriva fra 8 e 38 secondi. Se `querySwitch` rispecchiasse lo
+        stato del veicolo e non l'intenzione registrata, leggere subito dopo restituirebbe il
+        valore VECCHIO — e renderlo autoritativo farebbe tornare indietro l'interruttore un
+        istante dopo la pressione, che è il difetto che questa release toglie a tutti gli
+        altri. Non sappiamo quale dei due sia (misurarlo vorrebbe dire attuare sull'auto),
+        quindi si aggiorna il ripiego senza agire su ciò che l'utente vede: se i due
+        coincidono non cambia nulla, se divergono la verità emerge allo scadere del tetto,
+        molto più fresca del valore letto all'avvio.
+
+        ⚠️ Gira in un task di sfondo: allungare la chiamata di servizio di un giro di rete
+        lascerebbe la card in attesa per una lettura che non le serve subito."""
+        try:
+            v = await self.coordinator.async_query_theft()
+        except Exception:  # noqa: BLE001 — non deve mai far fallire un comando riuscito
+            return
+        if v is not None:
+            self._real = v != 0
+            self.async_write_ha_state()
+
+    def _programma_rilettura(self) -> None:
+        self.hass.async_create_background_task(
+            self._rileggi_stato_reale(), f"{DOMAIN}_antifurto_rilettura")
+
     async def async_turn_on(self, **kwargs) -> None:
         await self._run_command("antifurto_on", True)
+        self._programma_rilettura()
 
     async def async_turn_off(self, **kwargs) -> None:
         await self._run_command("antifurto_off", False)
+        self._programma_rilettura()

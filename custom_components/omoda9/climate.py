@@ -15,6 +15,8 @@ così accendere il clima NON tocca lo stato dei sedili.
 """
 from __future__ import annotations
 
+import time
+
 from homeassistant.components.climate import (
     ENTITY_ID_FORMAT,
     ClimateEntity,
@@ -28,7 +30,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import CLIMA_MAX_DEFAULT, CLIMA_MIN_DEFAULT, CLIMA_STEP_DEFAULT, DOMAIN
+from .const import (CAMPO_CLIMA, CLIMA_MAX_DEFAULT, CLIMA_MIN_DEFAULT, CLIMA_STEP_DEFAULT,
+                    DOMAIN, OPT_MAX_S)
 from .entity import Omoda9Entity, field_on
 
 # Ripiego OMODA. Il range VERO della vettura, quando il backend lo dichiara in queryList,
@@ -73,6 +76,7 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
         self._target = min(hi, max(lo, DEFAULT_TEMP))
         self._opt_on: bool | None = None
         self._opt_anchor = None
+        self._opt_at: float | None = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -87,7 +91,7 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
 
     # ── stato ──
     def _live_on(self) -> bool | None:
-        return field_on(self.coordinator.data.get("fields", {}).get("frontHVACState"))
+        return field_on(self.coordinator.data.get("fields", {}).get(CAMPO_CLIMA))
 
     @property
     def target_temperature(self) -> float:
@@ -101,16 +105,27 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
         return HVACMode.HEAT_COOL if on else HVACMode.OFF
 
     def _handle_coordinator_update(self) -> None:
-        # un nuovo messaggio dall'auto (last_seen cambiato) invalida l'ottimismo
-        if self._opt_on is not None and \
-                self.coordinator.data.get("last_seen") != self._opt_anchor:
+        # L'ottimismo si annulla quando arriva la verità sul CAMPO del clima, non a un
+        # messaggio qualsiasi: le conferme di `airControl` osservate non portano alcun campo
+        # di stato, e annullando su quelle la card tornava OFF con il clima acceso — dopodiché
+        # l'utente ripremeva, che è come nascono i comandi accavallati. Stessa regola del
+        # mixin degli altri attuatori (`entity.Omoda9OptimisticMixin`), riscritta qui perché
+        # questa entità non lo eredita; il tetto temporale evita che, se il campo non
+        # arrivasse mai, la card resti per sempre su un valore mai confermato.
+        if self._opt_on is not None and (
+                (self.coordinator.data.get("last_seen") != self._opt_anchor
+                 and CAMPO_CLIMA in (self.coordinator.data.get("msg_fields") or {}))
+                or (self._opt_at is not None
+                    and (time.monotonic() - self._opt_at) > OPT_MAX_S)):
             self._opt_on = None
             self._opt_anchor = None
+            self._opt_at = None
         super()._handle_coordinator_update()
 
     def _set_optimistic(self, on: bool) -> None:
         self._opt_on = on
         self._opt_anchor = self.coordinator.data.get("last_seen")
+        self._opt_at = time.monotonic()
         self.async_write_ha_state()
 
     # ── comandi ──
@@ -120,12 +135,19 @@ class Omoda9Climate(Omoda9Entity, ClimateEntity, RestoreEntity):
 
     async def _send(self, key: str, on: bool) -> None:
         self._set_optimistic(on)
+        # `finally` e non solo `except`: la cancellazione del task (`CancelledError`, che
+        # deriva da `BaseException`) lasciava la card bloccata sullo stato ottimistico.
+        # Stesso rimedio di `entity._run_command` e della coda comandi del coordinator.
+        inviato = False
         try:
             await self.coordinator.async_send_command(key, self._params())
+            inviato = True
         except Exception as err:  # noqa: BLE001
-            self._opt_on = None
-            self.async_write_ha_state()
             raise HomeAssistantError(f"Comando clima non riuscito: {err}") from err
+        finally:
+            if not inviato:
+                self._opt_on = None
+                self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.OFF:

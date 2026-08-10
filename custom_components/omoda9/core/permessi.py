@@ -83,8 +83,10 @@ CATEGORIA = {
     "chargeAppointControl": 213,
     "findCar": 202,
     "vehicleLocation": 211,
-    "remoteStart": 231,
 }
+# NB `remoteStart` non compare: il comando è stato tolto dal catalogo dopo una prova dal vivo
+# (vedi `commands.py`). Teneva qui la categoria 231, e una riga irraggiungibile si legge come
+# informazione anche quando non lo è.
 
 # ─────────────────────── categoria dei comandi fuori da /asc/vehicleControl ───────────────────
 # L'antifurto vive su `/act` e nel catalogo usa la chiave `path`: non passa da `adatta()` perché
@@ -151,9 +153,19 @@ RIPIEGO = {
 
 # Corpo minimo che `airControl` pretende quando ci si ripiega dentro. Ricalcato sull'envelope
 # reale dell'app (cattura 2026-06-20: airControlType, airType, temperature, times + il campo).
-# ⚠️ `airControlType` fa parte della richiesta: passando di qui **si comanda anche il clima**,
-# esattamente come fanno le macro. È un effetto collaterale dichiarato, non un incidente — e si
-# attiva solo su veicoli dove oggi quel comando fallirebbe comunque al 100%.
+# ⚠️ `airControlType` fa parte della richiesta: passando di qui **si comanda anche il clima** —
+# lo si ACCENDE accendendo il campo e lo si SPEGNE spegnendolo, esattamente come fanno le macro.
+# È un effetto collaterale dichiarato, non un incidente, e si attiva solo su veicoli dove oggi
+# quel comando fallirebbe comunque al 100%.
+# ⚠️ `temperature` e `times` qui sono SEGNAPOSTO: sono i valori dell'Omoda 9, e questo modulo non
+# conosce la scheda tecnica della vettura. Chi chiama DEVE farli ripassare dagli adattatori alla
+# scheda DOPO l'instradamento, perché quelli girano PRIMA (a quel punto l'endpoint era ancora
+# quello dedicato e questi due valori non esistevano nel corpo).
+# Gli adattatori giusti sono `commands._limita_temperatura` e `commands._adatta_durata`, e sono
+# quelli che `commands.send()` richiama quando l'endpoint è cambiato. ⚠️ NON
+# `commands.adatta_capability`: quella lavora solo su `coolingControl`/`heatingControl`, dove
+# `temperature` è la posizione LO/HI della macro, e su `airControl` è esclusa di proposito.
+# Chiamarla qui sarebbe una riga che non fa mai nulla.
 BASE_AIRCONTROL = {"airType": "1", "temperature": "21.0", "times": "15"}
 
 
@@ -253,15 +265,60 @@ def porta_chiusa(endpoint: str, perms: dict) -> bool:
 
     ⚠️ Questa funzione esiste per un difetto reale della prima versione, che merita di restare
     scritto. Il ripiego decideva guardando **solo la voce figlia**, e `consentito()` tratta una
-    voce sconosciuta come consentita (fallimento permissivo). Su un veicolo la cui lista è più
-    corta della nostra — quella dell'issue #1 ne ha ~200 contro le nostre 334 — i figli `2141`-`2148`
-    possono semplicemente non esserci, mentre è la **categoria** `214` a essere negata in blocco.
-    Risultato: la porta dedicata veniva giudicata aperta, il ripiego non scattava, e la funzione
-    restava rotta **proprio sul veicolo per cui era stata scritta**.
+    voce sconosciuta come consentita (fallimento permissivo). Bastava allora che i figli
+    `2141`-`2148` mancassero perché la porta dedicata fosse giudicata aperta, il ripiego non
+    scattasse mai, e la funzione restasse rotta **proprio sul veicolo per cui era stata scritta**.
+
+    ⚠️ Sul veicolo dell'issue #1 le cose stanno diversamente da come si era supposto, e ora il
+    dato grezzo c'è (`45_capability/permessi_jaecoo7_phev_eu.json`, 280 voci contro le nostre
+    334): gli otto figli `2141`-`2148` **ci sono tutti, e valgono tutti 0**, insieme alla
+    categoria 214. Il difetto restava reale, solo per un'altra strada. La vecchia stima «~200
+    voci» era di seconda mano ed era sbagliata.
 
     La categoria è il segnale più grossolano ma anche il più affidabile: c'è sempre, ed è quello
     che i due `isSeparate*` dell'app guardano. Resta permissiva: categoria sconosciuta = aperta."""
     return categoria_chiusa(CATEGORIA.get(endpoint), perms)
+
+
+# Il testo dell'avviso «categoria negata» vive in UNA sola costante perché lo emettono due rami
+# diversi di `commands.send()`: i comandi con endpoint (via `verdetto`) e quelli con `path`
+# esplicito (l'antifurto, via `categoria_chiusa`). Erano due stringhe gemelle copiate a mano, e
+# due stringhe gemelle divergono: la misura del limite dei 255 caratteri ne guardava una sola.
+# ⚠️ Il testo deve reggere ACCANTO all'elenco dei campi potati, non al posto suo. La coda
+# «non c'è nulla da adattare» era nata quando i due avvisi erano alternativi (`elif`): tolto
+# l'`elif`, sul veicolo dell'issue #1 «Raffredda tutto» produce le due righe in fila —
+#   «salto aria sedile guida, …» seguito da «non c'è nulla da adattare» —
+# e la seconda nega la prima, oltre a essere falsa: quattro campi li abbiamo appena adattati.
+# Dire invece che nessun adattamento basta è vero in entrambi i casi, con o senza potatura.
+MSG_CATEGORIA_NEGATA = ("il costruttore non autorizza affatto questa funzione su questa auto: "
+                        "nessun adattamento può farla passare")
+MSG_BASE_NEGATA = ("questa auto non autorizza il cuore di questa richiesta: il rifiuto che sta "
+                   "per arrivare non dipende dall'integrazione")
+
+
+def verdetto(endpoint: str, perms: dict) -> str | None:
+    """La frase da dire PRIMA di spedire quando il comando è condannato comunque, o None.
+
+    Va valutata DOPO l'instradamento e la potatura, e **in aggiunta** all'elenco dei campi
+    potati, mai in alternativa: sono due fatti diversi e all'utente servono entrambi. Sul
+    veicolo dell'issue #1 la macro «Raffredda tutto» produce quattro campi potati **e** ha la
+    categoria 210 negata: dirgli solo «salto i quattro sedili» gli fa credere che il clima si
+    accenderà, e non si accende.
+
+    Non modifica nulla e non impedisce l'invio: il comando parte e l'utente riceve il rifiuto
+    vero del backend, che è un'informazione. Sopprimerlo non lo sarebbe.
+
+    I due rami guardano segnali diversi — `porta_chiusa` la categoria, `base_negata` la voce
+    base — e sul profilo reale del veicolo dell'issue #1 il freddo li accende entrambi (210 e
+    2103 negate); esistono profili in cui scatterebbe solo il secondo. La categoria viene prima
+    perché è il segnale che c'è sempre."""
+    if not perms or not endpoint:
+        return None
+    if porta_chiusa(endpoint, perms):
+        return MSG_CATEGORIA_NEGATA
+    if base_negata(endpoint, perms):
+        return MSG_BASE_NEGATA
+    return None
 
 
 def categoria_chiusa(categoria: int | None, perms: dict) -> bool:
@@ -282,8 +339,11 @@ def categoria_chiusa(categoria: int | None, perms: dict) -> bool:
 # 7 giorni e la 212 solo il personalizzato. Per questo la tabella è per-endpoint e non una regola.
 CICLO = {
     "chargeAppointControl": (2131, 2132, "cycleData"),
-    "appointmentTravel": (2121, 2122, "travelWeekday"),
 }
+# NB `appointmentTravel` non compare: non esiste un comando con quell'endpoint — il piano di
+# partenza programmata è di sola lettura (`sensor.py`). Le sue voci restano però interessanti e
+# vanno conservate qui: (2121 «ciclo personalizzato», 2122 «7 giorni», campo `travelWeekday`),
+# con la polarità INVERTITA rispetto alla ricarica e identica su entrambe le auto conosciute.
 
 
 def _giorni(body: dict, campo: str) -> list | None:
@@ -344,9 +404,12 @@ def instrada(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, str | N
         nuovo = dict(BASE_AIRCONTROL)
         nuovo["airControlType"] = "1" if acceso else "0"
         nuovo[campo] = body[campo]
+        # ⚠️ Il verbo segue il campo: spegnendo il sedile si spegne anche il clima. Dire sempre
+        # «si accende» era falso proprio nel ramo che l'utente usa per FERMARE qualcosa.
         return ("airControl", nuovo,
                 "questa funzione non è autorizzata sulla sua via abituale su questo veicolo: "
-                "inviata tramite il clima (che quindi si accende anche lui)")
+                "inviata tramite il clima, che quindi si "
+                + ("accende" if acceso else "spegne") + " insieme a lei")
     return endpoint, body, None
 
 
@@ -360,3 +423,34 @@ def adatta(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, list, str
     endpoint, body, nota = instrada(endpoint, body, perms)
     body, saltati = pota(endpoint, body, perms)
     return endpoint, body, saltati, nota
+
+
+# ────────────────────── sospetti: quello che non sappiamo, detto come tale ──────────────────────
+# Chiavi che compaiono nei corpi ma per cui NON abbiamo una corrispondenza PROVATA con una voce
+# della lista. Servono ESCLUSIVAMENTE al log e alla diagnostica: sono mappature PER NOME, e in
+# questo progetto una mappatura per nome ha già prodotto un errore (`timeConsuming` → 2134). Non
+# possono e non devono influenzare il corpo spedito: per questo stanno qui e non in `POTABILI`.
+#
+#   `times` ↔ 2044 «impostare la durata»: sulla nostra auto vale 1, sul veicolo dell'issue #1
+#   vale 0. `times` non sta solo nel corpo di ripiego: lo portano **quattordici** comandi del
+#   catalogo, e fra questi `clima_on`, `clima_off` e i due disappannamenti del parabrezza dal
+#   clima partono interi anche su quel veicolo (categoria 204 e voce 2045 consentite: niente
+#   potatura, niente cambio di porta). Quindi delle due l'una: o 2044 non governa `times` — e
+#   allora non c'è niente da fare — oppure lo governa, e allora «Clima acceso» su quell'auto è già
+#   rotto oggi, senza che noi cambiamo una riga. È una domanda all'utente, non un esperimento:
+#   finché non ha risposto, potare sarebbe indovinare.
+SOSPETTI_NON_MAPPATI = {"times": 2044}
+
+
+def sospetti(body: dict, perms: dict) -> list[tuple[str, int]]:
+    """Chiavi del corpo la cui voce SOSPETTA (non provata) risulta negata su questo veicolo.
+
+    Solo per il log e la diagnostica. Chi chiama non deve toccare il corpo in base a questo
+    ritorno: se lo facesse, una mappatura per nome sarebbe diventata comportamento.
+
+    Lista assente o vuota ⇒ lista vuota, come ogni altra funzione di questo modulo: non sapere
+    non deve mai produrre un'affermazione."""
+    if not perms:
+        return []
+    return [(chiave, voce) for chiave, voce in SOSPETTI_NON_MAPPATI.items()
+            if chiave in body and perms.get(voce) == 0]

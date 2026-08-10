@@ -251,6 +251,51 @@ def test_capability_dichiarate_arrivano_fino_al_corpo():
     assert body == {"temperature": "17.0", "duration": "10"}
 
 
+def test_il_range_impostabile_arriva_a_core_come_dichiarazione_a_se():
+    """Il range (min/max) e gli estremi (LO/HI) devono viaggiare come **due** dichiarazioni.
+
+    Serve al corpo di ripiego su `airControl`, che porta un 21.0 messo da noi: per sapere se è
+    ammesso bisogna guardare il range impostabile. Gli estremi non bastano — per costruzione
+    stanno FUORI da quel range (`capabilities_from_item` rifiuta la coppia se `lo > min` o
+    `hi < max`), quindi un setpoint fuori dal range può benissimo cadere dentro LO..HI.
+
+    ⚠️ E resta una dichiarazione, non un default: `climate_limits()` ricade su 16-30 quando il
+    backend tace, ma quel 16-30 non deve mai arrivare a `core/`, altrimenti l'assenza diventa
+    indistinguibile da una risposta vera.
+
+    ⚠️ Sul «per costruzione stanno FUORI»: `capabilities_from_item` lo impone solo quando il
+    range è stato dichiarato. Qui lo si dichiara, quindi vale."""
+    coord = _coord_con({DATA_CLIMATE_MIN: 22.0, DATA_CLIMATE_MAX: 30.0,
+                        DATA_CLIMATE_LO: 15.0, DATA_CLIMATE_HI: 31.0})
+    caps = coord._caps_correnti()
+    assert (caps["clima_min"], caps["clima_max"]) == (22.0, 30.0)
+    assert (caps["clima_lo"], caps["clima_hi"]) == (15.0, 31.0)
+
+    corpo = {"temperature": "21.0"}
+    commands._limita_temperatura(corpo, caps)
+    assert corpo["temperature"] == "22.0"
+
+    # senza dichiarazione niente chiavi: il default 16-30 di `climate_limits()` resta in HA
+    assert coord.climate_limits()[:2] == (22.0, 30.0)
+    vuoto = _coord_con({})._caps_correnti()
+    assert "clima_min" not in vuoto and "clima_max" not in vuoto
+
+
+@pytest.mark.parametrize("dati", [
+    {DATA_CLIMATE_MIN: 22.0},                      # solo il minimo
+    {DATA_CLIMATE_MAX: 30.0},                      # solo il massimo
+    {DATA_CLIMATE_MIN: 22.0, DATA_CLIMATE_MAX: "non un numero"},
+], ids=["solo-min", "solo-max", "sporco"])
+def test_mezzo_range_non_e_una_dichiarazione(dati):
+    """Metà intervallo non è un intervallo: o entrambe le chiavi o nessuna.
+
+    Una `clima_min` da sola che arrivasse a `core/` sarebbe un vincolo a una coda sola, e la
+    regola del componente è che ciò che non è dichiarato non esiste. Il caso «sporco» copre
+    `entry.data`, che passa da JSON e può contenere qualunque cosa."""
+    caps = _coord_con(dati)._caps_correnti()
+    assert "clima_min" not in caps and "clima_max" not in caps, caps
+
+
 def test_durate_corrotte_in_entry_data_non_rompono_i_comandi():
     """`entry.data` passa da JSON e può tornare indietro sporca. Meglio nessuna capability
     che un'eccezione dentro la property `ctx`, che romperebbe OGNI comando."""

@@ -620,7 +620,14 @@ def _adatta_durata(endpoint, body: dict, caps: dict | None, emit=lambda m: None)
     l'Omoda 9 ne ammette 5, 10 o 15: chi imposta 30 vedrebbe 30 nell'interfaccia e l'auto
     ne riceverebbe 15. Tutti gli altri adattamenti del componente (`permessi.adatta`) dicono
     all'utente cosa hanno cambiato; tacere qui sarebbe l'unica eccezione, e la meno
-    giustificabile — è un numero che l'utente ha scelto con le sue mani."""
+    giustificabile — è un numero che l'utente ha scelto con le sue mani.
+
+    ⚠️ Un solo chiamante NON deve dichiarare, e per la stessa ragione: il corpo costruito dal
+    ripiego su `airControl` (`permessi.BASE_AIRCONTROL`) porta un `times` di comodo che
+    **abbiamo messo noi**, non l'utente. Annunciarne la correzione direbbe «la durata di 15
+    minuti che hai chiesto non è ammessa» a chi ha premuto «Sedile guida riscaldato» e non ha
+    mai visto un cursore della durata — cioè esattamente il tipo di messaggio incongruo che
+    questa versione sta togliendo di mezzo altrove. Lì si chiama senza `emit` (vedi `send`)."""
     durate = (caps or {}).get("durate_aria")
     if not durate or endpoint not in _ENDPOINT_ARIA:
         return
@@ -632,6 +639,56 @@ def _adatta_durata(endpoint, body: dict, caps: dict | None, emit=lambda m: None)
                 body[chiave] = str(corretta)
                 emit(f"durata {voluta}′ non ammessa da questa vettura "
                      f"({'/'.join(str(d) for d in durate)}′) → uso {corretta}′")
+
+
+def _limita_temperatura(body: dict, caps: dict | None) -> None:
+    """Riporta la temperatura dentro il range che la vettura dichiara di accettare. Sul posto.
+
+    Serve **solo** al corpo costruito dal ripiego su `airControl`, che porta il 21.0 di comodo
+    di `permessi.BASE_AIRCONTROL` perché quel modulo non conosce la scheda tecnica della
+    vettura. Su un'auto il cui clima parte da 22 °C, quel 21.0 è un valore che la vettura
+    dichiara di non ammettere, e nessuno l'ha scelto.
+
+    `adatta_capability` non può coprire questo caso e non va chiamata al suo posto: lavora sui
+    soli `coolingControl`/`heatingControl`, dove `temperature` È la posizione LO/HI della macro,
+    ed esclude `airControl` di proposito perché lì il valore lo sceglie l'utente dalla card.
+    Qui invece nessun utente ha scelto niente — il valore l'abbiamo messo noi, e per questo lo
+    correggiamo in silenzio.
+
+    ⚠️ L'intervallo giusto è `clima_min`/`clima_max` (la temperatura IMPOSTABILE), **non**
+    `clima_lo`/`clima_hi`. La prima stesura usava questi ultimi e sembrava funzionare, ma non
+    curava il caso che questa docstring stessa porta a esempio: LO/HI sono le posizioni estreme,
+    che stanno FUORI dal range impostabile — quando il range è dichiarato,
+    `const.capabilities_from_item` scarta la coppia se non è così (`lo <= min` e `hi >= max`;
+    senza range dichiarato non c'è alcun controllo di coerenza). Su un'auto che parte da 22 °C
+    con LO a 16, il 21.0 cadeva dentro 16-…, restava intatto e nessun test se ne accorgeva —
+    perché il test dichiarava un LO/HI stretto che nessuna vettura vera produrrebbe.
+    LO/HI resta un ripiego utile quando il range non è dichiarato: è un vincolo più largo, ma
+    sono pur sempre valori che quella vettura dice di accettare. ⚠️ Più largo davvero: su una
+    richiesta `airControl` parametrica potrebbe portare la temperatura a LO o HI, che sono
+    posizioni estreme e non setpoint. Serve `21.0` fuori da LO..HI, quindi oggi non capita su
+    nessuna scheda plausibile; se capitasse, è il caso in cui il ripiego allarga proprio il
+    vincolo che questa funzione esiste per far rispettare.
+
+    Se la vettura non dichiara nulla non si tocca niente: è la regola invariata di tutto il
+    componente."""
+    caps = caps or {}
+    if "temperature" not in body:
+        return
+    for chiave_bassa, chiave_alta in (("clima_min", "clima_max"), ("clima_lo", "clima_hi")):
+        basso, alto = caps.get(chiave_bassa), caps.get(chiave_alta)
+        if basso is None or alto is None:
+            continue
+        try:
+            valore, basso, alto = float(body["temperature"]), float(basso), float(alto)
+        except (TypeError, ValueError):
+            return
+        if basso > alto:             # scheda incoerente: meglio non inventare un intervallo
+            return
+        corretta = min(max(valore, basso), alto)
+        if corretta != valore:
+            body["temperature"] = f"{corretta:.1f}"
+        return
 
 
 def send(ctx, cmd_key, emit=lambda m: None, params=None):
@@ -700,8 +757,7 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
         endpoint, saltati, nota = c.get("endpoint"), [], None
         if c.get("path"):
             if permessi.categoria_chiusa(c.get("categoria"), ctx.permessi or {}):
-                emit(f"{c['name']}: il costruttore non autorizza affatto questa funzione su "
-                     f"questa auto — non c'è nulla da adattare")
+                emit(f"{c['name']}: {permessi.MSG_CATEGORIA_NEGATA}")
         elif endpoint:
             endpoint, body, saltati, nota = permessi.adatta(endpoint, body, ctx.permessi or {})
             if nota:
@@ -709,13 +765,41 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None):
             if saltati:
                 emit(f"{c['name']}: non autorizzate su questa auto, salto "
                      f"{nomi_saltati(saltati)}")
-            # Categoria negata in blocco: non c'è campo da togliere né porta alternativa, e il
-            # rifiuto che sta per arrivare NON è un difetto dell'integrazione. Dirlo prima evita
-            # che l'utente concluda «l'aggiornamento non ha funzionato»: senza questa riga, su un
-            # veicolo con la macro freddo negata l'esito è identico a prima e inspiegabile.
-            elif permessi.porta_chiusa(endpoint, ctx.permessi or {}):
-                emit(f"{c['name']}: il costruttore non autorizza affatto questa funzione su "
-                     f"questa auto — non c'è nulla da adattare")
+            # Il comando è condannato comunque: non c'è campo da togliere né porta alternativa, e
+            # il rifiuto che sta per arrivare NON è un difetto dell'integrazione. Dirlo prima
+            # evita che l'utente concluda «l'aggiornamento non ha funzionato».
+            # ⚠️ NON è un `elif` dei campi potati: i due fatti convivono. Sul veicolo dell'issue
+            # #1 la macro freddo pota quattro sedili E ha la categoria negata — dire solo «salto
+            # i sedili» gli fa credere che il clima partirà, e non parte.
+            if (avviso := permessi.verdetto(endpoint, ctx.permessi or {})):
+                emit(f"{c['name']}: {avviso}")
+
+            # ── il corpo di ripiego non ha mai visto la scheda della vettura ────────────────
+            # Quando l'instradamento cambia porta, il corpo non è più quello del catalogo: è
+            # `BASE_AIRCONTROL`, che porta una temperatura e una durata scelte da NOI perché
+            # `permessi.py` non conosce la scheda tecnica. Gli adattatori (`adatta_capability`
+            # e `_adatta_durata`, in cima al giro) sono già passati quando l'endpoint era
+            # ancora quello dedicato e questi due campi non c'erano: senza questo secondo giro
+            # si spedirebbero 21.0 e 15 — i valori dell'Omoda 9 — a una vettura che magari
+            # ammette solo 5 e 10 minuti e non scende sotto i 22 °C.
+            #
+            # ⚠️ `_adatta_durata` è chiamata SENZA `emit`, ed è deliberato: la sua correzione
+            # si dichiara quando il numero l'ha scelto l'utente, e qui non l'ha scelto nessuno.
+            # Annunciarla direbbe «la durata di 15′ che hai chiesto non è ammessa» a chi ha
+            # premuto il pulsante di un sedile.
+            # ⚠️ `adatta_capability` NON va aggiunta qui: è esclusa di proposito su
+            # `airControl`, che è l'unica destinazione possibile del ripiego — sarebbe una riga
+            # che non fa mai nulla. La temperatura la sistema `_limita_temperatura`.
+            if endpoint != c.get("endpoint"):
+                _limita_temperatura(body, ctx.caps)
+                _adatta_durata(endpoint, body, ctx.caps)
+
+            # Quello che NON sappiamo, detto solo al log. `times` somiglia alla voce 2044, ma
+            # somigliare non è mappare: il corpo non si tocca (vedi `permessi.SOSPETTI_NON_MAPPATI`).
+            for chiave, voce in permessi.sospetti(body, ctx.permessi or {}):
+                _LOGGER.debug("[permessi] %s: spedisco `%s` con la voce %s negata su questo "
+                              "veicolo (corrispondenza NON provata, nessuna potatura)",
+                              cmd_key, chiave, voce)
 
         # Ciclo dei piani programmati: il backend valida anche la FORMA della lista dei giorni,
         # non solo la presenza dei campi (misurato: `cycleData` [1,3,5] → A00084 sotto la voce

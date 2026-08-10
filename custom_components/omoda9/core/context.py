@@ -137,8 +137,12 @@ class CoreCtx:
     # Scheda tecnica della vettura, letta da `queryList` (la stessa risposta da cui esce il
     # nome del veicolo: nessuna chiamata in più). Chiavi NEUTRE, perché `core/` è autonomo e
     # non importa `const.py`:
+    #   clima_min / clima_max = intervallo di temperatura IMPOSTABILE (es. 16-30 °C)
     #   clima_lo / clima_hi  = massimo freddo e massimo caldo accettati dalla vettura
     #   durate_aria          = elenco dei minuti ammessi per il clima (es. [5, 10, 15])
+    # ⚠️ Le prime due coppie non sono la stessa cosa: LO/HI stanno FUORI dall'intervallo
+    # impostabile (sono le posizioni estreme), quindi non si può usare l'una per l'altra —
+    # chi vuole sapere se un setpoint è ammesso deve guardare min/max, non LO/HI.
     # Vuoto = backend che non dichiara nulla ⇒ si spedisce quello che il catalogo dice da
     # sempre. Non sapere non autorizza a inventare.
     caps: dict = field(default_factory=dict)

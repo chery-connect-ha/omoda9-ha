@@ -276,6 +276,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # scelta dell'utente viene poi ricordata tra i riavvii (switch RestoreEntity).
         self.poll_enabled = False
         self._cmd_gate = asyncio.Lock()  # serializza i comandi: l'auto ne esegue uno alla volta (coda, non rifiuto)
+        # sveglia in volo, condivisa da chi la chiede nello stesso momento (vedi
+        # `async_assicura_sveglia`): due `localizza` ravvicinati sono un doppione, non una
+        # sveglia più efficace — e il secondo si prende un A00082.
+        self._sveglia_task: asyncio.Task | None = None
         self._fields: dict[str, str] = {}
         self._state_lock = threading.Lock()  # [H2] serializza _fields/position tra thread paho/executor/loop
         self._last_msg_ts: float = 0.0
@@ -284,7 +288,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         self._confirm_n: int = 0
         self.position: dict | None = None
         self.otp_code: str = ""   # impostato dall'entità text «Codice OTP», letto da confirm
-        self.data = {"fields": {}, "position": None,
+        self.data = {"fields": {}, "msg_fields": {}, "position": None,
                      "awake": False, "car_connected": False,
                      "session_ok": None, "session_detail": "",
                      # — sensori diagnostici (parità col bridge) —
@@ -644,10 +648,9 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             return
         # auto offline (A07900) → una sveglia + rilettura per riportarla online
         _LOGGER.debug("[poll] auto offline: sveglio (localizza) e rileggo")
-        try:
-            await self.async_send_command("localizza")
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("[poll] sveglia (localizza) fallita: %s", err)
+        # sveglia CONDIVISA: se la macro comfort ne ha già una in volo si aspetta quella,
+        # invece di spedirne una seconda che si prenderebbe un A00082 (vedi il metodo).
+        await self.async_assicura_sveglia()
         await asyncio.sleep(POLL_WAKE_WAIT)
         try:
             await self.async_probe(force=True)
@@ -770,6 +773,14 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # i meta-campi (CMD_CONFIRM_META) NO (non sono stato del veicolo).
         is_confirmation = "result" in data or "seq" in data
 
+        # I campi di stato di QUESTO messaggio, tenuti a parte da `fields`. Non è un doppione:
+        # `fields` è CUMULATIVO — accumula l'ultimo valore noto di ogni campo e se lo porta
+        # dietro per giorni — mentre qui c'è solo ciò che l'auto ha appena detto. Chi deve
+        # decidere «l'auto ha spento il preset» ha bisogno del secondo: sul primo mescolerebbe
+        # un valore fresco con uno vecchio di ieri e concluderebbe qualcosa che nessuno ha
+        # affermato. Serve alla macro comfort (`switch.py`), l'unica entità senza uno stato
+        # reale proprio da confrontare.
+        msg_fields: dict[str, str] = {}
         # [H2] _fields/_last_msg_ts toccati anche dall'executor → sotto lock; emetti una COPIA
         with self._state_lock:
             was_awake = bool(self._last_msg_ts) and (now - self._last_msg_ts) < self.awake_window
@@ -777,6 +788,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             for k, v in data.items():
                 if k != "time" and k not in CMD_CONFIRM_META:
                     self._fields[k] = str(v)
+                    msg_fields[k] = str(v)
             fields_copy = dict(self._fields)
 
         # [diag] auto-discovery: chiavi 5A02 che l'auto manda ma che META non mappa. È il
@@ -795,7 +807,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
                         and k not in GEO_KEYS and not _is_unit_flag(k)):
                     self._diag.note_unknown_field(k, v, svc)
 
-        patch.update({"fields": fields_copy, "awake": True})
+        patch.update({"fields": fields_copy, "msg_fields": msg_fields, "awake": True})
         if is_confirmation:
             patch["cmd_status"] = self._format_cmd_result(data)
             # [H2] il contatore è l'ancora della pausa di coda → si tocca sotto lock, perché
@@ -1016,6 +1028,48 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             if self._confirm_n != anchor:
                 return   # l'auto ha confermato → si può passare al comando successivo
 
+    async def _sveglia_una_volta(self) -> None:
+        """Un `localizza` (vehicleLocation = sveglia + GPS, benigno) che non propaga errori.
+
+        Non solleva di proposito: la sveglia è un mezzo, non il fine, e chi la chiede deve
+        poter proseguire comunque — è quello che facevano già, ciascuno per conto suo, sia la
+        macro comfort sia il ciclo di poll."""
+        try:
+            await self.async_send_command("localizza")
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("[sveglia] localizza non riuscito: %s", err)
+
+    async def async_assicura_sveglia(self) -> None:
+        """Sveglia l'auto UNA volta sola: chi arriva mentre un `localizza` è già in volo
+        aspetta QUELLO invece di spedirne un altro.
+
+        ⚠️ Non decide *se* svegliare: la condizione resta di chi chiama, e i due chiamanti
+        guardano segnali diversi (la macro `auto_sveglia`, cioè il traffico MQTT recente; il
+        poll `_online`, cioè la risposta del realtime). Qui si toglie solo il doppione.
+
+        Serviva: nel diario diagnostico ci sono **13 coppie di `localizza` a meno di 60
+        secondi l'una dall'altra, 6 delle quali finite in A00082** («veicolo occupato») — la
+        macro e il poll che si svegliavano l'auto a vicenda, ciascuno occupando uno slot
+        della coda e la pausa che lo segue. Il secondo `localizza` non aggiunge nulla:
+        l'auto o si è svegliata col primo, o non si sveglia.
+
+        `shield` perché la sveglia è condivisa: se il task che l'ha chiesta per primo viene
+        annullato (una chiamata di servizio interrotta), gli altri in attesa non devono
+        perderla con lui."""
+        task = self._sveglia_task
+        if task is None or task.done():
+            # Task di BACKGROUND: uno normale verrebbe atteso allo spegnimento di Home
+            # Assistant, e una sveglia può restare in coda fino a COMMAND_QUEUE_WAIT più la
+            # chiamata HTTP — decine di secondi di arresto in più per qualcosa che a quel
+            # punto non serve più a nessuno.
+            task = self._sveglia_task = self.hass.async_create_background_task(
+                self._sveglia_una_volta(), f"{DOMAIN}_sveglia")
+        try:
+            await asyncio.shield(task)
+        finally:
+            if self._sveglia_task is task and task.done():
+                self._sveglia_task = None   # non trattenere un task concluso
+
     # ───────────────── azioni (delega a core/, in executor) ─────────────────
     async def async_send_command(self, key: str, params: dict | None = None) -> str:
         """Invia un comando serializzato dietro una coda: l'auto ne esegue uno alla volta, quindi
@@ -1031,10 +1085,25 @@ class Omoda9Coordinator(DataUpdateCoordinator):
                 "L'auto è ancora impegnata coi comandi precedenti — riprova tra qualche istante."
             ) from err
         t0 = time.monotonic()
+        # ⚠️ Il rilascio dello slot NON può stare solo nei rami che si vedono. Prima era
+        # scritto in due punti — il ramo `except Exception` qui sotto e il task di rilascio
+        # differito, creato solo in caso di successo — e in mezzo restava un buco: la
+        # cancellazione del task chiamante. `asyncio.CancelledError` deriva da
+        # `BaseException`, quindi NON passa da `except Exception`: attraversava la funzione
+        # senza rilasciare niente e senza creare il task che rilascia. Da lì in poi la coda
+        # restava chiusa PER SEMPRE (nessun watchdog, nessuna auto-guarigione) e ogni comando
+        # successivo — compresi quelli del poll automatico — falliva dopo 30 secondi con
+        # «L'auto è ancora impegnata», fino al riavvio di Home Assistant. Basta un'automazione
+        # in `mode: restart` che si ri-attivi mentre l'invio è in volo.
+        # Con la bandiera + `finally` il rilascio è UNO solo ed è per costruzione impossibile
+        # farlo due volte (`asyncio.Lock.release()` su un lock non preso solleva RuntimeError).
+        # ⚠️ Rilasciare non ferma il thread dell'executor: il comando parte comunque verso
+        # l'auto, mentre Home Assistant lo considera annullato.
+        consegnato = False
         try:
             res = await self.hass.async_add_executor_job(self._send_command, key, params)
+            consegnato = True
         except Exception as err:  # noqa: BLE001 — instrada il rimedio, poi RILANCIA
-            self._cmd_gate.release()   # invio fallito → libera subito lo slot
             if self._diag is not None:
                 self._diag.record("command", key=key, ok=False,
                                   duration_ms=int((time.monotonic() - t0) * 1000),
@@ -1047,6 +1116,12 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             # errato» rifiuti che erano di permessi o di sessione.
             self._instrada_rimedio(err)
             raise
+        finally:
+            # invio non andato a buon fine (errore, cancellazione, arresto): libera lo slot.
+            # In caso di successo NON si rilascia qui: lo slot resta occupato ancora un po',
+            # ed è `_hold_then_release` a restituirlo dopo la pausa di rispetto.
+            if not consegnato:
+                self._cmd_gate.release()
         if self._diag is not None:
             self._diag.record("command", key=key, ok=True,
                               duration_ms=int((time.monotonic() - t0) * 1000), result=res)
@@ -1411,9 +1486,32 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         """Le capability con i nomi NEUTRI che usa `core/` (che non importa `const.py`).
 
         Le chiavi non dichiarate dal backend **non compaiono affatto**: `core/` distingue
-        «assente» da «dichiarato», e l'assenza vuol dire «spedisci quello che spedivi»."""
-        lo, hi = self.climate_extremes()
+        «assente» da «dichiarato», e l'assenza vuol dire «spedisci quello che spedivi».
+
+        ⚠️ `clima_min`/`clima_max` e `clima_lo`/`clima_hi` sono due dichiarazioni DIVERSE e non
+        vanno confuse: la prima è l'intervallo che si può impostare (`minTemperature`/
+        `maxTemperature`), la seconda le due posizioni estreme LO/HI, che stanno **fuori** da
+        quell'intervallo. Serve la prima per sapere se un setpoint è ammesso, la seconda per
+        sapere cosa spedire quando si vuole «il massimo che quest'auto sa fare».
+        ⚠️ Quel «fuori» è imposto da `const.capabilities_from_item` **solo quando il range è
+        stato dichiarato** (`lo <= min` e `hi >= max`, estremi inclusi): senza `minTemperature`/
+        `maxTemperature` la coppia LO/HI entra senza controlli di coerenza. Non darlo per
+        garantito in un ragionamento che debba reggere su una vettura che non conosciamo.
+        Qui si legge `entry.data` direttamente perché `climate_limits()` ricade sui default
+        dell'Omoda 9, e un default non è una dichiarazione: passarlo a `core/` sarebbe
+        esattamente l'invenzione che `climate_extremes()` esiste per impedire."""
         caps: dict = {}
+        tmin, tmax = self.entry.data.get(DATA_CLIMATE_MIN), self.entry.data.get(DATA_CLIMATE_MAX)
+        # ⚠️ Entrambi o nessuno: mezzo intervallo non è un intervallo, e `_limita_temperatura`
+        # salterebbe comunque la coppia incompleta. La `try` copre `entry.data` sporca (passa da
+        # JSON); e poiché la tupla si assegna in blocco, un `float()` che solleva non lascia
+        # dietro di sé mezza dichiarazione.
+        if tmin is not None and tmax is not None:
+            try:
+                caps["clima_min"], caps["clima_max"] = float(tmin), float(tmax)
+            except (TypeError, ValueError):
+                pass
+        lo, hi = self.climate_extremes()
         if lo is not None and hi is not None:
             caps["clima_lo"], caps["clima_hi"] = lo, hi
         durate = self.air_durations()

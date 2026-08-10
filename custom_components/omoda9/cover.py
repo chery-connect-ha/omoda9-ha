@@ -49,6 +49,7 @@ class Omoda9Cover(Omoda9OptimisticMixin, Omoda9Entity, CoverEntity, RestoreEntit
     def __init__(self, coord, name, suffix, keys, open_cmd, close_cmd, dclass, icon) -> None:
         super().__init__(coord, name, suffix, entity_id_format=ENTITY_ID_FORMAT)
         self._keys = keys
+        self._opt_keys = tuple(keys)   # chiudono l'ottimismo solo i campi di QUESTA cover
         self._open_cmd = open_cmd
         self._close_cmd = close_cmd
         self._attr_device_class = dclass

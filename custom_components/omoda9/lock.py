@@ -31,6 +31,7 @@ class Omoda9Lock(Omoda9OptimisticMixin, Omoda9Entity, LockEntity, RestoreEntity)
 
     def __init__(self, coord) -> None:
         super().__init__(coord, "Omoda9 Serratura", "lock", entity_id_format=ENTITY_ID_FORMAT)
+        self._opt_keys = ("doorLock",)   # l'unico campo che dice davvero com'è la serratura
         self._restored: bool | None = None
 
     async def async_added_to_hass(self) -> None:
