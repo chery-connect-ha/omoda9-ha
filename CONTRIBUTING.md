@@ -29,7 +29,8 @@ Adding a car should mean adding rows, not adding code paths.
 **How a change moves.** It **lands** — cheaply if it only touches your own car's
 data, with one read by somebody else if it touches shared code, and labelled
 `unverified-hardware` if it is written for a car none of us owns. It **ships as a
-pre-release**, so you have your own work on your own car the same day. It becomes
+pre-release** — on merge, or from the pull request itself if you label it `beta`
+— so you have your own work on your own car the same day. It becomes
 **stable** only once someone who owns each affected model has run it. Merging is
 never blocked. Only the last step is.
 
@@ -121,6 +122,13 @@ Merges go out as **pre-releases**. Anyone who wants them turns on *Show beta
 versions* for this repository in HACS and has them on their own car the same day.
 This is deliberate: nobody in this project should ever be separated from work they
 just did because they are waiting on somebody else's free time.
+
+**And it can ship before it lands.** Put the label `beta` on a pull request and a
+pre-release is built from it, installable the same way. That is what carries a
+change to the one person who can disprove it *while there is still time to change
+it* — which matters most exactly where the author is powerless: code written for a
+car they do not own is, on their own car, a no-op. It is two taps in a phone
+browser, and only write access can do it, so a tester never runs anything.
 
 ### 3. It becomes stable
 

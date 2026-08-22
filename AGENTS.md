@@ -93,6 +93,12 @@ Land it (small pull request, CI green), it ships to volunteers as a
 affected model has run it. Nothing waits on anybody's free time except the last
 step. Full rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+A pull request can also be made installable **before** it lands — label it
+`beta` and a pre-release is cut from it. Reach for that whenever the change is
+written for a car you do not own: your instance cannot disprove it, and this is
+what puts it in front of the person whose instance can, while there is still
+time to change it.
+
 ## The commands
 
 `master` is protected: no direct pushes. Everything below assumes the remote is
@@ -151,6 +157,22 @@ hardware, say it there rather than leaving it blank:
 gh pr edit --add-label unverified-hardware
 ```
 
+**Get it onto a real car, before it lands**
+
+```bash
+gh pr edit --add-label beta
+```
+
+This publishes a pre-release built from the pull request, installable from HACS
+with *Show beta versions* on. Ask for it whenever the change touches a model
+nobody testing it here owns — including your own author's case, where the change
+is a no-op on your car and therefore unfalsifiable by you. Post the release link
+in the pull request and name who you are asking. Only write access can label, so
+a tester never has to run anything: they get a link.
+
+A beta is never cut from a fork. If this pull request comes from one, a member
+publishes it by hand after reading what is in it.
+
 **When CI is red**
 
 ```bash
@@ -179,15 +201,27 @@ Make the changes on the same branch, commit, push. Do not close and reopen. Repl
 to the comment saying what you changed — a review is a conversation, and silence
 reads as disagreement.
 
-**Cutting a pre-release** (maintainers)
+**Cutting a release** (maintainers)
+
+A pre-release from a pull request is the `beta` label — do not do it by hand.
+
+For a **stable**, the archive is not optional. `hacs.json` sets `zip_release`
+with `omoda9.zip`, so HACS installs *only* from a release carrying that asset:
+publish without it and HACS lists the version and then fails to install it,
+which is worse than not publishing at all.
 
 ```bash
-gh release create v<X.Y.Z> --prerelease --generate-notes
+# from a clean checkout of the commit you are releasing
+cd custom_components/omoda9
+git ls-files -z | xargs -0 zip -q -X ../../omoda9.zip
+cd -
+gh release create v<X.Y.Z> omoda9.zip --latest --generate-notes
 ```
 
-Volunteers pick it up by enabling *Show beta versions* for this repository in
-HACS. A stable release is `--latest` and requires the field tests described in
-`CONTRIBUTING.md`.
+Only tracked files, and the contents of `custom_components/omoda9/` sit at the
+root of the archive — that is where HACS expects them with
+`content_in_root: false`. The version in `manifest.json` must already match the
+tag. A stable also requires the field tests described in `CONTRIBUTING.md`.
 
 ## Getting out of trouble
 
