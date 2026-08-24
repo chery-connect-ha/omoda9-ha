@@ -99,11 +99,16 @@ def indirizzo_email(valore) -> str:
 
 
 def identita_mobile(valore) -> str:
-    """`APP-LOGIN@<numero>_<prefisso>` → `APP-LOGIN@***1234_39`.
+    """`APP-LOGIN@<prefisso>_<numero>` → `APP-LOGIN@39_***1234`.
 
     Tiene la FORMA dell'identità composita — che è poi ciò che si sta verificando quando si
     legge un log di login — e butta il numero. Se la stringa non ha la forma attesa non si
-    tira a indovinare: si maschera tutto tranne la coda."""
+    tira a indovinare: si maschera tutto tranne la coda.
+
+    ⚠️ ORDINE: l'identità è `<prefisso>_<numero>` (prefisso prima, numero dopo — vedi
+    `prova_token.build_params_mobile`). Il pezzo da OSCURARE è il SECONDO (il numero); il primo
+    è il solo prefisso internazionale, non sensibile. Con l'ordine sbagliato qui si mascherava
+    il prefisso e il numero usciva in chiaro nei log."""
     s = str(valore or "")
     testa, chiocciola, coda = s.rpartition("@")
     # ⚠️ La testa si ristampa SOLO se è il modulo che ci aspettiamo. `rpartition` da sola non
@@ -118,8 +123,8 @@ def identita_mobile(valore) -> str:
     modulo_noto = bool(chiocciola) and testa.isascii() and testa.isupper() \
         and testa.replace("-", "").isalpha()
     corpo = coda if chiocciola else s
-    num, sep, area = corpo.rpartition("_")
+    area, sep, num = corpo.partition("_")         # ordine: <prefisso>_<numero>
     prefisso_testa = f"{testa}@" if modulo_noto else ""
     if not sep:                                   # forma inattesa: nessuna deduzione
         return f"{prefisso_testa}{numero(corpo)}"
-    return f"{prefisso_testa}{numero(num)}{sep}{area}"
+    return f"{prefisso_testa}{area}{sep}{numero(num)}"

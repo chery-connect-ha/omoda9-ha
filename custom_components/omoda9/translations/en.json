@@ -115,7 +115,7 @@
     "error": {
       "otp_send_failed": "Could not send the code. Check the email/phone and PIN and try again.",
       "otp_invalid": "Invalid or expired OTP code.",
-      "no_vehicle": "Login succeeded but no vehicle was found on this account.",
+      "no_vehicle": "Signed in, but this account has no vehicles. If your car is registered under a different login (e.g. your email address), sign in with that one instead.",
       "pin_required": "Enter the vehicle control PIN.",
       "otp_required": "Enter the code you received.",
       "phone_invalid": "That phone number does not look right. Enter the digits of the number only, without the country code and without spaces; in the other field put only the digits of the country code (Italy = 39).",
