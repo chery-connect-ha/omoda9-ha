@@ -73,13 +73,14 @@ def build_params_password(username, password, is_phone=False, area="39"):
     """ROPC (grant_type=password): login con USERNAME + PASSWORD, senza OTP né captcha.
 
     `username` è l'identificatore GREZZO (e-mail oppure numero), NON la forma composita
-    `APP-LOGIN@…` che usa l'OTP; la password viaggia in chiaro dentro il TLS con `needDecode=1`.
-    Verificato dal vivo (2026-08-24): risolve all'account REALE, stesso token del login e-mail.
+    `APP-LOGIN@…` che usa l'OTP. La password è cifrata AES-128-CBC (`A.aes_cbc_password`) e va nel
+    BODY con `needDecode=1`: il server la decifra. Verificato dal vivo (2026-08-24): conia il
+    token dell'account REALE, lo stesso del login e-mail.
 
-    ⚠️ La password è una CREDENZIALE: non entra MAI in un log (solo la sua lunghezza) né in
-    entry.data. Si conia il token UNA volta e da lì la sessione vive sul refresh_token, come per
-    l'OTP — la password non viene conservata."""
-    p = {"username": username, "password": password, "grant_type": "password",
+    ⚠️ La password è una CREDENZIALE: cifrata prima di partire (mai in chiaro nei parametri), mai
+    in un log (solo la sua lunghezza) né in entry.data. Si conia il token UNA volta e da lì la
+    sessione vive sul refresh_token, come per l'OTP — la password non viene conservata."""
+    p = {"username": username, "password": A.aes_cbc_password(password), "grant_type": "password",
          "scope": "server", "needDecode": "1"}
     if is_phone:
         p["loginType"] = "mobile"
@@ -93,8 +94,21 @@ def call_password(username, password, is_phone=False, area="39", verbose=True):
     """Conia il token via ROPC (username+password). Ritorna (status, json, token)."""
     params = build_params_password(username, password, is_phone, area)
     H = A.headers_post(TOKEN_PATH, secret=A.SIGN_SECRET, **_dept(area))
-    # come il login e-mail OTP: parametri in QUERY (verificato dal vivo per l'e-mail).
-    r = requests.post(A.BFF + TOKEN_PATH, params=params, headers=H, timeout=20)
+    # ⚠️ Parametri nel BODY (`data=`), NON in query. Due ragioni che coincidono: (1) il server
+    # accetta la password solo così — è nel body che la DECIFRA (verificato dal vivo 2026-08-24:
+    # la password cifrata mandata in query è rifiutata «utente/password errati», perché la query
+    # non decifra); (2) privacy — la credenziale è già cifrata AES-CBC E fuori dalla URL, quindi
+    # non può finire nel messaggio di un'eccezione `urllib3` (→ stderr → `session` → i log di
+    # Home Assistant che l'utente allega alle issue) né nei log d'accesso di Chery.
+    # Il try/except resta come buona educazione: un errore di rete non deve uscire come traceback
+    # grezzo, e `str(e)` non si logga comunque (solo la CLASSE dell'eccezione).
+    try:
+        r = requests.post(A.BFF + TOKEN_PATH, data=params, headers=H, timeout=20)
+    except requests.RequestException as e:
+        if verbose:
+            print(f"[login password pwd_len={len(password)}] errore di rete: {type(e).__name__}")
+        return 0, {"key": "network.error",
+                   "msg": f"errore di rete durante il login ({type(e).__name__})"}, None
     try:
         j = r.json()
     except Exception:
