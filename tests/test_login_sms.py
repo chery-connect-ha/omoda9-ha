@@ -5,7 +5,9 @@ Perché questi test esistono. La forma del login mobile non è documentata da ne
 sola contro il server vero. Sono quattro dettagli che sembrano arbitrari e che, se qualcuno
 li «riordina» in buona fede, fanno fallire il login con un messaggio che accusa il codice OTP:
 
-  * l'identità NON è il numero, è la stringa composita `APP-LOGIN@<numero>_<prefisso>`;
+  * l'identità NON è il numero, è la stringa composita `APP-LOGIN@<prefisso>_<numero>`
+    (prefisso PRIMA, numero DOPO — `UserService::phoneVerifyLogin` costruisce
+    `APP-LOGIN@{areaCode}_{number}`; l'ordine invertito conia un token ma verso l'account sbagliato);
   * `grant_type=mobile` (non `email`, non `sms`);
   * i parametri viaggiano nel **BODY**, mentre il ramo e-mail li manda in **QUERY**;
   * il codice è cifrato SM4 come nel ramo e-mail, non in chiaro.
@@ -27,11 +29,12 @@ import fixtures as FX
 # ───────────────────────── forma delle richieste ─────────────────────────
 
 def test_identita_mobile_e_composita(core):
-    """`APP-LOGIN@<numero>_<prefisso>`: il numero nudo NON funziona (verificato dal vivo)."""
+    """`APP-LOGIN@<prefisso>_<numero>` (prefisso PRIMA): il numero nudo NON funziona, e nemmeno
+    l'ordine invertito — quello conia un token ma verso un altro account (verificato dal vivo)."""
     pt = core["prova_token"]
     p = pt.build_params_mobile(FX.PHONE, FX.AREA_CODE, "123456")
 
-    assert p["mobile"] == f"APP-LOGIN@{FX.PHONE}_{FX.AREA_CODE}"
+    assert p["mobile"] == f"APP-LOGIN@{FX.AREA_CODE}_{FX.PHONE}"
     assert p["grant_type"] == "mobile"
     assert p["loginType"] == "mobile"
     assert p["code"] != "123456", "il codice deve essere cifrato SM4, non in chiaro"
