@@ -221,23 +221,51 @@ def unisci_esito_e_note(esito: str, note, limite: int = STATO_MAX) -> str:
     pulite = [str(n).strip() for n in (note or []) if str(n).strip()]
     if not pulite:
         return testo[:limite]
+    # Il nome del comando è già la prima cosa dell'esito: ripeterlo davanti a ogni avviso costa
+    # spazio dentro un budget di 255 caratteri che è il vero motivo per cui un avviso resta
+    # fuori. «Sbrina lunotto: HTTP 200 A00084 … · Sbrina lunotto: il costruttore non autorizza…»
+    # spendeva 16 caratteri per dire due volte la stessa cosa, e con quei 16 l'avviso non
+    # entrava (270 contro 255). Nel registro il prefisso resta: lì ogni riga si legge da sola,
+    # qui no. Si toglie solo se è ESATTAMENTE lo stesso prefisso dell'esito.
+    prefisso = testo.split(": ", 1)[0] + ": " if ": " in testo else None
+    if prefisso:
+        pulite = [n[len(prefisso):].strip() if n.startswith(prefisso) else n for n in pulite]
+        pulite = [n for n in pulite if n]
+    def _riga(accettate) -> str:
+        return _SEP_NOTE.join([p for p in (testo, *accettate) if p])
+
+    accettate: list[str] = []
     fuori = 0
     for i, n in enumerate(pulite):
-        cand = f"{testo}{_SEP_NOTE}{n}" if testo else n
-        if len(cand) <= limite:
-            testo = cand
+        if len(_riga([*accettate, n])) <= limite:
+            accettate.append(n)
         else:
             fuori = len(pulite) - i
             break
-    if fuori:
-        # Quanti ne restano fuori si dice, e la coda che lo dice deve entrare a sua volta:
-        # se non c'è spazio nemmeno per lei si sacrifica la fine del testo, che a quel punto
-        # è già l'ultima informazione in ordine di importanza.
+    while fuori:
+        # Quanti ne restano fuori si dice, e la coda che lo dice occupa spazio a sua volta.
+        #
+        # ⚠️ Qui c'era il difetto che questa funzione esiste per non fare. Se la coda non
+        # entrava si tagliava la fine del testo — ma «il testo» a quel punto contiene già gli
+        # avvisi accettati, quindi a essere mozzato era l'ULTIMO AVVISO, non l'esito. Misurato
+        # sul caso reale della macro freddo dell'issue #1: l'utente leggeva «…ricomposto in
+        # un'unica richiesta al c · (+1 nel registro)». Un avviso tagliato sembra completo, che
+        # è esattamente ciò che la docstring qui sopra promette di non fare mai.
+        #
+        # Ora si rinuncia all'avviso INTERO: esce dalla riga e va a ingrossare il conteggio. Si
+        # perde un'informazione, ma non se ne inventa una monca — e nel registro c'è per esteso.
         coda = f"{_SEP_NOTE}(+{fuori} nel registro)"
-        if len(testo) + len(coda) > limite:
-            testo = testo[:max(0, limite - len(coda))].rstrip()
-        testo += coda
-    return testo[:limite]
+        riga = _riga(accettate)
+        if len(riga) + len(coda) <= limite:
+            return riga + coda
+        if not accettate:
+            # Nessun avviso da sacrificare: resta solo l'esito, ed è l'unico caso in cui si
+            # accorcia il testo — è l'ultima informazione in ordine di importanza e non è un
+            # avviso. (Succede con un esito già lungo quanto tutto il limite.)
+            return (riga[:max(0, limite - len(coda))].rstrip() + coda)[:limite]
+        fuori += 1
+        accettate.pop()
+    return _riga(accettate)[:limite]
 
 
 def _is_unit_flag(key: str) -> bool:
@@ -1245,13 +1273,31 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             # servono di più. `finally` per la stessa ragione del resto di questa release —
             # un'eccezione, compresa una cancellazione, non deve far sparire l'informazione.
             self._note_cmd = list(note)
-        esito = msgs[-1] if msgs else "inviato"
-        finale = unisci_esito_e_note(esito, note)
-        # L'ultimo `emit` ha già pubblicato l'esito NUDO: qui lo si riscrive con gli avvisi
-        # attaccati. Due aggiornamenti invece di uno, ma è l'unico modo per comporre una riga
-        # che `core/` non può conoscere (non sa nulla di Home Assistant né del limite dei 255).
-        if finale != esito:
-            self._update({"cmd_status": finale})
+            # ⚠️ La ricomposizione sta QUI dentro, e non dopo il `try`, per un difetto che è
+            # sopravvissuto alla release che diceva di averlo chiuso. Un comando rifiutato
+            # (`A00084` e ogni altro codice di fallimento) fa sollevare `commands.send()`:
+            # con queste righe fuori dal `finally` non venivano mai eseguite, e sullo stato
+            # restava l'esito nudo dell'ultimo `emit`. Cioè gli avvisi si vedevano solo
+            # quando il comando riusciva — mentre il caso in cui l'utente ha davvero bisogno
+            # di sapere *perché* è quello in cui il comando è stato rifiutato. Sul veicolo
+            # dell'issue #1 sono i quattro comandi che gli interessano di più («raffredda
+            # tutto», lunotto, sedili posteriori): finivano tutti nel registro e basta.
+            # L'ultimo `emit` ha già pubblicato l'esito NUDO: qui lo si riscrive con gli
+            # avvisi attaccati. Due aggiornamenti invece di uno, ma è l'unico modo per
+            # comporre una riga che `core/` non può conoscere (non sa nulla di Home Assistant
+            # né del limite dei 255 caratteri).
+            esito = msgs[-1] if msgs else "inviato"
+            finale = unisci_esito_e_note(esito, note)
+            try:
+                if finale != esito:
+                    self._update({"cmd_status": finale})
+            except Exception as err:  # noqa: BLE001
+                # Un problema nel MOSTRARE l'esito non deve mai sostituirsi all'errore vero:
+                # sul percorso d'eccezione un `raise` da qui rimpiazzerebbe la `CommandError`
+                # e con essa il `reason` su cui il coordinator instrada il rimedio (PIN,
+                # riautenticazione, permessi). Meglio uno stato non aggiornato che un rimedio
+                # sbagliato.
+                _LOGGER.debug("[cmd] esito con avvisi non pubblicato: %s", err)
         return finale
 
     def _instrada_rimedio(self, err: Exception, dal_loop: bool = True) -> str:

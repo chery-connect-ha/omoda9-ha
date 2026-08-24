@@ -29,7 +29,7 @@ import pytest
 
 import fixtures as FX
 from custom_components.omoda9.const import DOMAIN, NOTE_COMANDO_S
-from custom_components.omoda9.coordinator import STATO_MAX, unisci_esito_e_note
+from custom_components.omoda9.coordinator import _SEP_NOTE, STATO_MAX, unisci_esito_e_note
 
 AVVISO_DURATA = "durata 30′ non ammessa"
 
@@ -50,6 +50,27 @@ def test_senza_avvisi_lesito_resta_identico():
     assert unisci_esito_e_note("Clima acceso ✅", ["", "   "]) == "Clima acceso ✅"
 
 
+def test_il_nome_del_comando_non_si_ripete_davanti_a_ogni_avviso():
+    """Ripeterlo costa spazio dentro un budget che è il vero motivo per cui un avviso resta fuori.
+
+    Misurato sul profilo dell'issue #1: «Sbrina lunotto» produce un esito di 146 caratteri e un
+    avviso di 121 col prefisso — 270 in tutto, e l'avviso finiva nel registro. Senza il prefisso
+    ripetuto sono 254 ed entra. Nel registro il prefisso resta, perché lì ogni riga si legge da
+    sola; qui l'esito lo dice già come prima cosa."""
+    out = unisci_esito_e_note("Sbrina lunotto: HTTP 200 A00084 — rifiutato",
+                              ["Sbrina lunotto: il costruttore non autorizza questa funzione"])
+    assert out == ("Sbrina lunotto: HTTP 200 A00084 — rifiutato · "
+                   "il costruttore non autorizza questa funzione")
+
+
+def test_si_toglie_solo_il_prefisso_IDENTICO():
+    """Un avviso che parla di un'ALTRA cosa non deve perdere la sua intestazione."""
+    out = unisci_esito_e_note("Clima acceso: HTTP 200 A00079 — ok",
+                              ["Sbrina lunotto: negato", "durata 30′ non ammessa → uso 15′"])
+    assert "Sbrina lunotto: negato" in out
+    assert "durata 30′ non ammessa → uso 15′" in out
+
+
 def test_non_si_supera_mai_il_limite_di_home_assistant():
     """255 caratteri è un limite di Home Assistant, non una preferenza tipografica: uno stato
     più lungo non si tronca da solo con grazia — va gestito qui."""
@@ -65,6 +86,43 @@ def test_un_avviso_che_non_entra_si_conta_invece_di_troncarsi():
     assert "(+2 nel registro)" in out, out
     assert "b" * 20 not in out, "il secondo avviso è stato tagliato invece che contato"
     assert len(out) <= STATO_MAX
+
+
+def test_un_avviso_accettato_non_viene_mozzato_dalla_coda():
+    """Il caso che il test qui sopra NON copriva, e che sull'auto vera si è presentato subito.
+
+    Il difetto: quando la coda «(+N nel registro)» non ci stava si accorciava «il testo» — che a
+    quel punto conteneva **già gli avvisi accettati**, quindi a essere tagliato non era l'esito
+    ma l'ULTIMO AVVISO. Sul profilo reale dell'issue #1 la macro freddo produceva esattamente
+    questo: «…ricomposto in un'unica richiesta al c · (+1 nel registro)».
+
+    La regola è la stessa dell'altro caso, applicata anche qui: un avviso c'è **per intero**
+    oppure non c'è e si conta. Le lunghezze qui sotto ricalcano quelle vere (esito 135, avviso
+    che entra ma non lascia spazio ai 20 caratteri della coda)."""
+    esito = "Raffredda tutto: HTTP 200 A00079 — " + "x" * 100
+    primo = "questa auto non autorizza il comando unico: " + "y" * 60 + " FINE"
+    assert len(esito) + len(_SEP_NOTE) + len(primo) <= STATO_MAX        # entra…
+    assert len(esito) + len(_SEP_NOTE) + len(primo) + 20 > STATO_MAX    # …ma senza la coda
+
+    out = unisci_esito_e_note(esito, [primo, "z" * 200])
+
+    assert len(out) <= STATO_MAX
+    assert "FINE" in out or "non autorizza" not in out, f"avviso mozzato a metà: {out!r}"
+    assert "(+2 nel registro)" in out, out
+
+
+def test_non_si_sacrifica_un_avviso_che_ci_starebbe():
+    """L'altra faccia: rinunciare a un avviso è l'ultima risorsa, non la prima.
+
+    Le lunghezze sono quelle vere della macro freddo dopo l'accorciamento del messaggio di
+    ricomposizione: l'avviso **e** la coda ci stanno entrambi, e devono esserci entrambi."""
+    esito = "Raffredda tutto: HTTP 200 A00079 — " + "x" * 100
+    primo = "questa auto non autorizza il comando unico: ricomposto nel clima"
+
+    out = unisci_esito_e_note(esito, [primo, "z" * 200])
+
+    assert primo in out, f"avviso sacrificato pur essendoci spazio: {out!r}"
+    assert "(+1 nel registro)" in out and len(out) <= STATO_MAX
 
 
 def test_la_coda_entra_anche_quando_lesito_e_gia_lunghissimo():
@@ -230,3 +288,32 @@ async def test_gli_avvisi_restano_anche_se_il_comando_fallisce(hass, integrazion
 
     assert any(AVVISO_DURATA in n for n in coord._note_cmd), (
         f"gli avvisi di un comando fallito sono andati persi: {coord._note_cmd}")
+
+
+async def test_il_comando_fallito_mostra_gli_avvisi_NELLO_STATO(hass, integrazione_avviata,
+                                                                cloud):
+    """E devono arrivare all'ENTITÀ, non solo restare in memoria.
+
+    ⚠️ Questo test esiste perché il suo gemello qui sopra è rimasto verde mentre il difetto era
+    presente, e la ragione è istruttiva: asseriva su `coord._note_cmd`, cioè sulla lista che il
+    `finally` conserva per la conferma dell'auto. Ma su un comando **rifiutato** la conferma non
+    arriva mai, quindi quella lista non veniva letta da nessuno: la ricomposizione dell'esito
+    stava DOPO il `try`, `commands.send()` sollevava, e sullo stato restava l'esito nudo.
+
+    È lo stesso errore di prospettiva descritto in cima al file — verificare che l'avviso sia
+    stato *prodotto* invece che *letto* — ripetuto un livello più in là. Sul veicolo dell'issue
+    #1 riguardava i quattro comandi che gli importano davvero: tutti rifiutati, tutti muti."""
+    coord = _coordinator(hass, integrazione_avviata)
+    coord.ctx.caps = {"durate_aria": [5, 10, 15]}
+    cloud.on("/asc/vehicleControl/", code="A00084")   # rifiutato dal backend
+
+    with pytest.raises(Exception):
+        await coord.async_send_command("clima_on", {"times": "30"})
+    await hass.async_block_till_done()
+
+    stato = coord.data["cmd_status"]
+    assert AVVISO_DURATA in stato, (
+        f"il comando è stato rifiutato e l'avviso non è arrivato all'utente: {stato!r}")
+    assert "A00084" in stato, (
+        f"gli avvisi hanno coperto l'esito, che resta la prima cosa da leggere: {stato!r}")
+    assert len(stato) <= STATO_MAX
