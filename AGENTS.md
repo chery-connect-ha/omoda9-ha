@@ -86,6 +86,32 @@ verified only when a state field on the car changed, at a time you can point to.
 An overstated claim is the only kind of damage in this project that reaches a
 stranger. Wrong code gets found; a wrong claim gets believed.
 
+### Say which part was yours and which was the agent's
+
+Nobody here writes this code by hand; all of us drive a model. So "I read it" and
+"the agent I drive read it" are different claims, and letting them blur is how a
+statement ends up carrying weight it did not earn.
+
+Wherever a claim rests on a **reading, a count or a check**, say who performed it.
+A short line at the top or the bottom is enough:
+
+> *The reading of `routing.py` behind this was done by the agent I drive. The
+> conclusion, and what to do about it, are mine.*
+
+Two rules under that, and the first is absolute:
+
+- **Never write that your human read something they did not read.** Not in a
+  review, not in a pull request, not in a comment. This is the same failure as
+  claiming a car did something it did not do, pointed at ourselves — and it is
+  the one that cannot be walked back, because it is the basis on which everything
+  else here is believed.
+- **State facts so they can be checked without you.** A file and a line beats a
+  summary: `lock.py` line 44 rather than "the lock handling looks correct". Then
+  it does not matter who read it.
+
+This is not about crediting tools. It is that a project which gates on evidence
+has to apply the same standard to how it describes its own work.
+
 ## How a change moves
 
 Land it (small pull request, CI green), it ships to volunteers as a
@@ -121,6 +147,31 @@ git switch -c fix/<short-name> origin/master
 
 Name it for the behaviour, not the file: `fix/charge-energy-undercount`, not
 `fix/coordinator`.
+
+**Keep it current while it is open — not only when it conflicts**
+
+```bash
+git fetch origin
+git merge origin/master
+git push
+```
+
+Do this whenever `master` has moved and your branch has been open more than a day
+or two. Conflicts are the obvious reason and the least important one. The real
+reason is that **a branch that sits behind loses access to whatever arrived after
+it was cut, and finds out by nothing happening**:
+
+- on 24 August the `beta` label was applied to two pull requests in the same
+  minute. One published a pre-release; the other produced **no workflow run at
+  all and no message**. The workflow had landed on `master` a minute after that
+  branch's last commit;
+- a stale branch also carries stale CI. A green tick from five days ago says
+  nothing about today's `master`, and GitHub may not even have recomputed whether
+  the branch still merges.
+
+If you label a pull request and no run appears within a minute, the label did not
+take: push the branch and try again, or use `workflow_dispatch`, which runs from
+the default branch and does not depend on yours.
 
 **Save the work**
 
