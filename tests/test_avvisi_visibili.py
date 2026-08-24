@@ -317,3 +317,40 @@ async def test_il_comando_fallito_mostra_gli_avvisi_NELLO_STATO(hass, integrazio
     assert "A00084" in stato, (
         f"gli avvisi hanno coperto l'esito, che resta la prima cosa da leggere: {stato!r}")
     assert len(stato) <= STATO_MAX
+
+
+async def test_un_guasto_nel_comporre_lesito_non_si_sostituisce_allerrore_vero(
+        hass, integrazione_avviata, cloud, monkeypatch):
+    """L'errore che l'utente riceve deve restare quello dell'AUTO, non il nostro.
+
+    ⚠️ Questo test nasce da un difetto trovato mentre si chiedeva la lettura di questo stesso
+    lavoro, non dalla suite: la ricomposizione era stata spostata nel `finally` — giusto — ma
+    lasciata FUORI dal `try` che protegge la pubblicazione. Protetto era solo il `_update`.
+    Se a sollevare era `unisci_esito_e_note`, cioè proprio la funzione che questo lavoro
+    riscrive, l'eccezione partiva dal `finally` e **rimpiazzava la `CommandError` in volo**,
+    portandosi via il `reason` su cui il coordinator sceglie il rimedio: un errore di
+    formattazione sarebbe arrivato all'utente come una richiesta di riconfigurare il PIN.
+
+    Il rimedio si decide sulla causa, e la causa è dell'auto: qui si verifica che resti tale."""
+    from custom_components.omoda9 import coordinator as COORD
+    from custom_components.omoda9.core.commands import CommandError
+
+    coord = _coordinator(hass, integrazione_avviata)
+    coord.ctx.caps = {"durate_aria": [5, 10, 15]}
+    cloud.on("/asc/vehicleControl/", code="A00084")   # rifiutato dal backend
+
+    def esplode(*a, **k):
+        raise RuntimeError("guasto nel comporre l'esito")
+
+    monkeypatch.setattr(COORD, "unisci_esito_e_note", esplode)
+
+    with pytest.raises(CommandError) as caduto:
+        await coord.async_send_command("clima_on", {"times": "30"})
+    await hass.async_block_till_done()
+
+    assert "guasto nel comporre" not in str(caduto.value), (
+        "il nostro guasto ha preso il posto dell'errore dell'auto")
+    assert caduto.value.reason is not None, (
+        "il `reason` è andato perso: il coordinator non saprebbe più quale rimedio proporre")
+    assert "A00084" in coord.data["cmd_status"], (
+        f"lo stato ha perso anche l'esito nudo: {coord.data['cmd_status']!r}")

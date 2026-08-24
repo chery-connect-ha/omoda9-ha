@@ -1287,16 +1287,22 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             # comporre una riga che `core/` non può conoscere (non sa nulla di Home Assistant
             # né del limite dei 255 caratteri).
             esito = msgs[-1] if msgs else "inviato"
-            finale = unisci_esito_e_note(esito, note)
+            # ⚠️ La ricomposizione sta DENTRO il `try`, e non una riga sopra. Un problema nel
+            # comporre o nel MOSTRARE l'esito non deve mai sostituirsi all'errore vero: sul
+            # percorso d'eccezione un `raise` da qui rimpiazzerebbe la `CommandError` e con
+            # essa il `reason` su cui il coordinator instrada il rimedio (PIN, riautenticazione,
+            # permessi) — l'utente si vedrebbe chiedere il PIN per un errore di formattazione.
+            # Tenere fuori `unisci_esito_e_note` era esattamente il difetto che questo lavoro
+            # dice di chiudere, lasciato indietro di una riga: è la funzione che qui si riscrive,
+            # cioè la più esposta delle due. `finale` parte dall'esito nudo, così esiste comunque
+            # un valore da restituire. Meglio uno stato non aggiornato che un rimedio sbagliato.
+            finale = esito
             try:
+                finale = unisci_esito_e_note(esito, note)
                 if finale != esito:
                     self._update({"cmd_status": finale})
             except Exception as err:  # noqa: BLE001
-                # Un problema nel MOSTRARE l'esito non deve mai sostituirsi all'errore vero:
-                # sul percorso d'eccezione un `raise` da qui rimpiazzerebbe la `CommandError`
-                # e con essa il `reason` su cui il coordinator instrada il rimedio (PIN,
-                # riautenticazione, permessi). Meglio uno stato non aggiornato che un rimedio
-                # sbagliato.
+                finale = esito
                 _LOGGER.debug("[cmd] esito con avvisi non pubblicato: %s", err)
         return finale
 
