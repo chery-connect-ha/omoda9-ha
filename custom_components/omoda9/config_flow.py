@@ -158,11 +158,11 @@ _MAX_CIFRE_PREFISSO = 3          # E.164: i prefissi paese hanno 1, 2 o 3 cifre.
 
 def _normalizza_telefono(numero: str | None, prefisso: str | None) -> tuple[str, str]:
     """Ripulisce numero e prefisso UNA VOLTA SOLA, qui: da qui in poi viaggiano in entry.data,
-    nell'ambiente dei sottoprocessi e nell'identità `APP-LOGIN@<num>_<area>`, e a valle nessuno
+    nell'ambiente dei sottoprocessi e nell'identità `APP-LOGIN@<area>_<num>`, e a valle nessuno
     li tocca più (`invia_sms` fa solo `lstrip("+")` + spazi, `build_params_mobile` altrettanto).
 
     Cose che la gente scrive davvero e che senza questo passaggio arrivano storte al server:
-      * numero copiato dalla rubrica col prefisso già dentro → identità `APP-LOGIN@39<num>_39`;
+      * numero copiato dalla rubrica col prefisso già dentro → identità `APP-LOGIN@39_39<num>`;
       * separatori dentro il numero: spazi, punti, trattini;
       * prefisso scritto `+39` o `0039` → `areaCode="+39"`, che il server non riconosce;
       * zero di accesso nazionale davanti al numero (Regno Unito, Germania, Francia…).
