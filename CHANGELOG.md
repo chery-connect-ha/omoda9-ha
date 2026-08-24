@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.14.0 — 2026-08-24
+
 ### 🇮🇹 Italiano
 
 - **Quando un comando viene rifiutato, adesso ti diciamo perché.** Se prima di mandare un comando l'integrazione deve saltare o adattare qualcosa — una funzione che il costruttore non autorizza sulla tua auto, una durata che la tua vettura non accetta — te lo scrive in «Esito comando». Fino a ieri però quella spiegazione compariva **solo quando il comando riusciva**: nel caso opposto, che è proprio quello in cui serve, restava scritto solo l'errore nudo e il motivo finiva unicamente nel registro tecnico, dove nessuno lo va a cercare. Adesso la spiegazione resta attaccata all'esito in entrambi i casi. E non ripetiamo più il nome del comando davanti alla spiegazione, visto che l'esito lo dice già come prima cosa: erano i caratteri che mancavano perché la frase ci stesse tutta nello spazio che Home Assistant concede. Su un'Omoda 9 quasi tutti questi avvisi non escono affatto — riguardano funzioni che il costruttore nega su altre vetture — ma **uno lo vedrai anche tu**: se imposti la durata del clima su un valore che l'auto non ammette (il cursore arriva a 30 minuti, l'Omoda 9 ne accetta 5, 10 o 15) e il comando viene rifiutato, per esempio perché l'auto è occupata, adesso accanto all'errore leggi anche quale durata è stata usata. Prima, in quel caso, restava solo l'errore.
