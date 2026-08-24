@@ -6,7 +6,8 @@
         "description": "Choose how to sign in to your Omoda/Jaecoo account. Use the phone option if your account is registered with a phone number instead of an email.",
         "menu_options": {
           "login_email": "Sign in with email",
-          "login_phone": "Sign in with phone number (SMS)"
+          "login_phone": "Sign in with phone number (SMS)",
+          "login_password": "Sign in with password (no code)"
         }
       },
       "login_email": {
@@ -112,6 +113,28 @@
           "phone": "Phone number (without country code)",
           "area_code": "Country code, digits only (Italy = 39)"
         }
+      },
+      "login_password": {
+        "title": "Sign in with password",
+        "description": "Enter your account email, password and vehicle PIN — no OTP code needed. VIN and account ID are detected automatically. The password is used once to sign in and is never stored.{reason}",
+        "data": {
+          "email": "Account email",
+          "pin": "Vehicle control PIN",
+          "password": "Account password",
+          "bff": "BFF endpoint (region)",
+          "tsp_host": "TSP console host (region)",
+          "car_mqtt_host": "Vehicle MQTT broker host (region)",
+          "car_mqtt_port": "Vehicle MQTT broker port (region)",
+          "channel_id": "Channel ID (region)",
+          "certs_src": "Folder with mutual-TLS certs to import (optional)"
+        }
+      },
+      "reauth_password": {
+        "title": "Re-enter your password",
+        "description": "The session expired. Enter the account password for {email} to sign back in — no code needed.{reason}",
+        "data": {
+          "password": "Account password"
+        }
       }
     },
     "error": {
@@ -121,7 +144,9 @@
       "pin_required": "Enter the vehicle control PIN.",
       "otp_required": "Enter the code you received.",
       "phone_invalid": "That phone number does not look right. Enter the digits of the number only, without the country code and without spaces; in the other field put only the digits of the country code (Italy = 39).",
-      "email_invalid": "That email address does not look right."
+      "email_invalid": "That email address does not look right.",
+      "password_invalid": "Wrong username or password.",
+      "password_required": "Enter your account password."
     },
     "abort": {
       "already_configured": "This vehicle (VIN) is already configured.",

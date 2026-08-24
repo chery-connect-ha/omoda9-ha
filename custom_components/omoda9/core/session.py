@@ -276,6 +276,33 @@ def confirm_otp(ctx, code, emit=lambda m: None):
     return False, f"codice rifiutato: {_riga_utile(out, r.returncode)[:120]}"
 
 
+def login_with_password(ctx, password, emit=lambda m: None):
+    """Conia il token con username+password (ROPC), UNA volta sola — niente OTP, niente captcha.
+
+    La password è una CREDENZIALE usa-e-getta qui dentro: viaggia SOLO nell'ambiente del
+    sottoprocesso (mai in argv → mai in `ps`), viene usata per coniare il token e NON viene
+    salvata da nessuna parte. Da questo punto la sessione vive sul `refresh_token`, esattamente
+    come per l'OTP: se un giorno sia access che refresh muoiono, si richiede di nuovo la password
+    (reauth), non la si conserva. Ritorna (ok, dettaglio)."""
+    if not (password or "").strip():
+        return False, "nessuna password inserita"
+    src_dir, timeout = ctx.src_dir, _timeout()
+    emit("conio il token con la password…")
+    try:
+        r = subprocess.run([PYEXE, "prova_token.py"],
+                           cwd=src_dir, capture_output=True, text=True, timeout=timeout,
+                           env=_subenv(ctx, OMODA_PASSWORD=password))
+    except subprocess.TimeoutExpired:
+        return False, "timeout conio token"
+    # ⚠️ `out` è lo stdout di prova_token, che NON stampa MAI la password (solo la sua lunghezza).
+    out = (r.stdout or "") + (r.stderr or "")
+    _LOGGER.debug("Omoda9 login: conio token via password rc=%s\n%s", r.returncode, out.strip())
+    if r.returncode == 0 and "RESULT: OK" in out:
+        ok, _detail, _status = check(ctx)
+        return ok, ("Sessione ripristinata ✅" if ok else "token coniato ma login ancora KO")
+    return False, f"password rifiutata: {_riga_utile(out, r.returncode)[:120]}"
+
+
 if __name__ == "__main__":
     from .context import ctx_da_environ
     print("check:", check(ctx_da_environ()))
