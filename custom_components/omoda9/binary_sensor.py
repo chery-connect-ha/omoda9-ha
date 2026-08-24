@@ -159,7 +159,7 @@ class Omoda9ACasa(Omoda9Entity, BinarySensorEntity):
     _attr_icon = "mdi:home-map-marker"
 
     def __init__(self, coord) -> None:
-        super().__init__(coord, "A casa", "at_home", entity_id_format=ENTITY_ID_FORMAT)
+        super().__init__(coord, "Omoda9 A casa", "at_home", entity_id_format=ENTITY_ID_FORMAT)
 
     @property
     def available(self) -> bool:

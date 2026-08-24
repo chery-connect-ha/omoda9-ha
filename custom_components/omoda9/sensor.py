@@ -540,7 +540,10 @@ class Omoda9ChargedEnergy(Omoda9Entity, RestoreSensor):
 
     def __init__(self, coord, *, home: bool) -> None:
         self._home = home
-        nome = "Energia ricarica a casa" if home else "Energia ricarica fuori casa"
+        # Il prefisso "Omoda9" e' la convenzione di questo file: da li' esce l'object_id
+        # `omoda9_...` dell'entity_id, e la translation_key e' quella senza prefisso.
+        nome = ("Omoda9 Energia ricarica a casa" if home
+                else "Omoda9 Energia ricarica fuori casa")
         super().__init__(coord, nome,
                          "energy_charged_home" if home else "energy_charged_away",
                          entity_id_format=ENTITY_ID_FORMAT)
