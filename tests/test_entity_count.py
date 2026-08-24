@@ -34,8 +34,8 @@ from custom_components.omoda9.const import (
 # che l'auto ci manda già a ogni sonda (`appointmentTravelSetVOS`) e che finora buttavamo via.
 # Nessuna chiamata nuova verso il cloud: solo un campo che smettevamo di ignorare.
 ATTESO = {
-    "binary_sensor": 26,
-    "sensor": 39,
+    "binary_sensor": 27,
+    "sensor": 41,
     "button": 14,
     "switch": 18,
     "cover": 3,
@@ -46,7 +46,11 @@ ATTESO = {
     "text": 1,
     "time": 1,
 }
-TOTALE_ATTESO = 107
+# 107 -> 110 il 2026-08-24: portati dalla linea fork i due contatori di energia di ricarica
+# (casa/fuori) e il binary sensor "A casa". Cambiamento DELIBERATO e annunciato: questo numero
+# e' il criterio di accettazione che @Caslinovich ha adottato per le fette architetturali, e
+# non deve muoversi per caso.
+TOTALE_ATTESO = 110
 
 
 def test_totale_dichiarato_coerente():

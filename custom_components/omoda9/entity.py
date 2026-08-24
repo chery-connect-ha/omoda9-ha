@@ -20,6 +20,38 @@ from .const import DEFAULT_VEHICLE_NAME, DOMAIN, OPT_MAX_S
 from .coordinator import Omoda9Coordinator
 
 
+def _flt(v):
+    """float() oppure None (non solleva mai)."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def car_zone(hass, position: dict | None) -> str | None:
+    """`"home"` / `"away"` / `None` (ignoto) per una posizione GPS viva, usando la logica di
+    zona di Home Assistant (`async_active_zone`) — LA STESSA che mette il device_tracker
+    dell'auto su `home`/`not_home`. `None` quando non c'e' un fix utilizzabile, cosi' chi
+    chiama puo' astenersi invece di tirare a indovinare.
+
+    Sorgente unica condivisa dal binary sensor "A casa" e dai contatori di energia di
+    ricarica casa/fuori: se i due divergessero, l'utente vedrebbe l'auto a casa e l'energia
+    contata come fuori, e non avrebbe modo di sapere quale dei due ha ragione.
+    """
+    # import locale: nessuna dipendenza dal componente zone al momento dell'import del modulo
+    from homeassistant.components.zone import async_active_zone
+
+    pos = position or {}
+    lat = _flt(pos.get("lat") or pos.get("latitude"))
+    lon = _flt(pos.get("lon") or pos.get("longitude"))
+    if lat is None or lon is None:
+        return None
+    zone = async_active_zone(hass, lat, lon)
+    if zone is None:
+        return "away"
+    return "home" if zone.entity_id == "zone.home" else "away"
+
+
 def field_on(v) -> bool | None:
     """Interpreta un campo 5A02 come acceso/aperto (True), spento/chiuso (False)
     o ASSENTE (None).
