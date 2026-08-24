@@ -1,0 +1,216 @@
+name: Beta
+
+# Una pre-release INSTALLABILE tagliata da una pull request, per farla provare su
+# un'auto vera prima che il cambiamento entri.
+#
+# Perché esiste. Il gate di questo progetto non è il merge ma la STABILE, e la
+# review di chi non programma è la prova sul campo sulla propria auto. Perché
+# quella regola sia esigibile, chi ha l'auto deve poter installare la PR — e fino
+# a oggi non poteva: `hacs.json` dichiara `zip_release`, quindi HACS installa solo
+# da una release che porta allegato `omoda9.zip`, e quell'asset veniva costruito e
+# caricato a mano una volta per release. L'unica strada era scaricare un branch e
+# copiare i file in `custom_components/` a mano: esattamente la barriera che tiene
+# fuori le persone la cui review vale di più.
+#
+# Come si avvia: si mette l'etichetta `beta` sulla PR. Due tocchi dal browser di un
+# telefono — è deliberato, perché chi deve poterla chiedere non sempre ha un
+# computer sotto mano. `workflow_dispatch` resta come uscita di sicurezza.
+#
+# Chi può avviarla: solo chi ha accesso in scrittura, perché è GitHub a decidere
+# chi può etichettare. I tester non avviano niente: ricevono un link e installano.
+
+on:
+  pull_request:
+    types: [opened, labeled]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Numero della PR da cui tagliare la beta"
+        required: true
+        type: string
+
+permissions:
+  contents: write        # creare il tag e la pre-release
+  pull-requests: write   # scrivere il commento sulla PR
+
+jobs:
+  # Il meccanismo si annuncia da solo nel momento in cui serve. Una riga in
+  # CONTRIBUTING.md non la rilegge nessuno: chi apre una PR fra due settimane non
+  # saprebbe che la beta si può chiedere, e saremmo di nuovo senza tester.
+  suggerimento:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'opened' &&
+      github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ricorda come si chiede una beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Solo se la PR tocca il codice dell'integrazione. Su una PR di soli
+          # documenti il suggerimento sarebbe un falso allarme, e un avviso che
+          # compare quando non serve smette di essere letto quando serve.
+          if ! gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only \
+               | grep -q '^custom_components/'; then
+            echo "PR di soli documenti: nessun suggerimento."
+            exit 0
+          fi
+
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body \
+          "Per far provare questa modifica sull'auto di qualcuno, metti l'etichetta \`beta\` a questa PR: esce una pre-release installabile da HACS (*Show beta versions*), e chi ha la vettura giusta può dire se l'auto ha fatto davvero quello che diciamo.
+
+          Serve soprattutto quando il cambiamento riguarda un modello che tu non possiedi: lì la tua prova non può falsificarlo, e la sola review possibile è quella di chi ha quella macchina."
+
+  beta:
+    # MAI da un fork. Quello zip finisce installato in istanze Home Assistant che
+    # contengono le credenziali dell'auto di qualcuno, e pubblicato come release del
+    # repo canonico ha tutta l'aria dell'ufficiale. Da un fork la beta la taglia un
+    # membro a mano, dopo aver guardato cosa c'è dentro.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == 'beta' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Risolvi la PR e rifiuta i fork
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUM: ${{ github.event.pull_request.number || inputs.pr }}
+        run: |
+          set -euo pipefail
+          dati=$(gh pr view "$NUM" --repo "$GITHUB_REPOSITORY" \
+                 --json headRefOid,headRepository,headRepositoryOwner,title,url)
+          sha=$(echo "$dati"   | jq -r .headRefOid)
+          owner=$(echo "$dati" | jq -r .headRepositoryOwner.login)
+          nome=$(echo "$dati"  | jq -r .headRepository.name)
+          titolo=$(echo "$dati" | jq -r .title)
+          url=$(echo "$dati"   | jq -r .url)
+
+          # Il guard vale anche per workflow_dispatch, dove l'espressione `if` del
+          # job non ha un evento PR da cui leggere il repo di provenienza.
+          if [ "$owner/$nome" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::La PR #$NUM arriva dal fork $owner/$nome. Le beta si tagliano solo da branch di questo repo."
+            exit 1
+          fi
+
+          {
+            echo "numero=$NUM"
+            echo "sha=$sha"
+            echo "titolo=$titolo"
+            echo "url=$url"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      - name: Calcola la versione della beta
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base=$(jq -r .version custom_components/omoda9/manifest.json)
+          if [ -z "$base" ] || [ "$base" = "null" ]; then
+            echo "::error::manifest.json senza campo version."
+            exit 1
+          fi
+
+          # Il contatore è il primo libero fra i TAG (non fra le release: un tag può
+          # esistere senza release). Due PR che puntano alla stessa versione non
+          # collidono; a distinguerle è il titolo della release, non il tag, così il
+          # tag resta semver pulito e HACS lo ordina correttamente.
+          esistenti=$(gh api "repos/$GITHUB_REPOSITORY/tags?per_page=100" --paginate --jq '.[].name' \
+                      | grep -E "^v${base}-beta\.[0-9]+$" || true)
+          n=1
+          if [ -n "$esistenti" ]; then
+            n=$(( $(echo "$esistenti" | sed -E 's/.*-beta\.//' | sort -n | tail -1) + 1 ))
+          fi
+
+          echo "versione=${base}-beta.${n}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${base}-beta.${n}"     >> "$GITHUB_OUTPUT"
+
+      - name: Costruisci omoda9.zip
+        env:
+          VERSIONE: ${{ steps.ver.outputs.versione }}
+        run: |
+          set -euo pipefail
+          # La versione va scritta nel manifest DENTRO lo zip: è quella che Home
+          # Assistant mostra, ed è come il tester capisce quale build sta girando
+          # senza doverci credere sulla parola.
+          tmp=$(mktemp)
+          jq --arg v "$VERSIONE" '.version = $v' custom_components/omoda9/manifest.json > "$tmp"
+          mv "$tmp" custom_components/omoda9/manifest.json
+
+          # L'asset delle stabili contiene il CONTENUTO di custom_components/omoda9/
+          # appiattito alla radice dell'archivio (HACS lo scompatta dentro
+          # custom_components/<dominio>/). Verificato voce per voce contro
+          # l'omoda9.zip di v1.13.0: stessa lista, 53 file, nessuna esclusione.
+          # Si zippano solo i file TRACCIATI, così nulla di generato può entrarci.
+          cd custom_components/omoda9
+          git ls-files -z | xargs -0 zip -q -X "$GITHUB_WORKSPACE/omoda9.zip"
+          cd "$GITHUB_WORKSPACE"
+
+          echo "File nell'archivio: $(unzip -Z1 omoda9.zip | wc -l)"
+          unzip -p omoda9.zip manifest.json | jq -r '"Versione nel manifest: " + .version'
+
+      - name: Pubblica la pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSIONE: ${{ steps.ver.outputs.versione }}
+          SHA: ${{ steps.pr.outputs.sha }}
+          NUM: ${{ steps.pr.outputs.numero }}
+          TITOLO: ${{ steps.pr.outputs.titolo }}
+          URL: ${{ steps.pr.outputs.url }}
+        run: |
+          set -euo pipefail
+          note=$(cat <<EOF
+          Build di prova della PR #${NUM} — **${TITOLO}**
+          ${URL}
+
+          Non è una release: è la PR resa installabile, così chi ha l'auto giusta può
+          dire se la macchina fa davvero quello che la PR dichiara.
+
+          **Come si installa.** In HACS, sulla scheda di questa integrazione: menù ⋮ →
+          *Redownload* → attiva **Show beta versions** → scegli \`${VERSIONE}\` → riavvia
+          Home Assistant. Per tornare indietro, stessa strada scegliendo l'ultima stabile.
+
+          **Se puoi, non provarla sull'istanza da cui dipendi ogni giorno.** È una
+          pre-release e l'auto è vera.
+
+          **Cosa serve sapere dopo.** Non "funziona", ma cosa ha fatto l'auto: il campo di
+          stato che è cambiato, e l'ora. \`HTTP 200\` e \`operation.successful\` dicono che
+          il backend ha accettato — non che la vettura abbia eseguito. Scrivilo sulla PR,
+          insieme al modello, alla regione e a cosa NON hai potuto provare: anche quello
+          è un risultato.
+
+          Commit: \`${SHA}\`
+          EOF
+          )
+          gh release create "$TAG" omoda9.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --prerelease \
+            --title "${VERSIONE} — PR #${NUM}: ${TITOLO}" \
+            --notes "$note"
+
+      - name: Dillo sulla PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSIONE: ${{ steps.ver.outputs.versione }}
+          NUM: ${{ steps.pr.outputs.numero }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
+          "**Beta installabile: \`${VERSIONE}\`** → https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}
+
+          In HACS: ⋮ → *Redownload* → **Show beta versions** → \`${VERSIONE}\` → riavvia.
+
+          Chi la prova: dì cosa ha fatto **l'auto** — il campo di stato che è cambiato e l'ora — non che il comando è stato accettato. E dì cosa non hai potuto provare."
