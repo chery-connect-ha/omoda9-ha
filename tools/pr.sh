@@ -154,7 +154,12 @@ if [ -n "$ORIGIN_SLUG" ] && [ "$ORIGIN_SLUG" != "$R_REPO" ]; then
 fi
 
 # ── 6. the pull request ────────────────────────────────────────────────────────────
-TITLE="$(printf '%s' "${MSG:-$(git log -1 --format=%s)}" | head -1)"
+# ⚠️ With --continue and no message, the title used to come from `git log -1`, i.e. the
+# LAST commit on the branch — which on a branch of several commits is the least
+# representative one. Measured on this very pull request: a two-line follow-up fix became
+# the title of the whole thing. The first commit beyond the base is what the branch is
+# about; the last one is usually a correction to it.
+TITLE="$(printf '%s' "${MSG:-$(git log --reverse --format=%s "origin/$BASE"..HEAD | head -1)}" | head -1)"
 BODY_F="$(mktemp)"; trap 'rm -f "$BODY_F" "${PAYLOAD:-}" "${RESP:-}"' EXIT
 TEMPLATE=".github/PULL_REQUEST_TEMPLATE.md"
 if [ -f "$TEMPLATE" ]; then
