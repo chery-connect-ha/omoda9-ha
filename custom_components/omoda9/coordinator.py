@@ -1848,3 +1848,9 @@ class Omoda9Coordinator(DataUpdateCoordinator):
     def _confirm_otp(self, code: str) -> tuple[bool, str]:
         from .core import session as SESSION
         return SESSION.confirm_otp(self.ctx, code or "")
+
+    def _login_with_password(self, password: str) -> tuple[bool, str]:
+        """Reauth degli account password: riconia il token con la password (usa-e-getta, mai
+        salvata) e ricontrolla la sessione. Speculare a `_confirm_otp` per il ramo OTP."""
+        from .core import session as SESSION
+        return SESSION.login_with_password(self.ctx, password or "")

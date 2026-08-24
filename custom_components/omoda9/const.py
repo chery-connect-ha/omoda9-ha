@@ -59,6 +59,15 @@ CONF_PHONE = "phone"
 CONF_AREA_CODE = "area_code"     # prefisso internazionale in sole cifre (Italia = 39)
 DEFAULT_AREA_CODE = "39"
 
+# Login con USERNAME + PASSWORD (ROPC): alternativa all'OTP (email/SMS). La password è una
+# CREDENZIALE usa-e-getta: serve SOLO a coniare il token al setup/reauth e NON viene mai salvata
+# in entry.data (da lì la sessione vive sul refresh_token, come per l'OTP). `login_method` è un
+# marcatore salvato nell'entry — NON la password — così la reauth sa chiedere di nuovo la password
+# invece di un OTP. Vedi `core/session.login_with_password`.
+CONF_PASSWORD = "password"          # campo del form, transitorio: MAI in entry.data
+CONF_LOGIN_METHOD = "login_method"  # "password" per gli account che accedono con la password
+LOGIN_METHOD_PASSWORD = "password"
+
 # Identità veicolo per il device HA (nome dinamico: "Omoda 9", "Jaecoo 7"…). `vehicle_name`
 # = nickname/modello dall'app, salvato in entry.data (catturato al config flow o backfillato);
 # è anche un'OPZIONE per l'override manuale. model/brand restano solo in entry.data.
