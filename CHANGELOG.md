@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.14.0 — 2026-08-24
+
 ### 🇮🇹 Italiano
 
 - **«Autonomia benzina (miglia)» ora capisce da sola in che unità parla l'auto.** È un
