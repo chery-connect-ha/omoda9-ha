@@ -157,6 +157,82 @@ def _frame_batteria_degradato(rt: dict) -> bool:
     return v == 0.0
 
 
+def _cruise_range_miglia(rt: dict):
+    """`cruiseRange` espresso in MIGLIA — o niente, se l'auto non permette di deciderlo.
+
+    ── Il fatto misurato ────────────────────────────────────────────────────────────────
+    Il centralino manda ALCUNE grandezze due volte, in due unità, come campi fratelli.
+    Frame reale di un'Omoda 9 PHEV, 2026-08-24:
+
+        mileageSurplus     209 km   ↔  cruiseRange            130   (rapporto 1,6077)
+        pureElectricRange  145 km   ↔  pureElectricRangeMile   90   (rapporto 1,6111)
+        lFrontTyreKpa      283      ↔  lFrontTyrePsi           41   (rapporto 6,90)
+
+    Sono TRE grandezze, non tutte: `odometer`, `averageFuel` e le temperature arrivano una
+    volta sola. E il dizionario dei campi dell'app contiene un gemello di `mileageSurplus`
+    con un nome dedicato (`mileageSurplusMile`) che quest'auto **non manda**: quindi
+    l'identificazione di `cruiseRange` come gemello imperiale è un'inferenza da tre campioni
+    su una sola auto, non l'accoppiamento dichiarato dal costruttore.
+
+    ── Perché non basta più inchiodare le miglia ────────────────────────────────────────
+    Il sensore dichiarava miglia per costante. Se su un altro modello quel campo fosse in
+    chilometri, Home Assistant convertirebbe un valore già metrico e mostrerebbe 1,6 volte
+    l'autonomia vera. ⚠️ **Non è dimostrato che accada**: la misura di @ThomasMeyer1970 sul
+    Jaecoo J7 riguarda `mileageSurplus`, non questo campo, e la lettura che chiuderebbe la
+    questione è stata chiesta (issue #3, e il filo su #7) e non è ancora tornata. Questa
+    funzione è quindi una difesa, non la correzione di un difetto osservato.
+
+    ── Come decide, e le tre cose da cui si difende ─────────────────────────────────────
+    Sul rapporto fra due campi, che è una misura, e non sui selettori `rangeUnit` (dei quali
+    si sa solo che esistono e che nella famiglia `*Unit` si osservano sia 1 sia 2 — su campi
+    DIVERSI: `rangeUnit` è sempre stato 1 in ogni campione conservato, il 2 è di
+    `avgHkPowerUnit`. Che 1 e 2 significhino km e miglia **non è misurato**).
+
+    1. **Senza ancora non si indovina, e non si ripiega sul grezzo.** Manca o è zero
+       `mileageSurplus` ⇒ `None` ⇒ resta l'ultimo valore noto. Restituire il grezzo
+       sembrerebbe «fail open» ma su un'auto in chilometri farebbe **riapparire il difetto
+       per quel frame** (misurato: 209 → 336,35 km) e per giunta lo scriverebbe nell'ultimo
+       noto. È lo stesso guasto già pagato in v1.7.1 con `_range_totale`.
+    2. **L'ancora si verifica quando l'auto lo consente.** Se arriva la coppia gemella *per
+       nome* `pureElectricRange`/`pureElectricRangeMile`, il suo rapporto dice se i campi
+       senza suffisso di QUEL veicolo sono metrici. Se lo nega, non si decide.
+
+    ⚠️ **Limite noto, non coperto e non copribile da qui.** Non è detto che `cruiseRange` sia
+    l'autonomia benzina: sul fork l'entità si chiama «Range Combined (Estimate)». Se su un
+    modello fosse l'autonomia ELETTRICA in chilometri, il rapporto con `mileageSurplus`
+    potrebbe valere ~1,609 per pura aritmetica (su una PHEV con 209 km di benzina e 130 di
+    elettrico è esattamente così) e la funzione direbbe «è già in miglia». Una guardia che
+    confronti `cruiseRange` con `pureElectricRange` è stata scritta e poi **rimossa**: in quel
+    caso restituiva lo stesso identico valore del ramo normale — un ramo che non cambia niente
+    è codice morto travestito da sicurezza — e in cambio faceva congelare il sensore sulla
+    nostra auto ogni volta che l'autonomia elettrica, scendendo, passava vicino al valore di
+    `cruiseRange`. Il caso si chiude con una misura sul J7, non con una difesa a indovinare.
+
+    Un solo cancello converte: rapporto ≈1 fra `cruiseRange` e `mileageSurplus`. In ogni
+    altro caso si spedisce il grezzo, cioè le miglia di sempre.
+    """
+    mi = _primo(rt, "cruiseRange")
+    if mi is None or mi <= 0:
+        # 0 è un segnaposto che il sensore pubblicava già come 0: non lo si trasforma.
+        return mi
+
+    # (2) l'ancora è verificabile? La coppia gemella PER NOME è l'unica prova diretta che i
+    # campi senza suffisso di questo veicolo siano metrici.
+    e_km = _primo(rt, *ELEC_RANGE_FIELDS)
+    e_mi = _primo(rt, "pureElectricRangeMile")
+    if e_km and e_mi and not (1.50 <= e_km / e_mi <= 1.72):
+        return mi
+
+    # (1) l'ancora
+    km = _primo(rt, "mileageSurplus")
+    if km is None or km <= 0:
+        return None
+
+    if 0.93 <= km / mi <= 1.07:        # stesso numero ⇒ cruiseRange è in chilometri
+        return mi / 1.609344
+    return mi                           # tutto il resto: il grezzo, come si è sempre fatto
+
+
 def _range_totale(rt: dict):
     """Autonomia totale REALE = elettrica (`pureElectricRange`) + benzina (`mileageSurplus`).
     None se manca un pezzo → resta l'ultimo valore noto (RestoreSensor).
@@ -219,8 +295,13 @@ _RT_SENSORS: list[_RtSpec] = [
     # mostrerà ~182 km invece di un "113 km" che sarebbe semplicemente falso.
     # precision=0: la conversione miglia→km produce 181,855872, sei decimali di
     # falsa precisione su un dato che l'auto manda arrotondato all'unità.
+    # L'unità DICHIARATA resta miglia — stabile, così Home Assistant non registra un
+    # cambio di unità e non spezza lo storico — mentre è il VALORE a essere normalizzato
+    # per veicolo. Vedi _cruise_range_miglia: l'unità è una proprietà dell'auto, non una
+    # costante del codice.
     _RtSpec("range_combinato", "Autonomia benzina (miglia)", "cruiseRange",
-            DIST, MIGLIA, MEAS, "mdi:map-marker-distance", diag=True, precision=0),
+            DIST, MIGLIA, MEAS, "mdi:map-marker-distance", diag=True, precision=0,
+            compute=_cruise_range_miglia),
     _RtSpec("odometro", "Odometro", "odometer",
             DIST, KM, TOTAL, "mdi:counter"),
     _RtSpec("km_ibrido", "Chilometraggio ibrido", "hybridMileage",
