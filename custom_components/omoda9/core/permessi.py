@@ -151,6 +151,58 @@ RIPIEGO = {
     ("seatControl", "brSeatAiry"):    (2148, 20415),
 }
 
+# ─────────────────────── ricomposizione: la macro negata, rifatta pezzo per pezzo ───────────
+# `instrada` sposta UN campo da una porta chiusa a una aperta. Non basta quando a essere negata
+# è la macro stessa: sul veicolo dell'issue #1 la categoria `210` («raffredda tutto») è chiusa in
+# blocco, quindi non c'è nessun campo da spostare — c'è un intero comando che non ha una porta.
+#
+# Ma i suoi PEZZI ce l'hanno. Su quella vettura clima (2041/2043) e ventilazione dei due sedili
+# anteriori (2049/20410) sono consentiti **sotto il clima**, e sono esattamente ciò che «raffredda
+# tutto» fa. Quindi la macro si riscrive come UNA richiesta `airControl` che porta gli stessi
+# campi: non è un modo di aggirare il diniego, è la porta che quel backend autorizza — la stessa
+# cosa che l'utente otterrebbe premendo nell'app il clima e poi i due sedili uno per uno.
+#
+# ⚠️ **MISURATO, non dedotto** (issue #1, 2026-08-11, Jaecoo 7 PHEV EU, auto ferma):
+#   POST /asc/vehicleControl/airControl
+#   {"airControlType":"1","airType":"1","temperature":"16.0","times":"15",
+#    "mSeatAiry":"3","pSeatAiry":"3"}                                        → A00079
+# e — l'unica parte che nessuna risposta HTTP può dire — l'utente è uscito, ha messo la mano sui
+# cuscini e **entrambi i sedili anteriori stavano davvero ventilando**. Due strati, non uno.
+# È anche la prima esecuzione dal vivo del ripiego `seatControl → airControl` rilasciato in
+# v1.11.0, che fino a quel giorno non era mai girato su nessun veicolo.
+#
+# ⚠️ **Solo il freddo, di proposito.** `heatingControl` NON è qui e non va aggiunto a cuor
+# leggero: fra i suoi campi c'è `steerWheelHeatSwitch`, per cui **non conosciamo** una voce sotto
+# la 204 (il volante ha una categoria propria, la 208, con un endpoint proprio che funziona).
+# Ricomporre il caldo significherebbe o spedire un campo che non sappiamo se quella porta accetta,
+# o buttarlo via in silenzio. E non serve a nessun veicolo conosciuto: sulle due liste reali che
+# abbiamo la 209 è **consentita** su entrambe, e la macro calda si cura con la sola potatura.
+# La guardia contro l'estensione distratta è nel codice, non solo in questa nota: un campo che non
+# sappiamo tradurre fa **annullare** la ricomposizione (vedi `ricomponi`), non finisce nel corpo.
+RICOMPONI = {"coolingControl": "airControl"}
+
+# I campi che DEFINISCONO la richiesta e vanno riportati sempre. `duration` cambia nome: le macro
+# la chiamano così, `airControl` la chiama `times` (entrambi ricostruiti dagli envelope reali).
+_STRUTTURALI = ("airControlType", "airType", "temperature")
+_RINOMINA = {"duration": "times"}
+
+# ⚠️ `temperature` cambia SIGNIFICATO passando di qui: nella macro è la posizione LO (il massimo
+# freddo che l'auto sa fare, che per costruzione sta FUORI dall'intervallo impostabile), su
+# `airControl` è una temperatura impostata, che dentro quell'intervallo ci deve stare. A
+# riportarcela è `commands._setpoint_da_posizione`, dal secondo giro degli adattatori che scatta
+# quando l'endpoint è cambiato.
+# ⚠️ NON basta `commands._limita_temperatura`, e crederlo è costato un difetto: quella ripiega su
+# LO..HI quando la vettura non dichiara il range impostabile, e LO..HI **contiene LO**, quindi su
+# questo percorso il controllo passava sempre. Senza scheda partiva il 15.0 dell'Omoda 9.
+#
+# ⚠️ **La lunghezza è un vincolo, non uno stile.** Questo avviso convive nella stessa riga da 255
+# caratteri con l'esito del comando (135 caratteri sulla macro freddo) e con l'elenco dei campi
+# potati. Misurato sul profilo reale dell'issue #1: con quattro parole in più l'avviso entrava ma
+# non ci stava più la coda «(+N nel registro)», e l'ultima parola veniva mozzata. Ogni parola
+# aggiunta qui è una parola tolta a un altro avviso.
+MSG_RICOMPOSTA = ("questa auto non autorizza il comando unico: "
+                  "ricomposto in un'unica richiesta al clima")
+
 # Corpo minimo che `airControl` pretende quando ci si ripiega dentro. Ricalcato sull'envelope
 # reale dell'app (cattura 2026-06-20: airControlType, airType, temperature, times + il campo).
 # ⚠️ `airControlType` fa parte della richiesta: passando di qui **si comanda anche il clima** —
@@ -380,6 +432,52 @@ def ciclo_non_autorizzato(endpoint: str, body: dict, perms: dict) -> str | None:
             + " per questa programmazione")
 
 
+def ricomponi(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, str | None]:
+    """Riscrive una macro negata in blocco come un'unica richiesta alla porta consentita.
+
+    Ritorna `(endpoint, corpo, nota)`, con `nota` valorizzata **solo** se si è ricomposto.
+
+    Le quattro guardie, in ordine, e ognuna esiste per un motivo diverso:
+
+    1. **la macro del costruttore è aperta** ⇒ non si tocca niente. Ricomporre quando la via
+       ufficiale funziona sarebbe sostituire un comando che l'auto conosce con una nostra
+       imitazione: sull'Omoda 9 questa funzione è un no-op letterale;
+    2. **anche la porta di destinazione è chiusa** ⇒ non si tocca niente. Non si ricompone verso
+       un secondo diniego: il comando parte com'era e l'utente riceve il rifiuto vero, che è
+       un'informazione;
+    3. **un campo che non sappiamo tradurre** ⇒ si annulla tutto. È la guardia contro l'aggiunta
+       distratta di un endpoint a `RICOMPONI` (o di un campo nuovo al catalogo): meglio la macro
+       intera che verrà rifiutata, che una macro monca spedita in silenzio. Non si sceglie mai
+       per l'utente di lasciare fuori una funzione senza dirglielo;
+    4. i campi accessori **si portano tutti**, anche quelli negati: a toglierli — e a dire
+       *quali* — ci pensa `pota` subito dopo, sull'endpoint nuovo. Deciderlo qui vorrebbe dire
+       scriverlo due volte, e la seconda copia è quella che prima o poi diverge.
+
+    ⚠️ Il diniego si riconosce da **due** segnali e basta uno solo: categoria chiusa
+    (`porta_chiusa`) oppure voce base negata (`base_negata`). Sul veicolo dell'issue #1 sono
+    negate entrambe (210 e 2103), ma sono cose diverse e non è detto che vadano sempre insieme —
+    è la stessa coppia che `verdetto` guarda per decidere cosa dire all'utente."""
+    destinazione = RICOMPONI.get(endpoint)
+    if not perms or not destinazione:
+        return endpoint, body, None
+    if not (porta_chiusa(endpoint, perms) or base_negata(endpoint, perms)):
+        return endpoint, body, None
+    if porta_chiusa(destinazione, perms) or base_negata(destinazione, perms):
+        return endpoint, body, None
+    accessori = POTABILI.get(destinazione, {})
+    nuovo: dict = {}
+    for campo, valore in body.items():
+        if campo in _STRUTTURALI:
+            nuovo[campo] = valore
+        elif campo in _RINOMINA:
+            nuovo[_RINOMINA[campo]] = valore
+        elif campo in accessori:
+            nuovo[campo] = valore
+        else:
+            return endpoint, body, None     # guardia 3: non sappiamo portarlo → non si ricompone
+    return destinazione, nuovo, MSG_RICOMPOSTA
+
+
 def instrada(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, str | None]:
     """Sceglie la porta aperta su QUESTO veicolo.
 
@@ -417,10 +515,19 @@ def adatta(endpoint: str, body: dict, perms: dict) -> tuple[str, dict, list, str
     """Punto d'ingresso unico: prima si sceglie la porta, poi si pota ciò che si spedisce.
 
     L'ordine conta: potare prima dell'instradamento significherebbe valutare i campi contro le
-    voci dell'endpoint sbagliato."""
+    voci dell'endpoint sbagliato. Vale identico per la ricomposizione, che di porta ne cambia una
+    sola volta ma per l'intero comando.
+
+    ⚠️ `instrada` si chiama **solo se la ricomposizione non ha agito**, e non per prudenza: le
+    due funzioni cambiano entrambe la porta, e la seconda restituisce `nota=None` quando non fa
+    nulla. Chiamandole in fila si cancellerebbe la nota della prima — l'utente vedrebbe il
+    comando ricomposto senza che nessuno gliel'abbia detto. (Oggi non si sovrappongono comunque:
+    nessuna chiave di `RIPIEGO` ha per endpoint `airControl`.)"""
     if not perms:
         return endpoint, body, [], None
-    endpoint, body, nota = instrada(endpoint, body, perms)
+    endpoint, body, nota = ricomponi(endpoint, body, perms)
+    if nota is None:
+        endpoint, body, nota = instrada(endpoint, body, perms)
     body, saltati = pota(endpoint, body, perms)
     return endpoint, body, saltati, nota
 
