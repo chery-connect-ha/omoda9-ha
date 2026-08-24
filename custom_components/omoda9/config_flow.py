@@ -35,6 +35,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     DOMAIN, CONF_EMAIL, CONF_PIN, CONF_VIN, CONF_TUSERID,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
+    CONF_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGES,
     CONF_BFF, CONF_TSP_HOST, CONF_CERTS_SRC, CONF_CHANNEL_ID,
     CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, DEFAULTS,
     CONF_TENANT_CODE, CONF_COUNTRY_ID,
@@ -274,6 +275,8 @@ def _ctx_del_flow(hass: HomeAssistant, data: dict, token_path: str | None = None
         # sempre col tenant Omoda (300006), quindi un account Chery non veniva riconosciuto.
         tenant_code=str(data.get(CONF_TENANT_CODE, DEFAULTS[CONF_TENANT_CODE])),
         country_id=str(data.get(CONF_COUNTRY_ID, DEFAULTS[CONF_COUNTRY_ID])),
+        # lingua (Accept-Language) scelta al login → e-mail/SMS OTP nella lingua giusta
+        language=str(data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE) or DEFAULT_LANGUAGE),
     )
 
 
@@ -367,13 +370,12 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return Omoda9OptionsFlow(config_entry)
 
     def _region_fields(self) -> dict:
-        """Campi opzionali di REGIONE/MARCHIO, comuni a login email e telefono.
+        """Campi opzionali di REGIONE/MARCHIO/LINGUA, comuni a login email e telefono.
 
-        Il preset è la scelta normale: «Omoda / Jaecoo (Europa)» (default, comportamento
-        storico) o «Chery (Europa)». Riempie da solo BFF + TENANT-CODE + channelId + countryId.
-        I campi sotto servono a chi sta su un'altra regione/marchio: si sceglie «Custom» e li si
-        compila a mano. TSP host, broker MQTT e certificati sono comuni per regione (EU di
-        default) e restano validi per entrambi i marchi."""
+        Il preset è la scelta normale: «Omoda / Jaecoo (Europa)» (default, comportamento storico)
+        o «Chery (Europa)»; riempie da solo BFF + TENANT-CODE + channelId + countryId. La lingua
+        guida l'Accept-Language (lingua di e-mail/SMS OTP e messaggi del server). I campi sotto
+        servono a un'altra regione/marchio: «Custom» e si compilano a mano."""
         return {
             vol.Optional(CONF_PRESET, default=DEFAULT_PRESET): SelectSelector(
                 SelectSelectorConfig(
@@ -386,6 +388,13 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         SelectOptionDict(value=PRESET_CUSTOM,
                                          label="Custom / other region (use the fields below)"),
                     ],
+                )
+            ),
+            # Lingua delle chiamate (Accept-Language): lingua di e-mail/SMS OTP e messaggi server.
+            vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): SelectSelector(
+                SelectSelectorConfig(
+                    mode=SelectSelectorMode.DROPDOWN,
+                    options=[SelectOptionDict(value=v, label=lbl) for v, lbl in LANGUAGES.items()],
                 )
             ),
             # Valori riempiti dal preset (tranne «Custom»). Restano modificabili per le
