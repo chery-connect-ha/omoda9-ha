@@ -23,6 +23,10 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -33,6 +37,9 @@ from .const import (
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
     CONF_BFF, CONF_TSP_HOST, CONF_CERTS_SRC, CONF_CHANNEL_ID,
     CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, DEFAULTS,
+    CONF_TENANT_CODE, CONF_COUNTRY_ID,
+    CONF_PRESET, PRESETS, DEFAULT_PRESET,
+    PRESET_OMODA_JAECOO_EU, PRESET_CHERY_EU, PRESET_CUSTOM,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING,
     DEFAULT_POLL_NORMAL_MIN, DEFAULT_POLL_CHARGING_MIN,
     CONF_VEHICLE_NAME,
@@ -247,6 +254,10 @@ def _ctx_del_flow(hass: HomeAssistant, data: dict, token_path: str | None = None
         tsp_host=data.get(CONF_TSP_HOST, DEFAULTS[CONF_TSP_HOST]),
         bff=data.get(CONF_BFF, DEFAULTS[CONF_BFF]),
         channel_id=str(data.get(CONF_CHANNEL_ID, DEFAULTS[CONF_CHANNEL_ID])),
+        # tenant/countryId per-marchio: senza questi il login e la queryList partivano
+        # sempre col tenant Omoda (300006), quindi un account Chery non veniva riconosciuto.
+        tenant_code=str(data.get(CONF_TENANT_CODE, DEFAULTS[CONF_TENANT_CODE])),
+        country_id=str(data.get(CONF_COUNTRY_ID, DEFAULTS[CONF_COUNTRY_ID])),
     )
 
 
@@ -340,18 +351,50 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return Omoda9OptionsFlow(config_entry)
 
     def _region_fields(self) -> dict:
-        """Campi opzionali di REGIONE, comuni a login email e telefono (default = Europa)."""
+        """Campi opzionali di REGIONE/MARCHIO, comuni a login email e telefono.
+
+        Il preset è la scelta normale: «Omoda / Jaecoo (Europa)» (default, comportamento
+        storico) o «Chery (Europa)». Riempie da solo BFF + TENANT-CODE + channelId + countryId.
+        I campi sotto servono a chi sta su un'altra regione/marchio: si sceglie «Custom» e li si
+        compila a mano. TSP host, broker MQTT e certificati sono comuni per regione (EU di
+        default) e restano validi per entrambi i marchi."""
         return {
-            # Solo per regioni diverse dall'Europa / setup avanzato (default EU).
+            vol.Optional(CONF_PRESET, default=DEFAULT_PRESET): SelectSelector(
+                SelectSelectorConfig(
+                    mode=SelectSelectorMode.DROPDOWN,
+                    options=[
+                        SelectOptionDict(value=PRESET_OMODA_JAECOO_EU,
+                                         label="Omoda / Jaecoo — Europe"),
+                        SelectOptionDict(value=PRESET_CHERY_EU,
+                                         label="Chery — Europe"),
+                        SelectOptionDict(value=PRESET_CUSTOM,
+                                         label="Custom / other region (use the fields below)"),
+                    ],
+                )
+            ),
+            # Valori riempiti dal preset (tranne «Custom»). Restano modificabili per le
+            # regioni/marchi non coperti da un preset.
             vol.Optional(CONF_BFF, default=DEFAULTS[CONF_BFF]): str,
+            vol.Optional(CONF_TENANT_CODE, default=DEFAULTS[CONF_TENANT_CODE]): str,
+            vol.Optional(CONF_COUNTRY_ID, default=DEFAULTS[CONF_COUNTRY_ID]): str,
+            vol.Optional(CONF_CHANNEL_ID, default=DEFAULTS[CONF_CHANNEL_ID]): str,
+            # Comuni per regione (default EU): un setup non-EU li cambia insieme al resto.
             vol.Optional(CONF_TSP_HOST, default=DEFAULTS[CONF_TSP_HOST]): str,
-            # Broker MQTT dell'auto + channel id: regione-specifici (default EU). Senza
-            # questi campi un setup non-EU resterebbe agganciato al broker europeo.
             vol.Optional(CONF_CAR_MQTT_HOST, default=DEFAULTS[CONF_CAR_MQTT_HOST]): str,
             vol.Optional(CONF_CAR_MQTT_PORT, default=DEFAULTS[CONF_CAR_MQTT_PORT]): vol.Coerce(int),
-            vol.Optional(CONF_CHANNEL_ID, default=DEFAULTS[CONF_CHANNEL_ID]): str,
             vol.Optional(CONF_CERTS_SRC, default=""): str,
         }
+
+    @staticmethod
+    def _apply_preset(data: dict) -> None:
+        """Se è selezionato un preset di marchio, i suoi valori di regione VINCONO sui campi
+        digitati (BFF/TENANT-CODE/channelId/countryId). «Custom» non tocca nulla: valgono i
+        campi così come li ha lasciati l'utente. Il preset viene poi rimosso dai dati salvati:
+        è una comodità del form, non un parametro che `core/` conosca."""
+        preset = data.pop(CONF_PRESET, DEFAULT_PRESET)
+        values = PRESETS.get(preset)
+        if values:
+            data.update(values)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Scelta del metodo di accesso: e-mail oppure numero di telefono (SMS).
@@ -366,6 +409,9 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _submit_login(self, user_input: dict[str, Any], step_id: str, schema):
         """Logica comune ai due login: salva i dati, prova a inviare l'OTP, va allo step OTP."""
         self._data.update(user_input)
+        # Preset di marchio → risolve BFF/TENANT-CODE/channelId/countryId prima di coniare il
+        # token: il primo login deve già partire verso il gateway/tenant giusto.
+        self._apply_preset(self._data)
         ok, msg = await self.hass.async_add_executor_job(_send_otp, self.hass, self._data)
         if ok:
             return await self.async_step_otp()
