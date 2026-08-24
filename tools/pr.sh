@@ -133,9 +133,24 @@ ORIGIN_SLUG="$(printf '%s' "$ORIGIN_URL" | sed -E 's#^(https://[^/]+/|git@[^:]+:
 printf '%s' "$ORIGIN_SLUG" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$' || ORIGIN_SLUG=""
 HEAD_REF="$BR_NOW"
 if [ -n "$ORIGIN_SLUG" ] && [ "$ORIGIN_SLUG" != "$R_REPO" ]; then
-  HEAD_REF="${ORIGIN_SLUG%%/*}:$BR_NOW"
-  warn "origin is $ORIGIN_SLUG, not $R_REPO: opening the pull request from a fork ($HEAD_REF)."
-  echo "      Note: a beta build is never cut from a fork — a member publishes it by hand."
+  # ⚠️ A different slug is not necessarily a fork. A repository that has been renamed or
+  # transferred keeps answering under its old name through a 301, and a remote URL left
+  # over from before the move is extremely common — this repository moved to an
+  # organisation and the maintainer's remote still said the old owner months later.
+  # Treating that as a fork sends `oldowner:branch` as the head and GitHub replies
+  # 422 "head invalid", with the branch already pushed and no pull request to show for it.
+  # Measured here, the first time this ran for real.
+  CANONICAL="$(_curl_gh -sL "https://api.github.com/repos/${ORIGIN_SLUG}" 2>/dev/null \
+               | python3 -c 'import json,sys;print(json.load(sys.stdin).get("full_name",""))' 2>/dev/null || true)"
+  if [ "$CANONICAL" = "$R_REPO" ]; then
+    warn "origin still says $ORIGIN_SLUG, which is an old name for $R_REPO."
+    echo "      Same repository, not a fork. Worth fixing so it stops surprising people:"
+    echo "        git remote set-url origin https://github.com/$R_REPO.git"
+  else
+    HEAD_REF="${ORIGIN_SLUG%%/*}:$BR_NOW"
+    warn "origin is $ORIGIN_SLUG, not $R_REPO: opening the pull request from a fork ($HEAD_REF)."
+    echo "      Note: a beta build is never cut from a fork — a member publishes it by hand."
+  fi
 fi
 
 # ── 6. the pull request ────────────────────────────────────────────────────────────
