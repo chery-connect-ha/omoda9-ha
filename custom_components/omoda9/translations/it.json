@@ -15,6 +15,7 @@
         "data": {
           "email": "Email dell'account",
           "pin": "PIN di controllo veicolo",
+          "language": "Lingua (e-mail / SMS OTP)",
           "bff": "Endpoint BFF (regione)",
           "tsp_host": "Host console TSP (regione)",
           "car_mqtt_host": "Host broker MQTT del veicolo (regione)",
@@ -30,6 +31,7 @@
           "phone": "Numero di telefono (senza prefisso)",
           "area_code": "Prefisso internazionale in cifre (es. 39)",
           "pin": "PIN di controllo veicolo",
+          "language": "Lingua (e-mail / SMS OTP)",
           "bff": "Endpoint BFF (regione)",
           "tsp_host": "Host console TSP (regione)",
           "car_mqtt_host": "Host broker MQTT del veicolo (regione)",

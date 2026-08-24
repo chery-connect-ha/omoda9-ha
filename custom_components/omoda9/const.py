@@ -59,6 +59,17 @@ CONF_PHONE = "phone"
 CONF_AREA_CODE = "area_code"     # prefisso internazionale in sole cifre (Italia = 39)
 DEFAULT_AREA_CODE = "39"
 
+# Lingua delle chiamate al backend: guida l'header `Accept-Language`, che a sua volta decide la
+# lingua di e-mail OTP, SMS e messaggi del server (il backend non ha un parametro `lang` sul
+# codice: comanda l'header). Il valore memorizzato È il valore dell'header (`en-GB`/`it-IT`).
+#   * setup ESISTENTI (nessun campo `language`) → `LANGUAGE_FALLBACK` = it-IT: comportamento
+#     storico invariato;
+#   * setup NUOVI → il dropdown parte da `DEFAULT_LANGUAGE` = en-GB (questo fork è in inglese).
+CONF_LANGUAGE = "language"
+DEFAULT_LANGUAGE = "en-GB"       # default del dropdown per i NUOVI account
+LANGUAGE_FALLBACK = "it-IT"      # entry senza il campo → comportamento storico
+LANGUAGES = {"en-GB": "English", "it-IT": "Italiano"}   # valore-header → etichetta del dropdown
+
 # Identità veicolo per il device HA (nome dinamico: "Omoda 9", "Jaecoo 7"…). `vehicle_name`
 # = nickname/modello dall'app, salvato in entry.data (catturato al config flow o backfillato);
 # è anche un'OPZIONE per l'override manuale. model/brand restano solo in entry.data.
