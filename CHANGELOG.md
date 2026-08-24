@@ -6,6 +6,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.14.0 — 2026-08-24
+
 ### 🇮🇹 Italiano
 
 - **«Raffredda tutto» ora fa qualcosa anche sulle auto che quel comando non ce l'hanno.** Su alcune vetture il costruttore non autorizza affatto il pulsante unico «raffredda tutto»: premendolo si otteneva soltanto un errore, e non c'era niente da fare. I suoi **pezzi**, però, quella stessa auto li autorizza benissimo, presi uno per uno: il climatizzatore e la ventilazione dei sedili anteriori. Adesso, quando il comando unico è negato, l'integrazione lo rifà da sé in un'unica richiesta che l'auto accetta — la stessa identica cosa che otterresti accendendo a mano il clima e poi i sedili dall'app ufficiale. Quello che la tua vettura non consente resta fuori, e **in «Esito comando» trovi quante funzioni sono rimaste indietro** invece di doverlo indovinare da un sedile che resta tiepido; se nella riga ci sta anche il loro nome te lo scriviamo, e per esteso ci sono comunque sempre nel registro. (Lo spazio è poco davvero: Home Assistant concede 255 caratteri a un messaggio, esito compreso.)
