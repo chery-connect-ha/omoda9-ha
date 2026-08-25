@@ -38,7 +38,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import CHARGE_ENERGY_MAX_GAP, DOMAIN, FIELDS_AS_RICH_ENTITY
 from .coordinator import SENSORS
-from .entity import Omoda9Entity, car_zone
+from .entity import Omoda9Entity, in_zona_casa
 
 
 # ───────────────────────── sensori "realtime" (Round B) ─────────────────────────
@@ -515,7 +515,8 @@ class Omoda9ChargedEnergy(Omoda9Entity, RestoreSensor):
     E' una STIMA: l'integrale trapezoidale di `chargingPower` (kW, solo BEV) nel tempo,
     accumulato solo mentre l'auto sta effettivamente caricando E la sua posizione GPS viva
     cade dentro o fuori dalla zona di casa — la stessa logica di zona che HA usa per il
-    device_tracker, condivisa via `car_zone`.
+    device_tracker — ma chiedendo il CONTENIMENTO in `zone.home` (`in_zona_casa`) e non
+    la zona attiva, perche' un garage disegnato dentro casa non deve spostare l'energia.
 
     Contatore di vita (`TOTAL_INCREASING`, kWh): si mette direttamente nella dashboard
     Energia come sorgente. Casa + Fuori ≈ energia totale caricata, divisa per luogo.
@@ -571,9 +572,11 @@ class Omoda9ChargedEnergy(Omoda9Entity, RestoreSensor):
         except (TypeError, ValueError):
             potenza = 0.0
         carica = _in_ricarica(_rt(self.coordinator, "chargeState")) and potenza > 0
-        zona = car_zone(self.hass, self.coordinator.data.get("position"))
-        atteso = "home" if self._home else "away"
-        attivo = carica and zona is not None and zona == atteso
+        # CONTENIMENTO in `zone.home`, non "in che zona sei": chi carica nel proprio garage
+        # sta caricando a casa, e una zona piu' stretta disegnata sopra non deve spostare
+        # l'energia da un contatore all'altro. Vedi `in_zona_casa` per il perche'.
+        a_casa = in_zona_casa(self.hass, self.coordinator.data.get("position"))
+        attivo = carica and a_casa is not None and a_casa == self._home
 
         ora = dt_util.utcnow()
         # si integra SOLO su un intervallo i cui DUE estremi erano attivi e vicini nel tempo

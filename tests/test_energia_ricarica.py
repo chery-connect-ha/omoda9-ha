@@ -39,8 +39,8 @@ def _contatore(home=True):
     return e
 
 
-def _campiona(e, coord, zona, istante, monkeypatch):
-    monkeypatch.setattr(S, "car_zone", lambda hass, pos: zona)
+def _campiona(e, coord, a_casa, istante, monkeypatch):
+    monkeypatch.setattr(S, "in_zona_casa", lambda hass, pos: a_casa)
     monkeypatch.setattr(S.dt_util, "utcnow", lambda: istante)
     e.coordinator = coord
     e.hass = None
@@ -64,9 +64,9 @@ def test_stato_carica_float_conta_come_in_ricarica():
 def test_trapezio_su_due_campioni_vicini(monkeypatch):
     """2 kW per 120 s = 0,0667 kWh. Il primo campione arma soltanto: non accumula."""
     e = _contatore(home=True)
-    _campiona(e, _CoordFinto("2.0"), "home", T0, monkeypatch)
+    _campiona(e, _CoordFinto("2.0"), True, T0, monkeypatch)
     assert e.native_value == 0.0
-    _campiona(e, _CoordFinto("2.0"), "home", T0 + dt.timedelta(seconds=120), monkeypatch)
+    _campiona(e, _CoordFinto("2.0"), True, T0 + dt.timedelta(seconds=120), monkeypatch)
     assert e.native_value == pytest.approx(2.0 * 120 / 3600, abs=1e-3)
 
 
@@ -78,14 +78,14 @@ def test_buco_lungo_non_inventa_energia(monkeypatch):
     deliberato finche' non viene corretto a parte: il test lo fissa perche' nessuno lo
     cambi per sbaglio credendolo un bug di battitura."""
     e = _contatore(home=True)
-    _campiona(e, _CoordFinto("2.0"), "home", T0, monkeypatch)
+    _campiona(e, _CoordFinto("2.0"), True, T0, monkeypatch)
     troppo_tardi = T0 + dt.timedelta(seconds=CHARGE_ENERGY_MAX_GAP + 1)
-    _campiona(e, _CoordFinto("2.0"), "home", troppo_tardi, monkeypatch)
+    _campiona(e, _CoordFinto("2.0"), True, troppo_tardi, monkeypatch)
     assert e.native_value == 0.0
 
 
 def test_zona_ignota_non_attribuisce_a_nessuno(monkeypatch):
-    """Senza fix GPS l'energia non finisce nel contatore sbagliato: non finisce da nessuna
+    """Senza fix GPS o senza `zone.home` l'energia non finisce nel contatore sbagliato: non finisce da nessuna
     parte. Meglio perdere un campione che attribuirlo alla zona sbagliata."""
     for casa in (True, False):
         e = _contatore(home=casa)
@@ -98,8 +98,8 @@ def test_i_due_contatori_si_dividono_la_carica(monkeypatch):
     """La stessa carica a casa accumula su `home` e lascia `away` a zero."""
     casa, fuori = _contatore(home=True), _contatore(home=False)
     for e in (casa, fuori):
-        _campiona(e, _CoordFinto("2.0"), "home", T0, monkeypatch)
-        _campiona(e, _CoordFinto("2.0"), "home", T0 + dt.timedelta(seconds=120), monkeypatch)
+        _campiona(e, _CoordFinto("2.0"), True, T0, monkeypatch)
+        _campiona(e, _CoordFinto("2.0"), True, T0 + dt.timedelta(seconds=120), monkeypatch)
     assert casa.native_value > 0
     assert fuori.native_value == 0.0
 
@@ -107,6 +107,6 @@ def test_i_due_contatori_si_dividono_la_carica(monkeypatch):
 def test_potenza_zero_non_accumula(monkeypatch):
     """`chargeState` puo' dire "in ricarica" mentre la potenza e' ancora 0: non e' energia."""
     e = _contatore(home=True)
-    _campiona(e, _CoordFinto("0"), "home", T0, monkeypatch)
-    _campiona(e, _CoordFinto("0"), "home", T0 + dt.timedelta(seconds=120), monkeypatch)
+    _campiona(e, _CoordFinto("0"), True, T0, monkeypatch)
+    _campiona(e, _CoordFinto("0"), True, T0 + dt.timedelta(seconds=120), monkeypatch)
     assert e.native_value == 0.0

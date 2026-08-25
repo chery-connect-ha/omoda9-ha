@@ -152,8 +152,12 @@ class Omoda9ACasa(Omoda9Entity, BinarySensorEntity):
     finche' non c'e' un fix utilizzabile.
 
     Comodo per automazioni e schede che vogliono il booleano senza interpretare lo stato del
-    device_tracker. Condivide `car_zone` con i contatori di energia casa/fuori: se i due
-    divergessero, l'utente vedrebbe l'auto a casa e l'energia contata come fuori."""
+    device_tracker: risponde con la zona piu' PICCOLA che contiene l'auto, quindi in un
+    garage disegnato dentro casa dice `off`. E' la convenzione di Home Assistant e resta.
+
+    I contatori di energia NON usano questa funzione ma `in_zona_casa`, che chiede il
+    contenimento in `zone.home`: le due domande sono diverse e tenerle diverse e' voluto —
+    la presenza dice dove sei, l'energia dice a chi va addebitata."""
 
     _attr_device_class = BinarySensorDeviceClass.PRESENCE
     _attr_icon = "mdi:home-map-marker"
