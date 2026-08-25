@@ -20,22 +20,33 @@ CASA = {"lat": 45.0, "lon": 9.0}
 
 @pytest.fixture
 async def zone_casa(hass):
-    """Solo `zone.home`, sulle coordinate di CASA."""
+    """Solo `zone.home`, sulle coordinate di CASA.
+
+    NB: impostare `hass.config.latitude/longitude` NON crea l'entita' `zone.home` — la
+    crea l'avvio del componente `zone`, a partire da quelle coordinate. Impararlo e' costato
+    una CI rossa."""
+    from homeassistant.setup import async_setup_component
+
     hass.config.latitude, hass.config.longitude = CASA["lat"], CASA["lon"]
+    assert await async_setup_component(hass, "zone", {})
     await hass.async_block_till_done()
+    assert hass.states.get("zone.home") is not None
     return hass
 
 
 @pytest.fixture
-async def zone_casa_e_garage(zone_casa):
+async def zone_casa_e_garage(hass):
     """`zone.home` con dentro un `zone.garage` da 20 m sullo stesso punto."""
     from homeassistant.setup import async_setup_component
 
-    await async_setup_component(zone_casa, "zone", {"zone": [{
+    hass.config.latitude, hass.config.longitude = CASA["lat"], CASA["lon"]
+    assert await async_setup_component(hass, "zone", {"zone": [{
         "name": "Garage", "latitude": CASA["lat"], "longitude": CASA["lon"], "radius": 20,
     }]})
-    await zone_casa.async_block_till_done()
-    return zone_casa
+    await hass.async_block_till_done()
+    assert hass.states.get("zone.home") is not None
+    assert hass.states.get("zone.garage") is not None
+    return hass
 
 
 # ───────────────────────── senza fix GPS ─────────────────────────
