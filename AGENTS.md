@@ -89,9 +89,17 @@ translating them would destroy exactly what makes them worth reading. So:
 **Two things this rule does not cover**, deliberately:
 
 - **entity translation keys and `entity_id` slugs** (`autonomia_benzina`,
-  `carburante_residuo`, …). Those are user-visible identifiers: renaming one changes an
-  `entity_id` and breaks somebody's automations, dashboards and statistics history. They
-  change only in a deliberate, announced release — never as a side effect of tidying;
+  `carburante_residuo`, …), of which **91 out of 107 are currently Italian**. Those are
+  user-visible identifiers: renaming one changes an `entity_id` and breaks somebody's
+  automations, dashboards and long-term statistics. Never as a side effect of tidying.
+
+  **They are not excluded forever, though — they are booked for the one moment when they
+  are free.** The HA domain rename (`omoda9` → `chery_connect`) changes every `entity_id`
+  in the integration anyway, and costs every user one reconfiguration. Renaming the slug at
+  the same time costs them nothing on top of a migration they are already doing; renaming it
+  at any other time is a second break for no reason. So the whole set moves **in that
+  release and in no other**, listed in its notes, with an old → new table so people can fix
+  their automations in one pass. See step 3 of #10;
 - **the user-facing Italian in `translations/it.json` and in command-result text**, which is
   a translation and is supposed to be in Italian.
 
