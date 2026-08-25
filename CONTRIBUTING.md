@@ -203,3 +203,15 @@ If you are working with a coding agent — and most of us are — point it at
 above plus the literal git and GitHub commands for branching, opening a pull
 request, syncing and getting out of trouble. You are not expected to know
 GitHub to contribute here.
+
+Everything above is prose, and prose is a thing to remember rather than a thing that
+stops you. [`tools/`](tools/) is the same rules written so a machine can check them:
+numbered `R01`–`R26`, each one pointing back at the paragraph here or in `AGENTS.md`
+that it comes from, and each one saying whether it blocks, warns, or merely asks.
+`./tools/rules.sh list` prints the table. Where a rule has **no** paragraph behind it in this
+repository, it is marked a house rule of whoever wrote the scripts, rather than
+presented as something the group agreed.
+
+Using it is optional and always will be: `git push` and `gh pr create` are in
+`AGENTS.md` for a reason. The point of putting it here is that a rule only one machine
+can enforce is a rule the rest of us are guessing at.

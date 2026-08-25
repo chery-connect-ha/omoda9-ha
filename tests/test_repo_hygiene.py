@@ -4,9 +4,13 @@ Il repo è **pubblico**. Nella stessa cartella di lavoro convivono due mondi:
 
   * il **package pubblicabile** (`custom_components/omoda9/`, README, LICENSE, hacs.json,
     CHANGELOG) — ciò che finisce su GitHub e da lì in HACS;
-  * il **tooling interno** (script di release, handoff, il ponte legacy, questa suite) e
-    i **dati per-account** (certificati, token, `.env`, file del monitor diagnostico) —
-    che devono restare su disco ma fuori dal set tracciato.
+  * il **materiale privato** (dati per-account: certificati, token, `.env`, file del
+    monitor diagnostico; il ponte legacy; gli handoff personali) — che deve restare su
+    disco ma fuori dal set tracciato.
+
+Il *tooling* non sta più in questo secondo gruppo: da quando vive in `tools/` è parte del
+repo e si legge e si esegue in quattro. Restano vietati i suoi **vecchi nomi alla radice**,
+che sono le copie rimaste sul disco di chi lo usava quando era privato.
 
 `check_secrets.sh` è il gate bloccante prima di ogni release e scandaglia tutta la
 history. Questi test sono la rete a maglie più larghe che gira però a OGNI esecuzione
@@ -32,16 +36,26 @@ def _git(*args: str) -> str:
 @pytest.fixture(scope="module")
 def tracciati() -> list[str]:
     """I file che git considera parte del repo (quindi pubblici)."""
-    if not os.path.isdir(os.path.join(REPO, ".git")):
+    # ⚠️ `isdir` da solo salta in silenzio dentro un git worktree, dove `.git` è un FILE
+    # che punta alla directory comune. Questi test sono passati in locale e falliti in CI
+    # proprio per questo: si controlla l'esistenza, non il tipo.
+    if not os.path.exists(os.path.join(REPO, ".git")):
         pytest.skip("non è una checkout git")
     return [r for r in _git("ls-files").splitlines() if r.strip()]
 
 
-# nomi/estensioni che NON devono mai comparire fra i file tracciati
+# nomi che NON devono mai comparire fra i file tracciati, a qualsiasi profondità
 VIETATI_ESATTI = {
-    "omoda9.env", "token.json", ".mqtt_cred", ".gh_token",
-    "check_secrets.sh", "deploy.sh", "release.sh", "ha_bridge.py",
-    "hacs_refresh.py",
+    "omoda9.env", "token.json", ".mqtt_cred", ".gh_token", "ha_bridge.py",
+    "hacs_refresh.py", "private-patterns.txt",
+    "DEROGATIONS.log", "DEROGHE.log", "COMMENTI.log",
+}
+# nomi vietati SOLO alla radice: sono le vecchie copie private del tooling, che oggi vive
+# in `tools/` ed è tracciato apposta. Vietarli ovunque bocciava `tools/release.sh` — cioè
+# la pull request che pubblica il tooling — ed è come questo test ha scoperto la modifica.
+VIETATI_ALLA_RADICE = {
+    "check_secrets.sh", "deploy.sh", "release.sh", "pr.sh", "regole.sh",
+    "commento.sh", "REGOLE.md",
 }
 VIETATI_SUFFISSI = (
     ".key", ".pem", ".cer", ".p12", ".pfx",      # materiale crittografico
@@ -56,6 +70,7 @@ def test_nessun_segreto_fra_i_file_tracciati(tracciati):
     colpevoli = [
         r for r in tracciati
         if os.path.basename(r) in VIETATI_ESATTI
+        or ("/" not in r and r in VIETATI_ALLA_RADICE)
         or r.endswith(VIETATI_SUFFISSI)
         or any(r.startswith(c) or f"/{c}" in r for c in VIETATE_CARTELLE)
     ]
