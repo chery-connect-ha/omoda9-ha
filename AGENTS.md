@@ -71,6 +71,43 @@ adding one, you have found an architecture problem: say so instead of encoding i
 **The suite stays green.** Not "green after a follow-up" — green in the pull
 request that changes the behaviour.
 
+## Before you write a rule, ask what would enforce it
+
+You will be asked to write rules — into this file, into `CONTRIBUTING.md`, into a pull
+request description. **A written rule is free and a tool is not**, so the gap between what
+the documents claim and what the repository actually permits widens on its own, silently,
+until somebody tries to follow the rule and hits a wall.
+
+When that happens it does not look like a rule being broken. It looks like a person not
+bothering.
+
+This project collected five of these in a single day, 24 August 2026:
+
+- `CONTRIBUTING.md` said the review that counts is somebody running the change on their own
+  car — while a pull request produced **nothing anyone could install**;
+- both documents told people to use the labels `beta`, `unverified-hardware` and
+  `merged-unread`, and **none of the three existed**. Two maintainers had just agreed to use
+  one: they would have got an error;
+- a maintainer proposed GitHub Projects while **Projects were disabled** and he had
+  read-only access;
+- another had built the executable form of these rules on his own machine, so his pull
+  requests were better documented than everyone else's — not through more care, but because
+  he had a gate and nobody else did;
+- and `AGENTS.md` forbids AI co-authorship trailers while one maintainer's tooling adds one
+  to every commit by default.
+
+So, when you write a rule:
+
+- **name the thing that enforces it** — a test, a CI job, a label that exists, a template
+  field. If the honest answer is "whoever reads this will remember", it is not a rule, it is
+  a hope, and hopes should be written as advice rather than as requirements;
+- **ship it in the same change.** `tests/test_traduzioni_complete.py` arrived in the same
+  commit as the rule about the three language files, and it started green — a rule that is
+  already true, pinned so it cannot quietly stop being true;
+- **check the thing exists before telling somebody to use it.** Open the settings, list the
+  labels, read the permissions. It takes a minute and it is the difference between an
+  instruction and an error message.
+
 ## The discipline that matters most: don't overstate evidence
 
 Half of this codebase is written for cars the author does not own. That is
