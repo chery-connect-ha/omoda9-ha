@@ -45,6 +45,14 @@ someone for whom it worked.
 refactor. If the entity count changes, that is a deliberate, announced change —
 and the test will stop you first.
 
+**Never leave a language behind.** Anything that adds or renames a user-visible label or
+an error message touches **three** files: `strings.json`, `translations/en.json` and
+`translations/it.json`. A key present in one and missing in another produces an entity
+with **no name at all** — but only for the people using that language, so whoever wrote
+the change never sees it. `tests/test_traduzioni_complete.py` compares the key sets and
+fails if they diverge; it checks that you did not forget a file, not that you translated
+anything, so a key is only really done when the text is in the right language.
+
 **No Home Assistant imports in `core/`.** The protocol logic must be exercisable
 without Home Assistant installed. This is what lets the sandbox test a change
 without an instance, and it is the rule the whole suite rests on.
@@ -200,6 +208,15 @@ CI be the gate — that is why CI exists — but say so in the pull request.
 git push -u origin HEAD
 gh pr create --fill
 ```
+
+**Put `Closes #12` in the body when the pull request finishes an issue.** GitHub then
+closes it on merge, and links the two forever. Without it somebody has to remember, and
+nobody does: on 24 August this repository had fifteen issues of which exactly one was
+closed — by the single pull request that carried the line.
+
+Use it only when the merge really finishes the issue. If it fixes part of one, write
+`Relates to #12` and say in the body what is left, so the issue outlives the merge instead
+of being closed on a half-answer.
 
 Then fill in the field-test block in the template. If you did not test on
 hardware, say it there rather than leaving it blank:
