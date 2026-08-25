@@ -103,6 +103,19 @@ translating them would destroy exactly what makes them worth reading. So:
 - **the user-facing Italian in `translations/it.json` and in command-result text**, which is
   a translation and is supposed to be in Italian.
 
+**The same rule covers everything you write on GitHub**: issues and their titles,
+comments, review comments — not only the commit messages and pull request text the hook
+below already refuses. Not as a matter of taste, but of who can read the queue.
+@GurliGebis is building the merged repository and offered to handle the HACS
+default-store submission, and has no Italian; @JackRonan, @ThomasMeyer1970, @Sisku and
+@kowi4 all write in English. An Italian title on a pull request asks them to review code
+through a thread they cannot read, and today several of the open ones do exactly that.
+
+The exception is the one directly above, and the test is **who the sentence is addressed
+to**: a collaborator, or somebody driving the car. `translations/it.json`, the Italian
+half of `CHANGELOG.md` and command-result text stay Italian — they are translations doing
+their job, and they are not to be "fixed".
+
 **What enforces it: a reader, not a test.** No check can tell whether a comment is English,
 so this is one of the few rules here that depends on somebody noticing in review. That is
 stated rather than hidden — see *Before you write a rule, ask what would enforce it* above.
