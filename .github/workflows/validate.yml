@@ -10,7 +10,7 @@ jobs:
     name: HACS validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hacs/action@main
         with:
           category: integration
@@ -20,14 +20,14 @@ jobs:
     name: Hassfest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: home-assistant/actions/hassfest@master
 
   tests:
     name: Suite di test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Home Assistant recente richiede Python 3.13+. È anche il motivo per cui la
       # suite NON gira sull'host di sviluppo (fermo a 3.11): la CI è l'unico posto

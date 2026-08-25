@@ -186,6 +186,12 @@ question as who can review what.
   belong in the private channel, never in this repository.
 - **Claim hardware verification you do not have.** "The backend accepted it" is
   not "the car did it". If you did not watch the car, say so.
+- **Say you read something when your agent read it.** All of us drive a model, so
+  where a claim rests on a reading, a count or a check, say who performed it — one
+  line is enough. This is the same rule as the one above, pointed at ourselves,
+  and the reason for it is the same: everything here is believed on the strength
+  of what we say we checked. Facts stated with a file and a line survive the
+  question entirely.
 - **Remove a function that worked for somebody.** When in doubt the code fails
   open: unknown, unreadable or timed-out means *send exactly as before*. The worst
   an untested path may do is fail to help.
