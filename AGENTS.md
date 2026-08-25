@@ -45,6 +45,14 @@ someone for whom it worked.
 refactor. If the entity count changes, that is a deliberate, announced change —
 and the test will stop you first.
 
+**Never leave a language behind.** Anything that adds or renames a user-visible label or
+an error message touches **three** files: `strings.json`, `translations/en.json` and
+`translations/it.json`. A key present in one and missing in another produces an entity
+with **no name at all** — but only for the people using that language, so whoever wrote
+the change never sees it. `tests/test_traduzioni_complete.py` compares the key sets and
+fails if they diverge; it checks that you did not forget a file, not that you translated
+anything, so a key is only really done when the text is in the right language.
+
 **No Home Assistant imports in `core/`.** The protocol logic must be exercisable
 without Home Assistant installed. This is what lets the sandbox test a change
 without an instance, and it is the rule the whole suite rests on.
@@ -62,6 +70,43 @@ adding one, you have found an architecture problem: say so instead of encoding i
 
 **The suite stays green.** Not "green after a follow-up" — green in the pull
 request that changes the behaviour.
+
+## Before you write a rule, ask what would enforce it
+
+You will be asked to write rules — into this file, into `CONTRIBUTING.md`, into a pull
+request description. **A written rule is free and a tool is not**, so the gap between what
+the documents claim and what the repository actually permits widens on its own, silently,
+until somebody tries to follow the rule and hits a wall.
+
+When that happens it does not look like a rule being broken. It looks like a person not
+bothering.
+
+This project collected five of these in a single day, 24 August 2026:
+
+- `CONTRIBUTING.md` said the review that counts is somebody running the change on their own
+  car — while a pull request produced **nothing anyone could install**;
+- both documents told people to use the labels `beta`, `unverified-hardware` and
+  `merged-unread`, and **none of the three existed**. Two maintainers had just agreed to use
+  one: they would have got an error;
+- a maintainer proposed GitHub Projects while **Projects were disabled** and he had
+  read-only access;
+- another had built the executable form of these rules on his own machine, so his pull
+  requests were better documented than everyone else's — not through more care, but because
+  he had a gate and nobody else did;
+- and `AGENTS.md` forbids AI co-authorship trailers while one maintainer's tooling adds one
+  to every commit by default.
+
+So, when you write a rule:
+
+- **name the thing that enforces it** — a test, a CI job, a label that exists, a template
+  field. If the honest answer is "whoever reads this will remember", it is not a rule, it is
+  a hope, and hopes should be written as advice rather than as requirements;
+- **ship it in the same change.** `tests/test_traduzioni_complete.py` arrived in the same
+  commit as the rule about the three language files, and it started green — a rule that is
+  already true, pinned so it cannot quietly stop being true;
+- **check the thing exists before telling somebody to use it.** Open the settings, list the
+  labels, read the permissions. It takes a minute and it is the difference between an
+  instruction and an error message.
 
 ## The discipline that matters most: don't overstate evidence
 
@@ -200,6 +245,15 @@ CI be the gate — that is why CI exists — but say so in the pull request.
 git push -u origin HEAD
 gh pr create --fill
 ```
+
+**Put `Closes #12` in the body when the pull request finishes an issue.** GitHub then
+closes it on merge, and links the two forever. Without it somebody has to remember, and
+nobody does: on 24 August this repository had fifteen issues of which exactly one was
+closed — by the single pull request that carried the line.
+
+Use it only when the merge really finishes the issue. If it fixes part of one, write
+`Relates to #12` and say in the body what is left, so the issue outlives the merge instead
+of being closed on a half-answer.
 
 Then fill in the field-test block in the template. If you did not test on
 hardware, say it there rather than leaving it blank:
