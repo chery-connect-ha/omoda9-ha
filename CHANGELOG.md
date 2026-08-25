@@ -6,6 +6,18 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.14.0 — 2026-08-24
+
+### 🇮🇹 Italiano
+
+- **Quando un comando viene rifiutato, adesso ti diciamo perché.** Se prima di mandare un comando l'integrazione deve saltare o adattare qualcosa — una funzione che il costruttore non autorizza sulla tua auto, una durata che la tua vettura non accetta — te lo scrive in «Esito comando». Fino a ieri però quella spiegazione compariva **solo quando il comando riusciva**: nel caso opposto, che è proprio quello in cui serve, restava scritto solo l'errore nudo e il motivo finiva unicamente nel registro tecnico, dove nessuno lo va a cercare. Adesso la spiegazione resta attaccata all'esito in entrambi i casi. E non ripetiamo più il nome del comando davanti alla spiegazione, visto che l'esito lo dice già come prima cosa: erano i caratteri che mancavano perché la frase ci stesse tutta nello spazio che Home Assistant concede. Su un'Omoda 9 quasi tutti questi avvisi non escono affatto — riguardano funzioni che il costruttore nega su altre vetture — ma **uno lo vedrai anche tu**: se imposti la durata del clima su un valore che l'auto non ammette (il cursore arriva a 30 minuti, l'Omoda 9 ne accetta 5, 10 o 15) e il comando viene rifiutato, per esempio perché l'auto è occupata, adesso accanto all'errore leggi anche quale durata è stata usata. Prima, in quel caso, restava solo l'errore.
+- **Un avviso o si legge intero o non c'è.** Quando gli avvisi non entrano tutti nella riga te ne diciamo il numero. Restava però un caso in cui, per far posto a quel conteggio, l'ultimo avviso veniva accorciato a metà parola: proprio la cosa che questa regola vuole evitare, perché una frase tagliata sembra completa. Adesso l'avviso che non ci sta per intero esce dalla riga e va a ingrossare il conteggio.
+
+### 🇬🇧 English
+
+- **When a command is refused, we now tell you why.** If the integration has to skip or adapt something before sending a command — a function the manufacturer does not authorise on your car, a duration your car does not accept — it writes that in "Command result". Until now, though, the explanation only appeared **when the command succeeded**: in the opposite case, which is exactly the one where it is needed, all you got was the bare error, and the reason went only to the technical log, where nobody goes looking. The explanation now stays attached to the result either way. And the command's name is no longer repeated in front of the explanation, since the result already opens with it: those were the characters missing for the sentence to fit in the space Home Assistant allows. On an Omoda 9 almost none of these notices appear at all — they concern functions the manufacturer denies on other cars — but **one of them you will see too**: if you set the climate duration to a value the car does not accept (the slider goes to 30 minutes, an Omoda 9 takes 5, 10 or 15) and the command is then refused, for instance because the car is busy, you now read alongside the error which duration was actually used. Before, in that case, only the error was left.
+- **A warning is either readable in full or not there at all.** When the warnings do not all fit in the line we tell you how many there are. One case remained, though, where making room for that count chopped the last warning mid-word: precisely what this rule exists to prevent, because a cut sentence looks complete. Now a warning that does not fit whole leaves the line and adds to the count instead.
+
 ## v1.13.0 — 2026-08-10
 
 ### 🇮🇹 Italiano
