@@ -321,6 +321,7 @@ def test_il_contesto_non_riceve_capability_inventate(tmp_path):
     c.email, c.phone, c.area_code = "x@y.z", "", "39"
     c.token_path = str(tmp_path / "token.json")
     c.tsp_host, c.bff, c.channel_id = "https://tsp.invalid", "https://bff.invalid", "1"
+    c.language = "en-GB"   # il selettore lingua aggiunge ctx.language: il finto coordinator lo deve avere
     c.hass = type("H", (), {"config": type("Cf", (), {"path": staticmethod(str)})()})()
     for nome in ("climate_limits", "climate_extremes", "air_durations", "_caps_correnti"):
         setattr(c, nome, (lambda n: lambda: getattr(Omoda9Coordinator, n)(c))(nome))

@@ -116,6 +116,10 @@ class CoreCtx:
     channel_id: str = DEFAULT_CHANNEL_ID
     country_id: str = DEFAULT_COUNTRY_ID
     tenant_code: str = DEFAULT_TENANT_CODE
+    # Lingua delle chiamate (header `Accept-Language`): decide la lingua di e-mail OTP/SMS/messaggi
+    # del server. Valore = valore dell'header. Default it-IT = comportamento storico per gli entry
+    # che non lo impostano.
+    language: str = "it-IT"
 
     # — comportamento —
     # conio automatico del taskId: senza, i comandi non possono partire (serve un
@@ -207,5 +211,6 @@ def ctx_da_environ() -> CoreCtx:
         channel_id=os.environ.get("CHANNEL_ID", DEFAULT_CHANNEL_ID),
         country_id=os.environ.get("OMODA_COUNTRY_ID", DEFAULT_COUNTRY_ID),
         tenant_code=os.environ.get("OMODA_TENANT_CODE", DEFAULT_TENANT_CODE),
+        language=os.environ.get("OMODA_LANGUAGE", "it-IT"),
         mint_taskid=os.environ.get("OMODA_MINT_TASKID", "1") not in ("0", "", "false", "no"),
     )

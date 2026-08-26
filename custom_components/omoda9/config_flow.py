@@ -23,6 +23,10 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -31,6 +35,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     DOMAIN, CONF_EMAIL, CONF_PIN, CONF_VIN, CONF_TUSERID,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
+    CONF_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGES,
     CONF_BFF, CONF_TSP_HOST, CONF_CERTS_SRC, CONF_CHANNEL_ID,
     CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, DEFAULTS,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING,
@@ -247,6 +252,8 @@ def _ctx_del_flow(hass: HomeAssistant, data: dict, token_path: str | None = None
         tsp_host=data.get(CONF_TSP_HOST, DEFAULTS[CONF_TSP_HOST]),
         bff=data.get(CONF_BFF, DEFAULTS[CONF_BFF]),
         channel_id=str(data.get(CONF_CHANNEL_ID, DEFAULTS[CONF_CHANNEL_ID])),
+        # lingua (Accept-Language) scelta al login → e-mail/SMS OTP nella lingua giusta
+        language=str(data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE) or DEFAULT_LANGUAGE),
     )
 
 
@@ -340,8 +347,16 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return Omoda9OptionsFlow(config_entry)
 
     def _region_fields(self) -> dict:
-        """Campi opzionali di REGIONE, comuni a login email e telefono (default = Europa)."""
+        """Campi opzionali di REGIONE/LINGUA, comuni a login email e telefono (default = Europa)."""
         return {
+            # Lingua delle chiamate (Accept-Language): decide la lingua di e-mail/SMS OTP e dei
+            # messaggi del server. Nuovi account: inglese; si può scegliere l'italiano.
+            vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): SelectSelector(
+                SelectSelectorConfig(
+                    mode=SelectSelectorMode.DROPDOWN,
+                    options=[SelectOptionDict(value=v, label=lbl) for v, lbl in LANGUAGES.items()],
+                )
+            ),
             # Solo per regioni diverse dall'Europa / setup avanzato (default EU).
             vol.Optional(CONF_BFF, default=DEFAULTS[CONF_BFF]): str,
             vol.Optional(CONF_TSP_HOST, default=DEFAULTS[CONF_TSP_HOST]): str,

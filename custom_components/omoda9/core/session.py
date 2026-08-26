@@ -161,6 +161,7 @@ def _subenv(ctx, **extra):
         "CHANNEL_ID": ctx.channel_id,
         "OMODA_COUNTRY_ID": ctx.country_id,
         "OMODA_TENANT_CODE": ctx.tenant_code,
+        "OMODA_LANGUAGE": getattr(ctx, "language", "it-IT") or "it-IT",
         "VIN": ctx.vin,
         "TUSERID": ctx.tuserid,
     })
