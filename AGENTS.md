@@ -45,6 +45,14 @@ someone for whom it worked.
 refactor. If the entity count changes, that is a deliberate, announced change —
 and the test will stop you first.
 
+**Never leave a language behind.** Anything that adds or renames a user-visible label or
+an error message touches **three** files: `strings.json`, `translations/en.json` and
+`translations/it.json`. A key present in one and missing in another produces an entity
+with **no name at all** — but only for the people using that language, so whoever wrote
+the change never sees it. `tests/test_traduzioni_complete.py` compares the key sets and
+fails if they diverge; it checks that you did not forget a file, not that you translated
+anything, so a key is only really done when the text is in the right language.
+
 **No Home Assistant imports in `core/`.** The protocol logic must be exercisable
 without Home Assistant installed. This is what lets the sandbox test a change
 without an instance, and it is the rule the whole suite rests on.
@@ -62,6 +70,43 @@ adding one, you have found an architecture problem: say so instead of encoding i
 
 **The suite stays green.** Not "green after a follow-up" — green in the pull
 request that changes the behaviour.
+
+## Before you write a rule, ask what would enforce it
+
+You will be asked to write rules — into this file, into `CONTRIBUTING.md`, into a pull
+request description. **A written rule is free and a tool is not**, so the gap between what
+the documents claim and what the repository actually permits widens on its own, silently,
+until somebody tries to follow the rule and hits a wall.
+
+When that happens it does not look like a rule being broken. It looks like a person not
+bothering.
+
+This project collected five of these in a single day, 24 August 2026:
+
+- `CONTRIBUTING.md` said the review that counts is somebody running the change on their own
+  car — while a pull request produced **nothing anyone could install**;
+- both documents told people to use the labels `beta`, `unverified-hardware` and
+  `merged-unread`, and **none of the three existed**. Two maintainers had just agreed to use
+  one: they would have got an error;
+- a maintainer proposed GitHub Projects while **Projects were disabled** and he had
+  read-only access;
+- another had built the executable form of these rules on his own machine, so his pull
+  requests were better documented than everyone else's — not through more care, but because
+  he had a gate and nobody else did;
+- and `AGENTS.md` forbids AI co-authorship trailers while one maintainer's tooling adds one
+  to every commit by default.
+
+So, when you write a rule:
+
+- **name the thing that enforces it** — a test, a CI job, a label that exists, a template
+  field. If the honest answer is "whoever reads this will remember", it is not a rule, it is
+  a hope, and hopes should be written as advice rather than as requirements;
+- **ship it in the same change.** `tests/test_traduzioni_complete.py` arrived in the same
+  commit as the rule about the three language files, and it started green — a rule that is
+  already true, pinned so it cannot quietly stop being true;
+- **check the thing exists before telling somebody to use it.** Open the settings, list the
+  labels, read the permissions. It takes a minute and it is the difference between an
+  instruction and an error message.
 
 ## The discipline that matters most: don't overstate evidence
 
@@ -85,6 +130,32 @@ verified only when a state field on the car changed, at a time you can point to.
 
 An overstated claim is the only kind of damage in this project that reaches a
 stranger. Wrong code gets found; a wrong claim gets believed.
+
+### Say which part was yours and which was the agent's
+
+Nobody here writes this code by hand; all of us drive a model. So "I read it" and
+"the agent I drive read it" are different claims, and letting them blur is how a
+statement ends up carrying weight it did not earn.
+
+Wherever a claim rests on a **reading, a count or a check**, say who performed it.
+A short line at the top or the bottom is enough:
+
+> *The reading of `routing.py` behind this was done by the agent I drive. The
+> conclusion, and what to do about it, are mine.*
+
+Two rules under that, and the first is absolute:
+
+- **Never write that your human read something they did not read.** Not in a
+  review, not in a pull request, not in a comment. This is the same failure as
+  claiming a car did something it did not do, pointed at ourselves — and it is
+  the one that cannot be walked back, because it is the basis on which everything
+  else here is believed.
+- **State facts so they can be checked without you.** A file and a line beats a
+  summary: `lock.py` line 44 rather than "the lock handling looks correct". Then
+  it does not matter who read it.
+
+This is not about crediting tools. It is that a project which gates on evidence
+has to apply the same standard to how it describes its own work.
 
 ## How a change moves
 
@@ -122,6 +193,31 @@ git switch -c fix/<short-name> origin/master
 Name it for the behaviour, not the file: `fix/charge-energy-undercount`, not
 `fix/coordinator`.
 
+**Keep it current while it is open — not only when it conflicts**
+
+```bash
+git fetch origin
+git merge origin/master
+git push
+```
+
+Do this whenever `master` has moved and your branch has been open more than a day
+or two. Conflicts are the obvious reason and the least important one. The real
+reason is that **a branch that sits behind loses access to whatever arrived after
+it was cut, and finds out by nothing happening**:
+
+- on 24 August the `beta` label was applied to two pull requests in the same
+  minute. One published a pre-release; the other produced **no workflow run at
+  all and no message**. The workflow had landed on `master` a minute after that
+  branch's last commit;
+- a stale branch also carries stale CI. A green tick from five days ago says
+  nothing about today's `master`, and GitHub may not even have recomputed whether
+  the branch still merges.
+
+If you label a pull request and no run appears within a minute, the label did not
+take: push the branch and try again, or use `workflow_dispatch`, which runs from
+the default branch and does not depend on yours.
+
 **Save the work**
 
 ```bash
@@ -149,6 +245,15 @@ CI be the gate — that is why CI exists — but say so in the pull request.
 git push -u origin HEAD
 gh pr create --fill
 ```
+
+**Put `Closes #12` in the body when the pull request finishes an issue.** GitHub then
+closes it on merge, and links the two forever. Without it somebody has to remember, and
+nobody does: on 24 August this repository had fifteen issues of which exactly one was
+closed — by the single pull request that carried the line.
+
+Use it only when the merge really finishes the issue. If it fixes part of one, write
+`Relates to #12` and say in the body what is left, so the issue outlives the merge instead
+of being closed on a half-answer.
 
 Then fill in the field-test block in the template. If you did not test on
 hardware, say it there rather than leaving it blank:

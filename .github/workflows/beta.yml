@@ -105,7 +105,7 @@ jobs:
             echo "url=$url"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.pr.outputs.sha }}
 
@@ -119,6 +119,24 @@ jobs:
           if [ -z "$base" ] || [ "$base" = "null" ]; then
             echo "::error::manifest.json senza campo version."
             exit 1
+          fi
+
+          # La versione del manifest DEVE essere già più avanti dell'ultima stabile.
+          # In semver una pre-release ordina PRIMA della versione omonima: con il
+          # manifest fermo sulla stabile corrente il tag sarebbe `v1.13.0-beta.1`, che
+          # HACS mostra come PIÙ VECCHIO della 1.13.0 installata — non comparirebbe
+          # come aggiornamento, e sceglierlo sarebbe formalmente un downgrade. Una beta
+          # così è peggio di nessuna beta, perché sembra funzionare. Si ferma qui, con
+          # l'istruzione esatta: la versione la decide chi apre la PR, non il workflow —
+          # indovinarla vorrebbe dire pubblicare un numero diverso da quello che poi
+          # uscirà come stabile.
+          stabile=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null | sed 's/^v//' || true)
+          if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
+            piu_alta=$(printf '%s\n%s\n' "$base" "$stabile" | sort -V | tail -1)
+            if [ "$base" = "$stabile" ] || [ "$piu_alta" = "$stabile" ]; then
+              echo "::error::Il manifest dichiara $base e l'ultima stabile è $stabile, quindi il tag sarebbe v$base-beta.N — che in semver ordina PRIMA di v$stabile e HACS mostrerebbe come più vecchio di quello che l'utente ha già installato. Alza \`version\` in custom_components/omoda9/manifest.json al numero con cui questa modifica uscirà (es. $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), fai commit sul branch della PR e rimetti l'etichetta \`beta\`."
+              exit 1
+            fi
           fi
 
           # Il contatore è il primo libero fra i TAG (non fra le release: un tag può

@@ -1,0 +1,21 @@
+# tools/private-patterns.txt — extra secret patterns, specific to YOU or YOUR machine.
+#
+# Copy this file to tools/private-patterns.txt (which is gitignored) and fill it in.
+# check-secrets.sh treats every pattern here as BLOCKING, exactly like the built-in ones.
+#
+# Why it is a separate, ignored file: these patterns necessarily contain the very things
+# they exist to catch — your surname inside an e-mail address, the layout of your disk,
+# the hostnames of your network. Writing them into a tracked script publishes them, and
+# the script would not even notice, because a regex written with backslashes does not
+# match itself. That is not hypothetical: it is how the author's e-mail address sat in
+# this tool for months.
+#
+# Format:  description|extended regex     (one per line, '#' starts a comment)
+#
+# Examples — replace with your own, then delete these lines:
+#
+# my e-mail (any domain)|(john\.smith|j\.smith)@
+# my home directory|/home/john/
+# my machine names|\b(bluebird|the-attic-box)[0-9]*\b
+# my HA instance|\bha\.example\.lan\b
+# my UK mobile|\b07[0-9]{9}\b

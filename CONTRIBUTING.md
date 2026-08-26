@@ -186,6 +186,12 @@ question as who can review what.
   belong in the private channel, never in this repository.
 - **Claim hardware verification you do not have.** "The backend accepted it" is
   not "the car did it". If you did not watch the car, say so.
+- **Say you read something when your agent read it.** All of us drive a model, so
+  where a claim rests on a reading, a count or a check, say who performed it — one
+  line is enough. This is the same rule as the one above, pointed at ourselves,
+  and the reason for it is the same: everything here is believed on the strength
+  of what we say we checked. Facts stated with a file and a line survive the
+  question entirely.
 - **Remove a function that worked for somebody.** When in doubt the code fails
   open: unknown, unreadable or timed-out means *send exactly as before*. The worst
   an untested path may do is fail to help.
@@ -197,3 +203,15 @@ If you are working with a coding agent — and most of us are — point it at
 above plus the literal git and GitHub commands for branching, opening a pull
 request, syncing and getting out of trouble. You are not expected to know
 GitHub to contribute here.
+
+Everything above is prose, and prose is a thing to remember rather than a thing that
+stops you. [`tools/`](tools/) is the same rules written so a machine can check them:
+numbered `R01`–`R26`, each one pointing back at the paragraph here or in `AGENTS.md`
+that it comes from, and each one saying whether it blocks, warns, or merely asks.
+`./tools/rules.sh list` prints the table. Where a rule has **no** paragraph behind it in this
+repository, it is marked a house rule of whoever wrote the scripts, rather than
+presented as something the group agreed.
+
+Using it is optional and always will be: `git push` and `gh pr create` are in
+`AGENTS.md` for a reason. The point of putting it here is that a rule only one machine
+can enforce is a rule the rest of us are guessing at.

@@ -6,6 +6,34 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+## v1.14.0 — 2026-08-24
+
+### 🇮🇹 Italiano
+
+- **«Autonomia benzina (miglia)» ora capisce da sola in che unità parla l'auto.** È un
+  sensore di diagnostica, e finora dava per scontato che quel dato arrivasse in miglia —
+  cosa vera sulla Omoda 9, ma dedotta da due sole letture di una sola macchina. Su un
+  modello che lo mandasse in chilometri, Home Assistant avrebbe convertito un numero già
+  metrico e mostrato **un'autonomia più lunga di una volta e mezza**. Adesso il confronto
+  con l'autonomia benzina normale, che arriva sempre in chilometri, dice quale delle due
+  cose sta succedendo. Sulla Omoda 9 non cambia niente: il numero è identico a prima.
+- **Un dato incompleto non fa più comparire un numero sbagliato.** Se in una lettura manca
+  il valore di confronto, quel sensore tiene l'ultimo numero buono invece di mostrarne uno
+  che potrebbe essere falso — e che sarebbe rimasto lì fino alla lettura dopo.
+
+### 🇬🇧 English
+
+- **"Petrol range (miles)" now works out for itself which unit the car is speaking.** It is
+  a diagnostic sensor, and until now it assumed that reading arrived in miles — true on the
+  Omoda 9, but worked out from two readings of a single car. On a model sending kilometres
+  instead, Home Assistant would have converted an already-metric number and shown **a range
+  half again as long as the real one**. It now compares against the ordinary petrol range,
+  which always arrives in kilometres, and that comparison settles which case it is. On an
+  Omoda 9 nothing changes: the number is identical to before.
+- **An incomplete reading no longer produces a wrong number.** When the value needed for
+  that comparison is missing, the sensor keeps the last good number instead of showing one
+  that might be false — and that would have stayed on screen until the next reading.
+
 ## v1.13.0 — 2026-08-10
 
 ### 🇮🇹 Italiano
