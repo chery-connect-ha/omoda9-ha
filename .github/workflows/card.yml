@@ -1,0 +1,41 @@
+name: Card sanity
+
+on:
+  push:
+    branches: [master]
+    paths: ["custom_components/omoda9/lovelace/**"]
+  pull_request:
+    paths: ["custom_components/omoda9/lovelace/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  card:
+    name: Lovelace card JS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Syntax check
+        run: node --check custom_components/omoda9/lovelace/chery-card.js
+      - name: No optional chaining / nullish coalescing (older Android WebView)
+        # `?.` and `??` fail to PARSE on older Android System WebView, which aborts
+        # customElements.define() and makes the card show "Configuration error" on the
+        # mobile app only. Guard it in CI so a future edit can't silently reintroduce it.
+        # Comments are stripped first: the file documents this very rule in prose that
+        # mentions the tokens, which a naive grep would flag.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const f = "custom_components/omoda9/lovelace/chery-card.js";
+            const code = fs.readFileSync(f, "utf8")
+              .replace(/\/\*[\s\S]*?\*\//g, "")
+              .replace(/^\s*\/\/.*$/gm, "");
+            const m = code.match(/\?\.[A-Za-z0-9_$([]|\?\?/);
+            if (m) { console.error("::error::" + f + ": optional chaining / nullish coalescing (" + m[0] + ") breaks older Android WebView"); process.exit(1); }
+            console.log("OK: no optional chaining / nullish coalescing in the card");
+          '
