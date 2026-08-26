@@ -20,6 +20,74 @@ from .const import DEFAULT_VEHICLE_NAME, DOMAIN, OPT_MAX_S
 from .coordinator import Omoda9Coordinator
 
 
+def _flt(v):
+    """float() oppure None (non solleva mai)."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def car_zone(hass, position: dict | None) -> str | None:
+    """`"home"` / `"away"` / `None` (ignoto), con la semantica del DEVICE_TRACKER.
+
+    Usa `async_active_zone`, cioe' la stessa funzione che mette il device_tracker dell'auto
+    su `home`/`not_home`. `None` quando non c'e' un fix utilizzabile, cosi' chi chiama puo'
+    astenersi invece di tirare a indovinare.
+
+    ⚠️ **`async_active_zone` restituisce la zona piu' PICCOLA che contiene il punto**, non
+    `zone.home`. Una zona non passiva disegnata dentro casa — un garage, un vialetto, cioe'
+    esattamente il posto dove sta una wallbox — vince su `zone.home`, e questa funzione
+    risponde `"away"` per un'auto che e' a casa. Misurato da @Caslinovich: con una
+    `zone.garage` da 20 m sulle stesse coordinate, una ricarica domestica finiva nel
+    contatore "fuori".
+
+    Per una entita' di PRESENZA quel comportamento e' la convenzione di Home Assistant e
+    resta. Per un CONTATORE DI ENERGIA e' sbagliato: la domanda li' non e' "in che zona
+    sei" ma "sei dentro casa", e la risposta e' `in_zona_casa()`.
+    """
+    # import locale: nessuna dipendenza dal componente zone al momento dell'import del modulo
+    from homeassistant.components.zone import async_active_zone
+
+    pos = position or {}
+    lat = _flt(pos.get("lat") or pos.get("latitude"))
+    lon = _flt(pos.get("lon") or pos.get("longitude"))
+    if lat is None or lon is None:
+        return None
+    zone = async_active_zone(hass, lat, lon)
+    if zone is None:
+        return "away"
+    return "home" if zone.entity_id == "zone.home" else "away"
+
+
+def in_zona_casa(hass, position: dict | None) -> bool | None:
+    """L'auto e' DENTRO `zone.home`? `None` se non c'e' un fix utilizzabile.
+
+    Domanda diversa da `car_zone()`, e va tenuta diversa. Quella chiede *in che zona sei* e
+    risponde con la piu' piccola che ti contiene — corretto per una presenza, sbagliato per
+    l'energia: chi carica nel proprio garage sta caricando a casa, qualunque zona piu'
+    stretta ci sia disegnata sopra.
+
+    Qui si chiede il CONTENIMENTO in `zone.home` e basta. Nessuna zona piu' piccola puo'
+    cambiare la risposta, e nessuna zona che l'utente aggiunge domani puo' spostare in
+    silenzio l'energia da un contatore all'altro.
+
+    `None` se `zone.home` non esiste: senza il riferimento non si indovina, e i contatori si
+    astengono invece di attribuire.
+    """
+    from homeassistant.components.zone import in_zone
+
+    pos = position or {}
+    lat = _flt(pos.get("lat") or pos.get("latitude"))
+    lon = _flt(pos.get("lon") or pos.get("longitude"))
+    if lat is None or lon is None:
+        return None
+    casa = hass.states.get("zone.home")
+    if casa is None:
+        return None
+    return bool(in_zone(casa, lat, lon))
+
+
 def field_on(v) -> bool | None:
     """Interpreta un campo 5A02 come acceso/aperto (True), spento/chiuso (False)
     o ASSENTE (None).
