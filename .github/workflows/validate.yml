@@ -32,7 +32,7 @@ jobs:
       # Home Assistant recente richiede Python 3.13+. È anche il motivo per cui la
       # suite NON gira sull'host di sviluppo (fermo a 3.11): la CI è l'unico posto
       # dove i test valgono davvero come gate.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
