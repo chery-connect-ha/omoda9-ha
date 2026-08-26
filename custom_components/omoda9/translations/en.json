@@ -157,6 +157,9 @@
   },
   "entity": {
     "binary_sensor": {
+      "a_casa": {
+        "name": "At home"
+      },
       "alta_tensione_attiva": {
         "name": "High voltage active"
       },
@@ -347,6 +350,12 @@
       },
       "dati_auto_aggiornati": {
         "name": "Car data updated"
+      },
+      "energia_ricarica_a_casa": {
+        "name": "Home charging energy"
+      },
+      "energia_ricarica_fuori_casa": {
+        "name": "Away charging energy"
       },
       "esito_comando": {
         "name": "Command result"

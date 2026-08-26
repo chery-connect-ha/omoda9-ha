@@ -1,0 +1,32 @@
+name: pip-audit
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # weekly, Monday 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    name: pip-audit (manifest runtime deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Extract requirements from manifest.json
+        run: |
+          python -c "import json;print('\n'.join(json.load(open('custom_components/omoda9/manifest.json')).get('requirements',[])))" > requirements-manifest.txt
+          cat requirements-manifest.txt
+      - name: Audit
+        # Advisory only: reports known CVEs in the runtime deps (e.g. Pillow) but does
+        # not block — the remedy is a manifest version bump, which is a maintainer's call.
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements-manifest.txt || true
