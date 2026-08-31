@@ -26,10 +26,10 @@
       },
       "login_phone": {
         "title": "Aanmelden met telefoon (SMS)",
-        "description": "Voer het telefoonnummer in dat aan uw Omoda/Jaecoo-account is gekoppeld, de landcode (Italië = 39, zonder +) en de voertuig-PIN. Er wordt een verificatiecode per SMS verzonden; VIN en account-ID worden automatisch gedetecteerd.{reason}",
+        "description": "Voer het telefoonnummer in dat aan uw Omoda/Jaecoo-account is gekoppeld, de landcode (Nederland = 31, België = 32, zonder +) en de voertuig-PIN. Er wordt een verificatiecode per SMS verzonden; VIN en account-ID worden automatisch gedetecteerd.{reason}",
         "data": {
           "phone": "Telefoonnummer (zonder landcode)",
-          "area_code": "Landcode in cijfers (bijv. 39)",
+          "area_code": "Landcode in cijfers (bijv. 31)",
           "pin": "Voertuigbedienings-PIN",
           "language": "Taal (OTP e-mails / SMS)",
           "bff": "BFF-endpoint (regio)",
@@ -95,10 +95,10 @@
       },
       "reconfigure_phone": {
         "title": "Ontvang de code per SMS",
-        "description": "De verificatiecode wordt voortaan naar dit nummer gestuurd. Schrijf het nummer zonder de landcode, en de landcode als cijfers alleen (Italië = 39).\n\nUw huidige sessie blijft geldig totdat u opnieuw verifieert.",
+        "description": "De verificatiecode wordt voortaan naar dit nummer gestuurd. Schrijf het nummer zonder de landcode, en de landcode als cijfers alleen (Nederland = 31, België = 32).\n\nUw huidige sessie blijft geldig totdat u opnieuw verifieert.",
         "data": {
           "phone": "Telefoonnummer (zonder landcode)",
-          "area_code": "Landcode, alleen cijfers (Italië = 39)"
+          "area_code": "Landcode, alleen cijfers (Nederland = 31, België = 32)"
         }
       }
     },
