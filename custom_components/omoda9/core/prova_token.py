@@ -52,14 +52,31 @@ def _dept(area):
 
 
 def build_params_mobile(phone, area, code, codefmt="plain"):
-    """Parametri per il login MOBILE (SMS). Forma ESATTA dell'app, dal dump Dart
-    `UserService::phoneVerifyLogin`: l'identità è la stringa COMPOSITA
-    `APP-LOGIN@<numeroNazionale>_<areaCode>` (NON il numero nudo) e il codice è SM4 come
-    l'email. NB: questi vanno inviati nel BODY, non in query (vedi `call`)."""
+    """Parametri per il login MOBILE (SMS). L'identità è la stringa COMPOSITA
+    `APP-LOGIN@<areaCode>_<numeroNazionale>` (prefisso PRIMA, numero DOPO) e il codice è SM4
+    come l'email. NB: questi vanno inviati nel BODY, non in query (vedi `call`).
+
+    ⚠️ ORDINE — verificato dal vivo (2026-08-24) confrontando due login sullo STESSO account
+    Omoda (numero + e-mail): l'ordine `<numero>_<area>` fa risolvere il backend a un account
+    FANTASMA vuoto (crea un utente con `areaCode`/`phone` invertiti, senza veicoli né utente TSP
+    → `getTuserId` = "0", `login` = `app.service.failed`), mentre `<area>_<numero>` risolve
+    all'account REALE con il veicolo (stesso tUserId del login e-mail). Era la causa del
+    fallimento di OGNI login via SMS: si coniava un token per un account sbagliato. L'app
+    ufficiale usa quest'ordine (prefisso_numero), coerente con come il profilo memorizza il dato
+    (`areaCode`=prefisso, `phone`=numero).
+
+    Confermato anche nel DECOMPILATO (non solo dal confronto live): `UserService::phoneVerifyLogin`
+    costruisce `APP-LOGIN@{arg2}_{arg3}`, e `isValidPhoneNum2(receiver=arg3, argument=arg2)` chiama
+    `AreaString.phoneMaxInputLength(arg2)` sul prefisso e `splitPhoneNumber(arg3)` (che ne stacca il
+    prefisso davanti) sul numero → `arg2`=areaCode, `arg3`=number. Un `200 operation.successful` da
+    solo NON conferma l'ordine: dice che la richiesta era ben formata, non a quale account è arrivata.
+    Sull'account giusto la controprova è `GET /marketing/v1/app/user`, che rende `phone`/`areaCode`
+    nei campi corretti, e — con un veicolo — il `queryList` non vuoto (NON `tUserId`: "0" vale anche
+    «nessun utente TSP mappato»)."""
     phone = str(phone).lstrip("+").replace(" ", "")
     cv = code if codefmt == "raw" else A.sm4_code(code, codefmt)
     return {
-        "mobile": f"APP-LOGIN@{phone}_{area}",
+        "mobile": f"APP-LOGIN@{area}_{phone}",
         "code": cv,
         "needDecode": "0",
         "grant_type": "mobile",
@@ -164,7 +181,7 @@ def call(email, code, secret="prod", emailfmt="module", codefmt="plain", verbose
 
 
 def _mask_identity(mobile):
-    """`APP-LOGIN@<numero>_<prefisso>` → `APP-LOGIN@***<ultime 4>_<prefisso>`: tiene la forma
+    """`APP-LOGIN@<prefisso>_<numero>` → `APP-LOGIN@<prefisso>_***<ultime 4>`: tiene la forma
     dell'identità (che è poi ciò che si sta verificando) e butta il numero. Lo stdout di questo
     script viene loggato da Home Assistant, e i log finiscono nelle issue pubbliche.
 

@@ -216,7 +216,7 @@ phone) + OTP. Chain orchestrated by the config flow (code in
 |---|---|---|
 | send OTP (email) | `login_omoda.py invia <email>` | solves the gateway captcha (§2) and triggers the code by **email** |
 | send OTP (SMS) | `login_omoda.py invia-sms <number-without-country-code> <country-code>` | same, via `sendSmsCode` — the one endpoint behind an Aliyun WAF that filters on the **TLS fingerprint**, handled by `tls_client.py` |
-| mint token | `prova_token.py <email> <code>` | calls `/auth/oauth2/token` replicating the app (SM4 encryption) and saves the token. For phone accounts the identity is the composite `APP-LOGIN@<number>_<area>` |
+| mint token | `prova_token.py <email> <code>` | calls `/auth/oauth2/token` replicating the app (SM4 encryption) and saves the token. For phone accounts the identity is the composite `APP-LOGIN@<area>_<number>` (area code first, then number — confirmed in `UserService::phoneVerifyLogin`) |
 | orchestration | `session.py` | exposes `request_otp()` / `confirm_otp(code)` / `check()` / `refresh()` |
 
 The **PIN plays no part in signing in**: the OTP mints the token, the PIN only
