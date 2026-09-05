@@ -1,0 +1,47 @@
+{
+  "delivery_id": "2026-08-19_architecture-seed-v113",
+  "date": "2026-08-19",
+  "repo": "chery-connect-ha/omoda9-ha",
+  "intent": "Pubblicare il seme architetturale sul repo canonico: vocabolario e invarianti del dominio, rotta in cinque fette rilasciabili, e un gate CI a cricchetto che nasce con le sole regole gia' vere. Nessun codice runtime toccato.",
+  "baseline": "29fef39 (v1.13.0)",
+  "head": "b7d990f",
+  "delivered_as": "PR chery-connect-ha/omoda9-ha#6 (6/6 check verdi)",
+  "units": [
+    {
+      "block": "intent",
+      "path": "docs/design/domain-model.md",
+      "lines": 227,
+      "note": "Vocabolario (capability, placeholder frame, backend acceptance, charge session, zone) e invarianti. La tabella invariante/comportamento-attuale/sintomo e' la parte che porta il peso: i quattro bug aperti sono quattro violazioni. Include la nota su cosa v1.10.0-v1.13.0 ha gia' confermato.",
+      "reading_estimate_minutes": 14
+    },
+    {
+      "block": "intent",
+      "path": "docs/design/architecture.md",
+      "lines": 159,
+      "note": "Mappatura modulo-per-modulo verso transport/, platform/, domain/, features/ e le cinque fette. Prevalentemente ri-seduta, non riscrittura.",
+      "reading_estimate_minutes": 9
+    },
+    {
+      "block": "test",
+      "path": "tests/test_architecture.py",
+      "lines": 182,
+      "note": "Quattro asserzioni gia' verdi: core/ non importa Home Assistant; le entity platform non toccano la rete; core/ non importa moduli entity; const.py e' foglia. Meccanica del cricchetto: una regola si aggiunge nello stesso commit che la rende vera, nessuna si toglie.",
+      "reading_estimate_minutes": 9
+    }
+  ],
+  "excluded": [
+    {
+      "what": "Port del delta fork-only (20 file + 6 feature dentro file condivisi)",
+      "why": "Congelato fino alla risposta sulla governance del 31/08: portarlo su un master non protetto rischia di essere scavalcato o duplicato."
+    },
+    {
+      "what": "Fetta 1 (estrazione di transport/mqtt.py dal coordinator)",
+      "why": "Deliberatamente non iniziata: il modello va concordato prima, altrimenti la prima fetta diventa un fatto compiuto."
+    },
+    {
+      "what": "Correzione dei quattro invarianti violati",
+      "why": "Citati come motivazione, non risolti: ognuno richiede il posto dove l'invariante possa vivere, che arriva con le fette."
+    }
+  ],
+  "reading_estimate_minutes_total": 32
+}

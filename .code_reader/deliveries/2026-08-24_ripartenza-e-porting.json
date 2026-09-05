@@ -1,0 +1,80 @@
+{
+  "delivery_id": "2026-08-24_ripartenza-e-porting",
+  "date": "2026-08-24",
+  "repo": "chery-connect-ha/omoda9-ha",
+  "intent": "Rendere esigibili le regole gia' concordate e portare il delta fork-only. Il filo comune non era la governance: lo standard era scritto e lo strumento che lo rende raggiungibile non c'era. Cinque istanze in un giorno, dalla review inesigibile senza una beta installabile alle tre etichette citate nei documenti e mai create.",
+  "baseline": "9c4bc6d (dopo il merge di #11 e #12)",
+  "head": "8189822 (master dopo #22, #23, #24, #28, #31)",
+  "delivered_as": "merged: #11 #12 #22 #23 #24 #28 #31 · aperte: #33 (in attesa di lettura), #6 (valvola 26/08) · sul fork: #18",
+  "units": [
+    {
+      "block": "security",
+      "path": ".github/workflows/beta.yml",
+      "lines": 216,
+      "note": "Etichetta `beta` su una PR -> pre-release installabile. La parte da leggere non e' il build ma il guard sui fork e il blocco `permissions`: quello zip finisce in istanze che contengono le credenziali dell'auto di qualcuno. Guard doppio (espressione `if` per l'evento label + controllo esplicito nello step per workflow_dispatch, dove non c'e' evento PR da cui leggere il repo di provenienza). La guardia sulla versione arriva subito dopo in #22, dopo che l'autore l'ha aggirata a mano producendo un tag che ordinava sotto la stabile.",
+      "reading_estimate_minutes": 13
+    },
+    {
+      "block": "logic",
+      "path": "custom_components/omoda9/sensor.py",
+      "lines": 113,
+      "note": "Classe `Omoda9ChargedEnergy`: integrale trapezoidale di `chargingPower` accumulato per zona. Il punto da leggere e' il passo di campionamento - si integra SOLO se entrambi gli estremi erano attivi e vicini nel tempo - e il fatto che il guard a 300 s porti con se' la sottostima nota (0,53 kWh contati contro ~8,2 da SoC), deliberatamente non corretta perche' un port deve restare verificabile contro la sua sorgente. `available` legge `poll_enabled`: senza polling due campioni attivi consecutivi non arrivano mai e un contatore fermo a zero sarebbe piu' ingannevole di un `unavailable`.",
+      "reading_estimate_minutes": 11
+    },
+    {
+      "block": "contract",
+      "path": "custom_components/omoda9/entity.py",
+      "lines": 32,
+      "note": "`car_zone()` come sorgente unica per il binary sensor e per entrambi i contatori. Superficie condivisa nuova: se i due divergessero, l'utente vedrebbe l'auto a casa e l'energia contata come fuori senza poter sapere quale dei due ha ragione. Usa `async_active_zone`, la stessa funzione dietro il device_tracker.",
+      "reading_estimate_minutes": 4
+    },
+    {
+      "block": "test",
+      "path": "tests/test_energia_ricarica.py",
+      "lines": 112,
+      "note": "Sei test, tre dei quali falliscono sulla forma ingenua del codice: rifiuto del buco lungo, astensione a zona ignota, e `chargeState` che arriva come '1.0' invece di '1' - forma che sulla linea fork teneva l'integrale a zero in silenzio. Costruiscono l'entita' senza costruttore: qui interessa l'aritmetica, non il cablaggio a Home Assistant.",
+      "reading_estimate_minutes": 7
+    },
+    {
+      "block": "prose",
+      "path": "SECURITY.md",
+      "lines": 78,
+      "note": "Portato dal fork ma con ogni affermazione verificata contro QUESTO codice, non copiata. Due sono tornate diverse: i diagnostici redigono anche dentro le frasi e coprono i telefoni (il fork sottostimava), e 'logs never contain the PIN, OTP, or tokens' e' falso - il login gira in un sottoprocesso di cui si cattura anche stderr. Aggiunta di nostro: HA tiene le config entry in chiaro in `.storage/`, fuori scope ma e' dove le credenziali stanno davvero.",
+      "reading_estimate_minutes": 6
+    },
+    {
+      "block": "prose",
+      "path": "AGENTS.md + CONTRIBUTING.md",
+      "lines": 57,
+      "note": "Due regole che la giornata ha insegnato: tenere il branch aggiornato mentre e' aperto (non solo quando confligge - un branch indietro perde gli strumenti arrivati dopo e lo scopre non succedendo niente), e dichiarare quale parte e' dell'agente. La seconda e' la regola sull'evidenza hardware puntata su noi stessi.",
+      "reading_estimate_minutes": 5
+    }
+  ],
+  "excluded": [
+    {
+      "what": "select.py dalla linea fork",
+      "why": "Non e' un'omissione: la funzione c'e' gia' (cover per apri/chiudi + pulsante `finestrini_ventila`) e il docstring di cover.py dichiara la scelta - 'la ventilazione resta un pulsante a se', non mappabile su apri/chiudi'. Portarlo metterebbe una terza entita' sulla stessa funzione fisica."
+    },
+    {
+      "what": "sandbox/ (5 file)",
+      "why": "Non e' una copia ma una riscrittura: fa `sys.path.insert(CORE_DIR)` e importa piatto, mentre `core/` qui e' un package con import relativi - muore prima di toccare la rete. Stessa causa per cui il probe di giugno non gira piu'. Chiesto a Caslinovich su #7 se sta gia' rifacendo la convenzione di chiamata una volta sola, prima di aprire un cantiere parallelo."
+    },
+    {
+      "what": "core/otp_result.py",
+      "why": "Ricabla la gestione errori dentro config_flow.py, dove JackRonan ha quattro PR aperte. Portarlo ora garantirebbe conflitti su lavoro in volo."
+    },
+    {
+      "what": ".github/workflows/tests.yml",
+      "why": "Duplica il job 'Suite di test' gia' in validate.yml: stesso pytest, differisce per matrice 3.12/3.13 e nome del requirements. Un secondo semaforo sulla stessa cosa costa attenzione e non compra niente."
+    },
+    {
+      "what": "Il fix della sottostima dei contatori energia (AI-003)",
+      "why": "Portato il difetto invariato di proposito, su decisione dell'utente. Mescolare port e fix renderebbe impossibile dire se una differenza dal fork e' l'uno o l'altro - e su un contatore che alimenta la dashboard Energia quella distinzione e' proprio quella che serve."
+    },
+    {
+      "what": "Riscrittura della storia per togliere i trailer Co-Authored-By di Caslinovich",
+      "why": "~33 commit pubblicati, tutti hanno gia' fatto pull. Riscriverli distruggerebbe blame e bisect, cioe' esattamente cio' che la scelta della base doveva proteggere. Registrato come AI-042, decisione sul se dirglielo lasciata all'utente."
+    }
+  ],
+  "reading_estimate_minutes_total": 46
+}
