@@ -1,0 +1,512 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Omoda 9 / Jaecoo",
+        "description": "Kies hoe u zich aanmeldt bij uw Omoda/Jaecoo-account. Gebruik de telefoonoptie als uw account is geregistreerd met een telefoonnummer in plaats van een e-mail.",
+        "menu_options": {
+          "login_email": "Aanmelden met e-mail",
+          "login_phone": "Aanmelden met telefoonnummer (SMS)"
+        }
+      },
+      "login_email": {
+        "title": "Aanmelden met e-mail",
+        "description": "Voer het e-mailadres van uw Omoda/Jaecoo-account en de voertuig-PIN in. Er wordt een OTP-code naar uw e-mail gestuurd; VIN en account-ID worden automatisch gedetecteerd.{reason}",
+        "data": {
+          "email": "Account-e-mail",
+          "pin": "Voertuigbedienings-PIN",
+          "language": "Taal (OTP e-mails / SMS)",
+          "bff": "BFF-endpoint (regio)",
+          "tsp_host": "TSP console host (regio)",
+          "car_mqtt_host": "Voertuig MQTT-broker host (regio)",
+          "car_mqtt_port": "Voertuig MQTT-broker poort (regio)",
+          "channel_id": "Kanaal-ID (regio)",
+          "certs_src": "Map met mutual-TLS certificaten om te importeren (optioneel)"
+        }
+      },
+      "login_phone": {
+        "title": "Aanmelden met telefoon (SMS)",
+        "description": "Voer het telefoonnummer in dat aan uw Omoda/Jaecoo-account is gekoppeld, de landcode (Nederland = 31, België = 32, zonder +) en de voertuig-PIN. Er wordt een verificatiecode per SMS verzonden; VIN en account-ID worden automatisch gedetecteerd.{reason}",
+        "data": {
+          "phone": "Telefoonnummer (zonder landcode)",
+          "area_code": "Landcode in cijfers (bijv. 31)",
+          "pin": "Voertuigbedienings-PIN",
+          "language": "Taal (OTP e-mails / SMS)",
+          "bff": "BFF-endpoint (regio)",
+          "tsp_host": "TSP console host (regio)",
+          "car_mqtt_host": "Voertuig MQTT-broker host (regio)",
+          "car_mqtt_port": "Voertuig MQTT-broker poort (regio)",
+          "channel_id": "Kanaal-ID (regio)",
+          "certs_src": "Map met mutual-TLS certificaten om te importeren (optioneel)"
+        }
+      },
+      "otp": {
+        "title": "Verificatiecode",
+        "description": "Voer de OTP-code in die u heeft ontvangen (per e-mail of SMS).{reason}",
+        "data": {
+          "code": "OTP-code"
+        }
+      },
+      "select_vehicle": {
+        "title": "Selecteer voertuig",
+        "description": "Uw account heeft meer dan één voertuig. Kies de VIN om toe te voegen.",
+        "data": {
+          "vin": "Voertuig (VIN)"
+        }
+      },
+      "reconfigure": {
+        "title": "Instellingen wijzigen",
+        "description": "Wat wilt u corrigeren? Elke optie vraagt alleen om wat hij verandert: het wijzigen van hoe u de code ontvangt vraagt niet om uw PIN.",
+        "menu_options": {
+          "reconfigure_pin": "Voertuigbedienings-PIN",
+          "reconfigure_email": "Ontvang de code per e-mail",
+          "reconfigure_phone": "Ontvang de code per SMS"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Opnieuw verifiëren Omoda 9 / Jaecoo",
+        "description": "De sessie is verlopen: totdat u opnieuw geverifieerd bent, kan de integratie niet met de auto communiceren en blijven commando's en sensoren vaststaan.\n\n**Er is geen code automatisch verzonden.** Kies hoe u wilt doorgaan of voer een bestaande code in.",
+        "menu_options": {
+          "send_code": "Stuur me een nieuwe code",
+          "enter_code": "Ik heb al een geldige code",
+          "install_fallback": "Installeer de fallback TLS-client (download, ~12 MB)"
+        }
+      },
+      "enter_code": {
+        "title": "Voer de verificatiecode in",
+        "description": "Voer de code in die zojuist naar {email} is verzonden. Codes verlopen na een paar minuten: als deze wordt geweigerd kunt u teruggaan en een nieuwe aanvragen.{reason}",
+        "data": {
+          "code": "OTP-code"
+        }
+      },
+      "reconfigure_pin": {
+        "title": "Voertuigbedienings-PIN",
+        "description": "Voer de 4-cijferige PIN in die wordt gebruikt voor externe commando's. De PIN wordt niet gebruikt om in te loggen, dus hier is geen verificatiecode nodig. Stel deze bij als commando's als \"succesvol\" terugkomen maar de auto het niet uitvoert.",
+        "data": {
+          "pin": "Voertuigbedienings-PIN"
+        }
+      },
+      "reconfigure_email": {
+        "title": "Ontvang de code per e-mail",
+        "description": "De verificatiecode wordt voortaan naar dit adres gestuurd. Gebruik dit als uw account met een e-mailadres geregistreerd is, of om een typfout te corrigeren.\n\nUw huidige sessie blijft geldig totdat u opnieuw verifieert.",
+        "data": {
+          "email": "Account-e-mail"
+        }
+      },
+      "reconfigure_phone": {
+        "title": "Ontvang de code per SMS",
+        "description": "De verificatiecode wordt voortaan naar dit nummer gestuurd. Schrijf het nummer zonder de landcode, en de landcode als cijfers alleen (Nederland = 31, België = 32).\n\nUw huidige sessie blijft geldig totdat u opnieuw verifieert.",
+        "data": {
+          "phone": "Telefoonnummer (zonder landcode)",
+          "area_code": "Landcode, alleen cijfers (Nederland = 31, België = 32)"
+        }
+      }
+    },
+    "error": {
+      "otp_send_failed": "Kon de code niet verzenden. Controleer e-mail/telefoon en PIN en probeer het opnieuw.",
+      "otp_invalid": "Ongeldige of verlopen OTP-code.",
+      "no_vehicle": "Aanmelding geslaagd, maar er is geen voertuig gevonden op dit account.",
+      "pin_required": "Voer de voertuigbedienings-PIN in.",
+      "otp_required": "Voer de ontvangen code in.",
+      "phone_invalid": "Dat telefoonnummer lijkt niet juist. Voer alleen de cijfers van het nummer in, zonder landcode en zonder spaties; in het andere veld zet u alleen de cijfers van de landcode.",
+      "email_invalid": "Dat e-mailadres lijkt niet juist."
+    },
+    "abort": {
+      "already_configured": "Dit voertuig (VIN) is al geconfigureerd.",
+      "token_move_failed": "Kon het authenticatietoken niet opslaan. Controleer de machtigingen van de config-map van Home Assistant en probeer het opnieuw.",
+      "reconfigure_no_entry": "Integratie niet gevonden — herlaad Home Assistant en probeer het opnieuw.",
+      "reconfigure_successful": "PIN bijgewerkt. De integratie is herladen.",
+      "reauth_no_entry": "Integratie niet gevonden — herlaad Home Assistant en probeer het opnieuw.",
+      "reauth_successful": "Opnieuw verifiëren geslaagd. De integratie is herladen."
+    }
+  },
+  "issues": {
+    "pin_wrong": {
+      "title": "Omoda 9: onjuiste commando-PIN",
+      "fix_flow": {
+        "step": {
+          "pin": {
+            "title": "Herstel de voertuigbedienings-PIN",
+            "description": "Externe commando's worden afgewezen omdat de 4-cijferige bedienings-PIN onjuist is (de sensoren blijven werken — dit is geen inlogprobleem). Voer de juiste PIN in. Probeer niet herhaaldelijk verkeerde waarden in te voeren.",
+            "data": {
+              "pin": "Voertuigbedienings-PIN"
+            }
+          }
+        },
+        "error": {
+          "pin_required": "Voer de voertuigbedienings-PIN in."
+        },
+        "abort": {
+          "entry_not_found": "Integratie niet gevonden — herlaad Home Assistant en probeer het opnieuw."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Omoda 9 — automatische updates",
+        "description": "Hoe vaak de auto gewekt moet worden en telemetry + GPS-positie moet verversen. 0 = uitgeschakeld. Het laadinterval wordt gebruikt terwijl de auto is aangesloten (telemetry ververst vaker om laadstatus te volgen).",
+        "data": {
+          "poll_normal_min": "Update-interval wanneer geparkeerd (minuten, 0 = uit)",
+          "poll_charging_min": "Update-interval tijdens opladen (minuten, 0 = uit)",
+          "vehicle_name": "Voertuignaam (laat leeg om de naam te gebruiken die door de auto is gedetecteerd)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "a_casa": {
+        "name": "Thuis"
+      },
+      "alta_tensione_attiva": {
+        "name": "Hoge spanning actief"
+      },
+      "auto_sveglia": {
+        "name": "Auto wakker"
+      },
+      "avviso_carburante_basso": {
+        "name": "Lage brandstofwaarschuwing"
+      },
+      "avviso_gomma_ant_dx": {
+        "name": "Bandwaarschuwing voor rechtsvoor"
+      },
+      "avviso_gomma_ant_sx": {
+        "name": "Bandwaarschuwing voor linksvoor"
+      },
+      "avviso_gomma_post_dx": {
+        "name": "Bandwaarschuwing voor rechtsachter"
+      },
+      "avviso_gomma_post_sx": {
+        "name": "Bandwaarschuwing voor linksachter"
+      },
+      "avviso_ricarica_necessaria": {
+        "name": "Opladen vereist waarschuwing"
+      },
+      "batteria_scarica": {
+        "name": "Laag batterijniveau"
+      },
+      "cofano": {
+        "name": "Motorkap"
+      },
+      "connessa": {
+        "name": "Verbonden"
+      },
+      "finestrino_anteriore_dx": {
+        "name": "Voorraam rechts"
+      },
+      "finestrino_anteriore_sx": {
+        "name": "Voorraam links"
+      },
+      "finestrino_posteriore_dx": {
+        "name": "Achterraam rechts"
+      },
+      "finestrino_posteriore_sx": {
+        "name": "Achterraam links"
+      },
+      "motore": {
+        "name": "Motor"
+      },
+      "porta_anteriore_dx": {
+        "name": "Voordeur rechts"
+      },
+      "porta_anteriore_sx": {
+        "name": "Voordeur links"
+      },
+      "porta_posteriore_dx": {
+        "name": "Achterdeur rechts"
+      },
+      "porta_posteriore_sx": {
+        "name": "Achterdeur links"
+      },
+      "portellone_in_movimento": {
+        "name": "Kofferklep in beweging"
+      },
+      "purificazione_aria": {
+        "name": "Luchtzuivering"
+      },
+      "riscaldamento_parabrezza": {
+        "name": "Voorruitverwarming"
+      },
+      "sessione": {
+        "name": "Sessie"
+      },
+      "spina_ricarica": {
+        "name": "Laadkabel"
+      },
+      "tendina_tetto": {
+        "name": "Zonnedakrolgordijn"
+      }
+    },
+    "button": {
+      "aggiorna_posizione": {
+        "name": "Locatie verversen"
+      },
+      "aggiorna_stato_completo": {
+        "name": "Status volledig verversen"
+      },
+      "antifurto_off": {
+        "name": "Alarm uit"
+      },
+      "antifurto_on": {
+        "name": "Alarm aan"
+      },
+      "clima_raffredda_off": {
+        "name": "Koeling uit"
+      },
+      "clima_raffredda_on": {
+        "name": "Koeling aan"
+      },
+      "clima_riscalda_off": {
+        "name": "Verwarming uit"
+      },
+      "clima_riscalda_on": {
+        "name": "Verwarming aan"
+      },
+      "conferma_otp": {
+        "name": "OTP bevestigen"
+      },
+      "finestrini_ventila": {
+        "name": "Ramen ventileren"
+      },
+      "localizza": {
+        "name": "Auto lokaliseren (GPS)"
+      },
+      "richiedi_codice_otp": {
+        "name": "Vraag OTP-code aan"
+      },
+      "sveglia_auto": {
+        "name": "Auto wekken"
+      },
+      "trova_auto": {
+        "name": "Auto vinden (knipperlichten)"
+      }
+    },
+    "climate": {
+      "clima": {
+        "name": "Klimaat"
+      }
+    },
+    "cover": {
+      "baule": {
+        "name": "Kofferbak"
+      },
+      "finestrini": {
+        "name": "Ramen"
+      },
+      "tetto": {
+        "name": "Zonnedak"
+      }
+    },
+    "device_tracker": {
+      "posizione": {
+        "name": "Locatie"
+      }
+    },
+    "lock": {
+      "serratura": {
+        "name": "Deurslot"
+      }
+    },
+    "number": {
+      "durata_clima": {
+        "name": "Klimaatduur"
+      },
+      "ricarica_durata": {
+        "name": "Laadduur"
+      }
+    },
+    "sensor": {
+      "autonomia_benzina": {
+        "name": "Brandstofbereik"
+      },
+      "autonomia_benzina_miglia": {
+        "name": "Benzinebereik (mijlen)"
+      },
+      "autonomia_elettrica": {
+        "name": "Elektrisch bereik"
+      },
+      "autonomia_totale": {
+        "name": "Totaal bereik"
+      },
+      "batteria": {
+        "name": "Batterij"
+      },
+      "carburante_residuo": {
+        "name": "Overgebleven brandstof"
+      },
+      "chilometraggio_ibrido": {
+        "name": "Hybride kilometerstand"
+      },
+      "consumo_medio_carburante": {
+        "name": "Gemiddeld brandstofverbruik"
+      },
+      "consumo_medio_elettrico": {
+        "name": "Gemiddeld energieverbruik"
+      },
+      "corrente_batteria_hv": {
+        "name": "HV batterijstroom"
+      },
+      "dati_auto_aggiornati": {
+        "name": "Autogegevens bijgewerkt"
+      },
+      "energia_ricarica_a_casa": {
+        "name": "Laadenergie thuis"
+      },
+      "energia_ricarica_fuori_casa": {
+        "name": "Laadenergie buitenshuis"
+      },
+      "esito_comando": {
+        "name": "Commando resultaat"
+      },
+      "esito_sonda_posizione": {
+        "name": "Locatie-proef resultaat"
+      },
+      "esito_sveglia": {
+        "name": "Wekresultaat"
+      },
+      "odometro": {
+        "name": "Kilometerstand"
+      },
+      "partenza_programmata": {
+        "name": "Geplande vertrek"
+      },
+      "presa_ricarica_rapida": {
+        "name": "Snel laadpunt"
+      },
+      "pressione_gomma_ant_dx": {
+        "name": "Bandenspanning voor rechts"
+      },
+      "pressione_gomma_ant_sx": {
+        "name": "Bandenspanning voor links"
+      },
+      "pressione_gomma_post_dx": {
+        "name": "Bandenspanning achter rechts"
+      },
+      "pressione_gomma_post_sx": {
+        "name": "Bandenspanning achter links"
+      },
+      "ricarica_programmata_stato": {
+        "name": "Status geplande lading"
+      },
+      "riscaldamento_sedile_post_centrale": {
+        "name": "Achterste middenzitplaats verwarming"
+      },
+      "stato_ricarica": {
+        "name": "Laadstatus"
+      },
+      "stato_sessione": {
+        "name": "Sessie status"
+      },
+      "temperatura_gomma_ant_dx": {
+        "name": "Bandtemperatuur voor rechts"
+      },
+      "temperatura_gomma_ant_sx": {
+        "name": "Bandtemperatuur voor links"
+      },
+      "temperatura_gomma_post_dx": {
+        "name": "Bandtemperatuur achter rechts"
+      },
+      "temperatura_gomma_post_sx": {
+        "name": "Bandtemperatuur achter links"
+      },
+      "temperatura_impostata_dx": {
+        "name": "Ingestelde temperatuur rechts"
+      },
+      "temperatura_impostata_sx": {
+        "name": "Ingestelde temperatuur links"
+      },
+      "tempo_di_ricarica_residuo": {
+        "name": "Resterende laadtijd"
+      },
+      "tensione_batteria_hv": {
+        "name": "HV batterijspanning"
+      },
+      "tetto_stato_movimento": {
+        "name": "Stand zonnedak beweging"
+      },
+      "ultima_posizione": {
+        "name": "Laatste locatie"
+      },
+      "ultima_sveglia": {
+        "name": "Laatste wekken"
+      },
+      "ultimo_contatto": {
+        "name": "Laatst gezien"
+      },
+      "velocita": {
+        "name": "Snelheid"
+      },
+      "ventilazione_sedile_post_centrale": {
+        "name": "Ventilatie achterste middenzitplaats"
+      }
+    },
+    "switch": {
+      "aggiornamento_automatico": {
+        "name": "Automatische updates"
+      },
+      "antifurto": {
+        "name": "Alarm"
+      },
+      "disappannamento_parabrezza": {
+        "name": "Voorruit ontwaseming"
+      },
+      "raffredda_tutto": {
+        "name": "Koel alles"
+      },
+      "ricarica": {
+        "name": "Opladen"
+      },
+      "ricarica_programmata": {
+        "name": "Geplande lading"
+      },
+      "riscalda_tutto": {
+        "name": "Verwarm alles"
+      },
+      "riscaldamento_lunotto": {
+        "name": "Achterruitverwarming"
+      },
+      "riscaldamento_sedile_guida": {
+        "name": "Bestuurdersstoel verwarming"
+      },
+      "riscaldamento_sedile_passeggero": {
+        "name": "Passagiersstoel verwarming"
+      },
+      "riscaldamento_sedile_post_dx": {
+        "name": "Achterste rechter stoel verwarming"
+      },
+      "riscaldamento_sedile_post_sx": {
+        "name": "Achterste linker stoel verwarming"
+      },
+      "riscaldamento_volante": {
+        "name": "Stuurwielverwarming"
+      },
+      "sbrinamento_parabrezza": {
+        "name": "Voorruit ontdooiing"
+      },
+      "ventilazione_sedile_guida": {
+        "name": "Bestuurdersstoel ventilatie"
+      },
+      "ventilazione_sedile_passeggero": {
+        "name": "Passagiersstoel ventilatie"
+      },
+      "ventilazione_sedile_post_dx": {
+        "name": "Achterste rechter stoel ventilatie"
+      },
+      "ventilazione_sedile_post_sx": {
+        "name": "Achterste linker stoel ventilatie"
+      }
+    },
+    "text": {
+      "codice_otp": {
+        "name": "OTP-code"
+      }
+    },
+    "time": {
+      "ricarica_orario_di_inizio": {
+        "name": "Starttijd laden"
+      }
+    }
+  }
+}
