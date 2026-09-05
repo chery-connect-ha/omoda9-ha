@@ -23,6 +23,10 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -31,6 +35,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     DOMAIN, CONF_EMAIL, CONF_PIN, CONF_VIN, CONF_TUSERID,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
+    CONF_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGES,
     CONF_BFF, CONF_TSP_HOST, CONF_CERTS_SRC, CONF_CHANNEL_ID,
     CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, DEFAULTS,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING,
@@ -62,6 +67,22 @@ def _clear_pin_lockout(hass: HomeAssistant, entry_id: str) -> None:
 def _pending_token_path(hass: HomeAssistant) -> str:
     """Path temporaneo dove conia il token finché non si conosce il VIN."""
     return hass.config.path(f"{DOMAIN}_pending_token.json")
+
+
+def _pending_token_minted(hass: HomeAssistant) -> bool:
+    """True se un token è stato davvero SCRITTO (OTP valido), anche quando `confirm_otp` ha poi
+    riportato un fallimento perché il login post-conio non è riuscito — di norma perché l'account
+    NON ha veicoli. Serve a distinguere «codice sbagliato» (nessun token) da «codice giusto ma
+    niente auto sull'account»: il primo è `otp_invalid`, il secondo `no_vehicle`, e finché non li
+    si separava un login sull'account sbagliato usciva come «OTP non valido», mandando l'utente a
+    ricontrollare all'infinito un codice che era corretto."""
+    try:
+        with open(_pending_token_path(hass), encoding="utf-8") as fh:
+            tok = json.load(fh)
+    except Exception:  # noqa: BLE001
+        return False
+    d = tok.get("data", tok) if isinstance(tok, dict) else {}
+    return bool(d.get("access_token") if isinstance(d, dict) else None)
 
 
 def _reason_line(detail: str | None) -> str:
@@ -133,11 +154,11 @@ _MAX_CIFRE_PREFISSO = 3          # E.164: i prefissi paese hanno 1, 2 o 3 cifre.
 
 def _normalizza_telefono(numero: str | None, prefisso: str | None) -> tuple[str, str]:
     """Ripulisce numero e prefisso UNA VOLTA SOLA, qui: da qui in poi viaggiano in entry.data,
-    nell'ambiente dei sottoprocessi e nell'identità `APP-LOGIN@<num>_<area>`, e a valle nessuno
+    nell'ambiente dei sottoprocessi e nell'identità `APP-LOGIN@<area>_<num>`, e a valle nessuno
     li tocca più (`invia_sms` fa solo `lstrip("+")` + spazi, `build_params_mobile` altrettanto).
 
     Cose che la gente scrive davvero e che senza questo passaggio arrivano storte al server:
-      * numero copiato dalla rubrica col prefisso già dentro → identità `APP-LOGIN@39<num>_39`;
+      * numero copiato dalla rubrica col prefisso già dentro → identità `APP-LOGIN@39_39<num>`;
       * separatori dentro il numero: spazi, punti, trattini;
       * prefisso scritto `+39` o `0039` → `areaCode="+39"`, che il server non riconosce;
       * zero di accesso nazionale davanti al numero (Regno Unito, Germania, Francia…).
@@ -247,6 +268,8 @@ def _ctx_del_flow(hass: HomeAssistant, data: dict, token_path: str | None = None
         tsp_host=data.get(CONF_TSP_HOST, DEFAULTS[CONF_TSP_HOST]),
         bff=data.get(CONF_BFF, DEFAULTS[CONF_BFF]),
         channel_id=str(data.get(CONF_CHANNEL_ID, DEFAULTS[CONF_CHANNEL_ID])),
+        # lingua (Accept-Language) scelta al login → e-mail/SMS OTP nella lingua giusta
+        language=str(data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE) or DEFAULT_LANGUAGE),
     )
 
 
@@ -340,8 +363,16 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return Omoda9OptionsFlow(config_entry)
 
     def _region_fields(self) -> dict:
-        """Campi opzionali di REGIONE, comuni a login email e telefono (default = Europa)."""
+        """Campi opzionali di REGIONE/LINGUA, comuni a login email e telefono (default = Europa)."""
         return {
+            # Lingua delle chiamate (Accept-Language): decide la lingua di e-mail/SMS OTP e dei
+            # messaggi del server. Nuovi account: inglese; si può scegliere l'italiano.
+            vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): SelectSelector(
+                SelectSelectorConfig(
+                    mode=SelectSelectorMode.DROPDOWN,
+                    options=[SelectOptionDict(value=v, label=lbl) for v, lbl in LANGUAGES.items()],
+                )
+            ),
             # Solo per regioni diverse dall'Europa / setup avanzato (default EU).
             vol.Optional(CONF_BFF, default=DEFAULTS[CONF_BFF]): str,
             vol.Optional(CONF_TSP_HOST, default=DEFAULTS[CONF_TSP_HOST]): str,
@@ -428,7 +459,13 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ok, msg = await self.hass.async_add_executor_job(
                 _mint_token, self.hass, self._data, user_input["code"].strip()
             )
-            if ok:
+            # Anche se `confirm_otp` riporta KO, il token può ESSERE stato coniato (OTP valido):
+            # a fallire è allora il login post-conio, di norma perché l'account non ha veicoli.
+            # Distinguo i due casi dal fatto che un token sia stato scritto, così un login
+            # sull'account sbagliato non esce più come «OTP non valido».
+            minted = ok or await self.hass.async_add_executor_job(
+                _pending_token_minted, self.hass)
+            if minted:
                 d_ok, tu, vins, detail = await self.hass.async_add_executor_job(
                     _discover, self.hass, self._data
                 )
@@ -445,7 +482,7 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         return await self._create_entry(vins[0])
                     return await self.async_step_select_vehicle()
             else:
-                # OTP errato/scaduto: butta il pending eventualmente già scritto.
+                # Nessun token scritto → il CODICE è stato davvero rifiutato (errato/scaduto).
                 await self.hass.async_add_executor_job(_cleanup_pending, self.hass)
                 errors["base"] = "otp_invalid"
                 reason = _reason_line(msg)

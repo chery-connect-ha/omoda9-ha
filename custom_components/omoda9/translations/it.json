@@ -15,6 +15,7 @@
         "data": {
           "email": "Email dell'account",
           "pin": "PIN di controllo veicolo",
+          "language": "Lingua (e-mail / SMS OTP)",
           "bff": "Endpoint BFF (regione)",
           "tsp_host": "Host console TSP (regione)",
           "car_mqtt_host": "Host broker MQTT del veicolo (regione)",
@@ -30,6 +31,7 @@
           "phone": "Numero di telefono (senza prefisso)",
           "area_code": "Prefisso internazionale in cifre (es. 39)",
           "pin": "PIN di controllo veicolo",
+          "language": "Lingua (e-mail / SMS OTP)",
           "bff": "Endpoint BFF (regione)",
           "tsp_host": "Host console TSP (regione)",
           "car_mqtt_host": "Host broker MQTT del veicolo (regione)",
@@ -103,7 +105,7 @@
     "error": {
       "otp_send_failed": "Impossibile inviare il codice. Controlla email/telefono e PIN e riprova.",
       "otp_invalid": "Codice OTP non valido o scaduto.",
-      "no_vehicle": "Login riuscito ma nessun veicolo trovato su questo account.",
+      "no_vehicle": "Accesso riuscito, ma questo account non ha veicoli. Se l'auto è registrata su un altro accesso (es. la tua e-mail), usa quello.",
       "pin_required": "Inserisci il PIN di controllo veicolo.",
       "otp_required": "Inserisci il codice che hai ricevuto.",
       "phone_invalid": "Questo numero non sembra giusto. Scrivi solo le cifre del numero, senza prefisso internazionale e senza spazi; nell'altro campo metti solo le cifre del prefisso (Italia = 39).",
@@ -155,6 +157,9 @@
   },
   "entity": {
     "binary_sensor": {
+      "a_casa": {
+        "name": "A casa"
+      },
       "alta_tensione_attiva": {
         "name": "Alta tensione attiva"
       },
@@ -345,6 +350,12 @@
       },
       "dati_auto_aggiornati": {
         "name": "Dati auto aggiornati"
+      },
+      "energia_ricarica_a_casa": {
+        "name": "Energia ricarica a casa"
+      },
+      "energia_ricarica_fuori_casa": {
+        "name": "Energia ricarica fuori casa"
       },
       "esito_comando": {
         "name": "Esito comando"

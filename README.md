@@ -112,6 +112,35 @@ app off the account. That is your call, so it starts **off**:
   server after a couple of refusals, which greatly reduces — but does not remove —
   the risk of the Chery account being locked: **correct the PIN, don't retry**.
 
+## Dashboard card
+
+The integration bundles a custom card and **loads it automatically** — after a restart it
+appears in **Add card → Custom → "Chery Card"** (no manual resource to add). It's a curated
+summary: vehicle name, battery %, charging state, estimated range, and warnings (tyre, low
+battery, offline) shown **only when something's wrong**.
+
+Minimal config just works:
+
+```yaml
+type: custom:chery-card
+```
+
+Options (all optional):
+
+| Option | What it does |
+|---|---|
+| `title` | Header title (default: the vehicle's name) |
+| `image` | Header image URL (overrides the one set in the integration options) |
+| `show_all: true` | Also list every remaining entity, grouped |
+| `entities: [...]` | Append your own rows (entity ids) |
+
+**Card shows "Configuration error" on the mobile app (but works on desktop)?** The integration
+auto-loads the card, but the companion app doesn't always pick that up. **Add the resource
+manually once** and it works: **Settings → Dashboards → ⋮ (top-right) → Resources → + Add
+resource**, URL `/omoda9_card/chery-card.js`, type **JavaScript module**. Then fully close and
+reopen the app (if it still shows the old state, **App configuration → Debugging → Reset
+frontend cache** first). You only need to add the resource once; it applies to every dashboard.
+
 ## Changing settings later
 
 **Settings → Devices & Services → Omoda 9 / Jaecoo → ⋮ → Reconfigure** ("Change
@@ -187,7 +216,7 @@ phone) + OTP. Chain orchestrated by the config flow (code in
 |---|---|---|
 | send OTP (email) | `login_omoda.py invia <email>` | solves the gateway captcha (§2) and triggers the code by **email** |
 | send OTP (SMS) | `login_omoda.py invia-sms <number-without-country-code> <country-code>` | same, via `sendSmsCode` — the one endpoint behind an Aliyun WAF that filters on the **TLS fingerprint**, handled by `tls_client.py` |
-| mint token | `prova_token.py <email> <code>` | calls `/auth/oauth2/token` replicating the app (SM4 encryption) and saves the token. For phone accounts the identity is the composite `APP-LOGIN@<number>_<area>` |
+| mint token | `prova_token.py <email> <code>` | calls `/auth/oauth2/token` replicating the app (SM4 encryption) and saves the token. For phone accounts the identity is the composite `APP-LOGIN@<area>_<number>` (area code first, then number — confirmed in `UserService::phoneVerifyLogin`) |
 | orchestration | `session.py` | exposes `request_otp()` / `confirm_otp(code)` / `check()` / `refresh()` |
 
 The **PIN plays no part in signing in**: the OTP mints the token, the PIN only

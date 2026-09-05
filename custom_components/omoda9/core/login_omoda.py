@@ -37,6 +37,9 @@ def _motivo(testo):
 BFF = os.environ.get("OMODA_BFF", "https://legend-oj.omodaauto.nl/api")   # regione (default EU)
 SECRET = "5c7af05e6fbf562842ef483ee96e06a0"
 NONCE = "chery_legend_marketing"
+# Lingua dell'invio OTP (header Accept-Language) → lingua di e-mail/SMS del codice. Default it-IT
+# (comportamento storico); il coordinator/config_flow passa `OMODA_LANGUAGE` nell'ambiente.
+ACCEPT_LANGUAGE = os.environ.get("OMODA_LANGUAGE", "it-IT")
 def _md5(s): return hashlib.md5(s.encode()).hexdigest()
 
 # L'invio SMS (`sendSmsCode`) è l'UNICO endpoint dietro il WAF Aliyun, che filtra
@@ -54,7 +57,7 @@ def _hdr_form(path):
             "TENANT-CODE": omoda.TENANT_CODE, "TENANT-ID": omoda.TENANT_CODE,
             "tenantCode": omoda.TENANT_CODE, "tenantID": omoda.TENANT_CODE, "tenant": omoda.TENANT_CODE,
             "channelId": omoda.CHANNEL_ID, "countryId": omoda.COUNTRY_ID,
-            "appversion": omoda.APP_VERSION, "User-Agent": "okhttp/4.9.0", "Accept-Language": "it-IT",
+            "appversion": omoda.APP_VERSION, "User-Agent": "okhttp/4.9.0", "Accept-Language": ACCEPT_LANGUAGE,
             "nonce": NONCE, "timestamp": str(ts), "url": path,
             "signature": _md5(f"{SECRET}{NONCE}{path}{ts}"),
             "Content-Type": "application/x-www-form-urlencoded"}
@@ -158,7 +161,7 @@ def _token_headers(path, params):
             "TENANT-CODE": omoda.TENANT_CODE, "TENANT-ID": omoda.TENANT_CODE,
             "tenantCode": omoda.TENANT_CODE, "tenantID": omoda.TENANT_CODE, "tenant": omoda.TENANT_CODE,
             "channelId": omoda.CHANNEL_ID, "countryId": omoda.COUNTRY_ID,
-            "appversion": omoda.APP_VERSION, "Accept-Language": "it-IT",
+            "appversion": omoda.APP_VERSION, "Accept-Language": ACCEPT_LANGUAGE,
             "nonce": NONCE, "timestamp": str(ts), "url": path, "keys": ",".join(keys),
             "signature": _md5(f"{SECRET}{NONCE}{path}{ts}[{vals_csv}]")}
 
@@ -225,7 +228,7 @@ if __name__ == "__main__":
         # ⚠️ Il conio del token per gli account SMS NON si fa da qui. Le combinazioni che
         # `_combos_sms` prova (numero nudo, codice in chiaro, parametri in query) sono quelle
         # tentate PRIMA di sapere come funziona davvero, e il server le rifiuta tutte: la forma
-        # buona — identità composita `APP-LOGIN@<num>_<area>`, codice cifrato SM4, parametri
+        # buona — identità composita `APP-LOGIN@<area>_<num>`, codice cifrato SM4, parametri
         # nel body — è in `prova_token.build_params_mobile`, ricavata decompilando l'app e
         # confermata dal vivo. Lasciare qui un sottocomando che non può funzionare significa
         # che chi lo usa per diagnosticare conclude «il server rifiuta il mio codice».
