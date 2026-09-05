@@ -57,3 +57,45 @@ def test_ogni_lingua_ha_le_chiavi_di_strings(nome):
         f"{nome} ha {len(in_piu)} chiavi che strings.json non dichiara: o sono rimaste da "
         f"una rimozione, o vanno aggiunte anche lì: {in_piu[:12]}"
     )
+
+
+# --------------------------------------------------------------------------------------
+# Il test sopra confronta i FILE fra loro. Non basta, e il 2026-09-05 si e' visto perche':
+# `_region_fields()` disegnava dieci campi in tutti e tre gli step di login, ma
+# `strings.json` ne dichiarava solo sei sotto `login_password`. Quattro campi comparivano
+# nel form SENZA etichetta, in tutte le lingue insieme -- quindi i tre file concordavano,
+# il test passava, e il difetto era visibile solo aprendo quella schermata.
+#
+# Non era colpa di nessuna delle due pull request: #16 scrisse `login_password` quando
+# `_region_fields()` non aveva ancora `preset`/`tenant_code`/`country_id`, e #19 aggiunse
+# quelle chiavi ai due step che sul suo ramo esistevano. Il difetto e' nato dall'incontro.
+# Un guardiano che confronta i file fra loro non puo' vedere una cosa del genere: deve
+# confrontarli con quello che il form DISEGNA.
+# --------------------------------------------------------------------------------------
+
+STEP_CON_CAMPI_DI_REGIONE = ("login_email", "login_phone", "login_password")
+
+
+def _campi_di_regione() -> set[str]:
+    """Le chiavi che `_region_fields()` mette davvero nel form, chieste al codice."""
+    from custom_components.omoda9.config_flow import Omoda9ConfigFlow
+
+    # `_region_fields` non tocca `self`: si puo' chiamare senza costruire il flow.
+    return {str(marcatore) for marcatore in Omoda9ConfigFlow._region_fields(None)}
+
+
+@pytest.mark.parametrize("step", STEP_CON_CAMPI_DI_REGIONE)
+def test_ogni_campo_disegnato_ha_una_etichetta(step):
+    """Ogni campo che il form mostra deve avere un'etichetta in `strings.json`."""
+    import json
+
+    strings = json.loads(FILES["strings.json"].read_text(encoding="utf-8"))
+    dichiarati = set(strings["config"]["step"][step].get("data", {}))
+
+    senza_etichetta = sorted(_campi_di_regione() - dichiarati)
+    assert not senza_etichetta, (
+        f"lo step `{step}` disegna {len(senza_etichetta)} campi che strings.json non "
+        f"nomina: {senza_etichetta}. Chi apre quella schermata li vede senza etichetta, "
+        f"in OGNI lingua -- e il confronto fra i file non se ne accorge, perche' mancano "
+        f"a tutti allo stesso modo."
+    )
