@@ -214,6 +214,12 @@ CONF_TSP_HOST = "tsp_host"
 CONF_CAR_MQTT_HOST = "car_mqtt_host"
 CONF_CAR_MQTT_PORT = "car_mqtt_port"
 CONF_CHANNEL_ID = "channel_id"
+# TENANT-CODE e countryId: fin qui erano cablati ai valori Omoda/Jaecoo dentro `CoreCtx`
+# (300006 / 1) e non arrivavano dal config entry. Sono diversi PER MARCHIO sullo stesso
+# gateway "legend": senza esporli non si poteva puntare l'integrazione al tenant Chery
+# (300001 / 2). Ora fanno parte dei parametri di regione, valorizzati dai preset qui sotto.
+CONF_TENANT_CODE = "tenant_code"
+CONF_COUNTRY_ID = "country_id"
 
 # Provisioning certificati mutual-TLS MQTT (FASE 3c). Cartella (dentro il filesystem di HA)
 # da cui importare i 4 cert nella certs_dir per-entry. Vuoto = i cert si mettono a mano.
@@ -228,6 +234,36 @@ DEFAULTS = {
     CONF_CAR_MQTT_HOST: "tspemqx-app-eu.cheryinternational.com",
     CONF_CAR_MQTT_PORT: 8083,
     CONF_CHANNEL_ID: "1",
+    CONF_TENANT_CODE: "300006",
+    CONF_COUNTRY_ID: "1",
+}
+
+# ── Preset marchio/regione ───────────────────────────────────────────────────────────────
+# Chery International serve Omoda/Jaecoo e Chery dallo STESSO backend "legend": il broker MQTT,
+# la TSP console e i certificati mutual-TLS sono comuni per regione; a cambiare per marchio sono
+# solo il gateway BFF, il TENANT-CODE, il channelId e il countryId. I valori Chery EU sono stati
+# ricavati dall'app Chery EU ufficiale (`com.chery.eu.chery`, .env.prod), che è lo stesso
+# applicativo `chery_legend` da cui è nata questa integrazione. Scegliere un preset riempie quei
+# quattro campi; "custom" lascia intatto ciò che l'utente ha digitato (altre regioni/marchi).
+CONF_PRESET = "preset"
+PRESET_OMODA_JAECOO_EU = "omoda_jaecoo_eu"
+PRESET_CHERY_EU = "chery_eu"
+PRESET_CUSTOM = "custom"
+DEFAULT_PRESET = PRESET_OMODA_JAECOO_EU
+
+PRESETS = {
+    PRESET_OMODA_JAECOO_EU: {
+        CONF_BFF: "https://legend-oj.omodaauto.nl/api",
+        CONF_TENANT_CODE: "300006",
+        CONF_CHANNEL_ID: "1",
+        CONF_COUNTRY_ID: "1",
+    },
+    PRESET_CHERY_EU: {
+        CONF_BFF: "https://eu-chery.cheryinternational.com/api",
+        CONF_TENANT_CODE: "300001",
+        CONF_CHANNEL_ID: "2",
+        CONF_COUNTRY_ID: "2",
+    },
 }
 
 # Costante app condivisa (non un segreto utente): seed per derivare la password MQTT

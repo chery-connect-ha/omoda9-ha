@@ -36,6 +36,7 @@ from .const import (
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
     CONF_LANGUAGE, LANGUAGE_FALLBACK,
     CONF_BFF, CONF_TSP_HOST, CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, CONF_CHANNEL_ID,
+    CONF_TENANT_CODE, CONF_COUNTRY_ID,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING, DEFAULT_POLL_NORMAL_MIN,
     DEFAULT_POLL_CHARGING_MIN, POLL_WAKE_WAIT, COMMAND_SETTLE_S, COMMAND_QUEUE_WAIT,
     HV_ON_POLL_EVERY, HV_ON_POLL_MAX,
@@ -273,6 +274,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         self.tsp_host = cfg[CONF_TSP_HOST]
         self.pin = cfg.get(CONF_PIN, "")
         self.bff = cfg[CONF_BFF]
+        # tenant/countryId per-marchio (default = Omoda/Jaecoo). `cfg` parte da DEFAULTS, quindi
+        # gli entry esistenti (senza queste chiavi) restano sui valori storici.
+        self.tenant_code = str(cfg.get(CONF_TENANT_CODE, DEFAULTS[CONF_TENANT_CODE]))
+        self.country_id = str(cfg.get(CONF_COUNTRY_ID, DEFAULTS[CONF_COUNTRY_ID]))
         self.email = cfg.get(CONF_EMAIL, "")
         # login via SMS (alternativa all'email): se il telefono è valorizzato, la
         # riautenticazione userà il ramo mobile. area_code = prefisso in cifre.
@@ -1064,6 +1069,8 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             tsp_host=self.tsp_host,
             bff=self.bff,
             channel_id=self.channel_id,
+            tenant_code=self.tenant_code,
+            country_id=self.country_id,
             mint_taskid=os.environ.get("OMODA_MINT_TASKID", "1") not in ("0", "", "false", "no"),
             # Capability della vettura con nomi NEUTRI: `core/` è autonomo e non importa nulla
             # dal package padre, quindi non può conoscere le chiavi `DATA_*` di const.py.
