@@ -199,10 +199,14 @@ rule ships with the thing that holds it up rather than with a request to remembe
 
 ## The commands
 
-`master` is protected: no direct pushes. Everything below assumes the remote is
-called `origin`. Replace `<name>` placeholders.
+`master` is protected and it is the only long-lived branch. There is no `develop`:
+everything is cut from `master` and comes back to it as a pull request. Nobody pushes to
+it, including the people who could. Replace `<name>` placeholders.
 
-**Once, to get set up**
+**Once, to get set up. Which of the two you are decides everything after it.**
+
+*If you have write access here* (you are one of the maintainers), clone the repository
+itself and work in branches of it:
 
 ```bash
 git clone https://github.com/chery-connect-ha/omoda9-ha.git
@@ -210,23 +214,42 @@ cd omoda9-ha
 gh auth status || gh auth login     # the GitHub CLI, for pull requests
 ```
 
-**Start a piece of work — always from an up-to-date `master`**
+*If you do not* (you are contributing from outside, which is the normal case), you cannot
+push a branch here at all. Fork first, and keep a second remote pointing at this
+repository so you can stay current with it:
 
 ```bash
-git fetch origin
-git switch -c fix/<short-name> origin/master
+gh repo fork chery-connect-ha/omoda9-ha --clone     # creates your fork and clones it
+cd omoda9-ha
+git remote -v                                       # origin = your fork, upstream = here
+```
+
+**Do not commit on the `master` of your fork.** It is the one mistake that costs you
+something you cannot undo cheaply: a pull request opened from `master` follows that branch,
+so every later commit you make lands inside the open pull request, and you can have only
+one going at a time. Branch, always, even for a single file.
+
+**Start a piece of work: always from an up-to-date `master`, never from your own.**
+
+```bash
+git fetch upstream                                  # or `origin` if you cloned directly
+git switch -c fix/<short-name> upstream/master      # or `origin/master`
 ```
 
 Name it for the behaviour, not the file: `fix/charge-energy-undercount`, not
 `fix/coordinator`.
 
-**Keep it current while it is open — not only when it conflicts**
+**Keep it current while it is open, not only when it conflicts**
 
 ```bash
-git fetch origin
-git merge origin/master
+git fetch upstream                                  # or `origin` if you cloned directly
+git merge upstream/master                           # or `origin/master`
 git push
 ```
+
+This is not tidiness. `master` requires a branch to be current before it can be merged, so
+a branch that sits behind is not mergeable no matter how green its checks are, and the
+person who finds out is you, at the end.
 
 Do this whenever `master` has moved and your branch has been open more than a day
 or two. Conflicts are the obvious reason and the least important one. The real

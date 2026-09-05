@@ -198,6 +198,19 @@ question as who can review what.
 
 ## The mechanics
 
+**If this is your first change here, start with the shape of the repository, because
+getting it wrong costs you a rewrite rather than a correction.** There is one long-lived
+branch, `master`, and no `develop`. It is protected: nobody pushes to it, maintainers
+included, and everything arrives as a pull request. If you are contributing from outside,
+you cannot push a branch here at all, so you fork first and open the pull request from
+your fork.
+
+The part people get wrong, and it has already happened here: **do not commit on the
+`master` of your own fork.** Make a branch, even for a one-file change. A pull request
+opened from `master` follows that branch, so anything else you commit afterwards lands
+inside the open pull request, and you are limited to one at a time. `AGENTS.md` has the
+exact commands for both cases, fork and clone.
+
 If you are working with a coding agent — and most of us are — point it at
 [`AGENTS.md`](AGENTS.md) before it touches anything. It carries the invariants
 above plus the literal git and GitHub commands for branching, opening a pull
