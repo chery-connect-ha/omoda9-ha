@@ -34,6 +34,7 @@ from .const import (
     DOMAIN, CAR_SEED, DEFAULT_AWAKE_WINDOW, DEFAULT_SESSION_EVERY, CERT_FILES,
     CONF_VIN, CONF_TUSERID, CONF_PIN, CONF_EMAIL, CONF_CERTS_SRC,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
+    CONF_LANGUAGE, LANGUAGE_FALLBACK,
     CONF_BFF, CONF_TSP_HOST, CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, CONF_CHANNEL_ID,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING, DEFAULT_POLL_NORMAL_MIN,
     DEFAULT_POLL_CHARGING_MIN, POLL_WAKE_WAIT, COMMAND_SETTLE_S, COMMAND_QUEUE_WAIT,
@@ -277,6 +278,8 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # riautenticazione userà il ramo mobile. area_code = prefisso in cifre.
         self.phone = cfg.get(CONF_PHONE, "")
         self.area_code = str(cfg.get(CONF_AREA_CODE, DEFAULT_AREA_CODE) or DEFAULT_AREA_CODE)
+        # lingua (Accept-Language): assente negli entry esistenti → it-IT (comportamento storico)
+        self.language = str(cfg.get(CONF_LANGUAGE) or LANGUAGE_FALLBACK)
 
         # identità veicolo per il device HA. Priorità: override manuale (opzioni) →
         # valore salvato in entry.data (config flow / backfill) → None (→ fallback in entity.py).
@@ -1052,6 +1055,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             email=self.email,
             phone=self.phone,
             area_code=self.area_code,
+            language=self.language,
             token_path=self.token_path,
             # taskId nella config dir per-VIN: sopravvive agli update HACS e non è
             # condiviso fra veicoli.

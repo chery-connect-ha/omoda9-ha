@@ -1,0 +1,72 @@
+name: Bug report
+description: Something the integration does wrong, or stopped doing
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before anything else: **remove your VIN, tokens, certificates and account
+        id** from anything you paste. They appear in logs more often than you
+        would expect. `<redacted>` is a perfectly good value.
+
+  - type: dropdown
+    id: model
+    attributes:
+      label: Car
+      description: What this was observed on. It decides who can reproduce it.
+      options:
+        - Omoda 9
+        - Omoda 5 / E5
+        - Omoda 7
+        - Jaecoo 7
+        - Jaecoo 5 / J5
+        - Other Chery-platform car (say which below)
+    validations:
+      required: true
+
+  - type: input
+    id: region
+    attributes:
+      label: Country / region
+      placeholder: IT, UK, DK, …
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Integration and Home Assistant versions
+      placeholder: "integration v1.13.0, HA 2026.7.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you expected, and what happened
+      description: |
+        Times help more than anything else — wall-clock, to the second, for what
+        you sent and for what you saw.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: official_app
+    attributes:
+      label: Does the official app manage it?
+      description: >
+        This separates "the car cannot" from "we ask wrongly", and it is usually
+        the fastest thing in the whole report.
+      options:
+        - "Yes — the official app does it fine"
+        - "No — the official app fails too"
+        - "Not tested"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (redacted)
+      description: Debug logs for the integration, with identifiers removed.
+      render: text
