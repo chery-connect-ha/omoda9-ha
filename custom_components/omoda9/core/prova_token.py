@@ -86,6 +86,60 @@ def build_params_mobile(phone, area, code, codefmt="plain"):
     }
 
 
+def build_params_password(username, password, is_phone=False, area="39"):
+    """ROPC (grant_type=password): login con USERNAME + PASSWORD, senza OTP né captcha.
+
+    `username` è l'identificatore GREZZO (e-mail oppure numero), NON la forma composita
+    `APP-LOGIN@…` che usa l'OTP. La password è cifrata AES-128-CBC (`A.aes_cbc_password`) e va nel
+    BODY con `needDecode=1`: il server la decifra. Verificato dal vivo (2026-08-24): conia il
+    token dell'account REALE, lo stesso del login e-mail.
+
+    ⚠️ La password è una CREDENZIALE: cifrata prima di partire (mai in chiaro nei parametri), mai
+    in un log (solo la sua lunghezza) né in entry.data. Si conia il token UNA volta e da lì la
+    sessione vive sul refresh_token, come per l'OTP — la password non viene conservata."""
+    p = {"username": username, "password": A.aes_cbc_password(password), "grant_type": "password",
+         "scope": "server", "needDecode": "1"}
+    if is_phone:
+        p["loginType"] = "mobile"
+        p["areaCode"] = area
+    else:
+        p["loginType"] = "email"
+    return p
+
+
+def call_password(username, password, is_phone=False, area="39", verbose=True):
+    """Conia il token via ROPC (username+password). Ritorna (status, json, token)."""
+    params = build_params_password(username, password, is_phone, area)
+    H = A.headers_post(TOKEN_PATH, secret=A.SIGN_SECRET, **_dept(area))
+    # ⚠️ Parametri nel BODY (`data=`), NON in query. Due ragioni che coincidono: (1) il server
+    # accetta la password solo così — è nel body che la DECIFRA (verificato dal vivo 2026-08-24:
+    # la password cifrata mandata in query è rifiutata «utente/password errati», perché la query
+    # non decifra); (2) privacy — la credenziale è già cifrata AES-CBC E fuori dalla URL, quindi
+    # non può finire nel messaggio di un'eccezione `urllib3` (→ stderr → `session` → i log di
+    # Home Assistant che l'utente allega alle issue) né nei log d'accesso di Chery.
+    # Il try/except resta come buona educazione: un errore di rete non deve uscire come traceback
+    # grezzo, e `str(e)` non si logga comunque (solo la CLASSE dell'eccezione).
+    try:
+        r = requests.post(A.BFF + TOKEN_PATH, data=params, headers=H, timeout=20)
+    except requests.RequestException as e:
+        if verbose:
+            print(f"[login password pwd_len={len(password)}] errore di rete: {type(e).__name__}")
+        return 0, {"key": "network.error",
+                   "msg": f"errore di rete durante il login ({type(e).__name__})"}, None
+    try:
+        j = r.json()
+    except Exception:
+        j = {"_raw": r.text[:300]}
+    tok = j.get("access_token") or (j.get("data") or {}).get("access_token")
+    if verbose:
+        # ⚠️ La password NON si logga: solo la sua lunghezza. Identità mascherata con helper
+        # ORDINE-INDIPENDENTI (non la composita), token redatti. Questo stdout finisce in HA.
+        who = mask.numero_con_prefisso(username, area) if is_phone else mask.indirizzo_email(username)
+        print(f"[login password user={who} pwd_len={len(password)}] HTTP {r.status_code}")
+        print("  resp:", json.dumps(_redact(j), ensure_ascii=False)[:400])
+    return r.status_code, j, tok
+
+
 def call(email, code, secret="prod", emailfmt="module", codefmt="plain", verbose=True,
          phone="", area="39"):
     sec = {"prod": A.SIGN_SECRET, "test": A.SIGN_SECRET_TEST}.get(secret)
@@ -159,20 +213,32 @@ if __name__ == "__main__":
     code = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("OMODA_OTP", "")
     phone = os.environ.get("OMODA_PHONE", "")
     area = os.environ.get("OMODA_AREA", "39")
-    # login via SMS: serve (telefono + codice); via email: (email + codice)
-    if not code or not (phone or email):
-        # ⚠️ Sentinella e motivo anche qui. Prima questo ramo stampava il solo testo d'uso, e
-        # `session._riga_utile` — che cerca l'ultima riga significativa — mostrava all'utente
-        # una frase a caso di quel testo come «motivo del rifiuto del codice». È lo stesso
-        # difetto già corretto nel gemello `login_omoda.py`, che qui era rimasto.
-        print(__doc__)
-        print("MOTIVO: manca il codice OTP oppure l'identità (numero o e-mail)")
-        print("RESULT: FAIL")
-        sys.exit(1)
-    secret  = sys.argv[3] if len(sys.argv) > 3 else "prod"
-    emailfmt= sys.argv[4] if len(sys.argv) > 4 else "module"
-    codefmt = sys.argv[5] if len(sys.argv) > 5 else "plain"
-    sc, j, tok = call(email, code, secret, emailfmt, codefmt, phone=phone, area=area)
+    # login con PASSWORD (ROPC): la password arriva SOLO dall'ambiente (mai in argv → mai in
+    # `ps`/`/proc/<pid>/cmdline`), è usata una volta per coniare il token e non viene conservata.
+    password = os.environ.get("OMODA_PASSWORD", "")
+    if password:
+        is_phone = bool(phone)
+        username = phone if is_phone else email
+        if not username:
+            print("MOTIVO: manca l'identità (numero o e-mail) per il login con password")
+            print("RESULT: FAIL")
+            sys.exit(1)
+        sc, j, tok = call_password(username, password, is_phone=is_phone, area=area)
+    else:
+        # login via SMS: serve (telefono + codice); via email: (email + codice)
+        if not code or not (phone or email):
+            # ⚠️ Sentinella e motivo anche qui. Prima questo ramo stampava il solo testo d'uso, e
+            # `session._riga_utile` — che cerca l'ultima riga significativa — mostrava all'utente
+            # una frase a caso di quel testo come «motivo del rifiuto del codice». È lo stesso
+            # difetto già corretto nel gemello `login_omoda.py`, che qui era rimasto.
+            print(__doc__)
+            print("MOTIVO: manca il codice OTP oppure l'identità (numero o e-mail)")
+            print("RESULT: FAIL")
+            sys.exit(1)
+        secret  = sys.argv[3] if len(sys.argv) > 3 else "prod"
+        emailfmt= sys.argv[4] if len(sys.argv) > 4 else "module"
+        codefmt = sys.argv[5] if len(sys.argv) > 5 else "plain"
+        sc, j, tok = call(email, code, secret, emailfmt, codefmt, phone=phone, area=area)
     if tok:
         # scrittura atomica: tmp + rename (token.json mai troncato se il processo muore)
         tmp = _TOKEN_OUT + ".tmp"
