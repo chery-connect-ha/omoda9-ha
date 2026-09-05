@@ -224,7 +224,7 @@ o telefono) + OTP. Catena orchestrata dal config flow (codice in
 |---|---|---|
 | invio OTP (email) | `login_omoda.py invia <email>` | risolve il captcha del gateway (§2) e fa partire il codice via **email** |
 | invio OTP (SMS) | `login_omoda.py invia-sms <numero-senza-prefisso> <prefisso>` | idem via `sendSmsCode` — l'unico endpoint dietro un WAF Aliyun che filtra sull'**impronta TLS**, gestito da `tls_client.py` |
-| conio token | `prova_token.py <email> <code>` | chiama `/auth/oauth2/token` replicando l'app (cifratura SM4) e salva il token. Per gli account col numero l'identità è la composita `APP-LOGIN@<numero>_<area>` |
+| conio token | `prova_token.py <email> <code>` | chiama `/auth/oauth2/token` replicando l'app (cifratura SM4) e salva il token. Per gli account col numero l'identità è la composita `APP-LOGIN@<area>_<numero>` (prima il prefisso, poi il numero — confermato in `UserService::phoneVerifyLogin`) |
 | orchestrazione | `session.py` | espone `request_otp()` / `confirm_otp(code)` / `check()` / `refresh()` |
 
 Il **PIN non c'entra con l'accesso**: è l'OTP a coniare il token, il PIN firma

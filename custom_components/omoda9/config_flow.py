@@ -35,6 +35,7 @@ from homeassistant.helpers.selector import (
 from .const import (
     DOMAIN, CONF_EMAIL, CONF_PIN, CONF_VIN, CONF_TUSERID,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
+    CONF_PASSWORD, CONF_LOGIN_METHOD, LOGIN_METHOD_PASSWORD,
     CONF_LANGUAGE, DEFAULT_LANGUAGE, LANGUAGES,
     CONF_BFF, CONF_TSP_HOST, CONF_CERTS_SRC, CONF_CHANNEL_ID,
     CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, DEFAULTS,
@@ -70,6 +71,22 @@ def _clear_pin_lockout(hass: HomeAssistant, entry_id: str) -> None:
 def _pending_token_path(hass: HomeAssistant) -> str:
     """Path temporaneo dove conia il token finché non si conosce il VIN."""
     return hass.config.path(f"{DOMAIN}_pending_token.json")
+
+
+def _pending_token_minted(hass: HomeAssistant) -> bool:
+    """True se un token è stato davvero SCRITTO (OTP valido), anche quando `confirm_otp` ha poi
+    riportato un fallimento perché il login post-conio non è riuscito — di norma perché l'account
+    NON ha veicoli. Serve a distinguere «codice sbagliato» (nessun token) da «codice giusto ma
+    niente auto sull'account»: il primo è `otp_invalid`, il secondo `no_vehicle`, e finché non li
+    si separava un login sull'account sbagliato usciva come «OTP non valido», mandando l'utente a
+    ricontrollare all'infinito un codice che era corretto."""
+    try:
+        with open(_pending_token_path(hass), encoding="utf-8") as fh:
+            tok = json.load(fh)
+    except Exception:  # noqa: BLE001
+        return False
+    d = tok.get("data", tok) if isinstance(tok, dict) else {}
+    return bool(d.get("access_token") if isinstance(d, dict) else None)
 
 
 def _reason_line(detail: str | None) -> str:
@@ -141,11 +158,11 @@ _MAX_CIFRE_PREFISSO = 3          # E.164: i prefissi paese hanno 1, 2 o 3 cifre.
 
 def _normalizza_telefono(numero: str | None, prefisso: str | None) -> tuple[str, str]:
     """Ripulisce numero e prefisso UNA VOLTA SOLA, qui: da qui in poi viaggiano in entry.data,
-    nell'ambiente dei sottoprocessi e nell'identità `APP-LOGIN@<num>_<area>`, e a valle nessuno
+    nell'ambiente dei sottoprocessi e nell'identità `APP-LOGIN@<area>_<num>`, e a valle nessuno
     li tocca più (`invia_sms` fa solo `lstrip("+")` + spazi, `build_params_mobile` altrettanto).
 
     Cose che la gente scrive davvero e che senza questo passaggio arrivano storte al server:
-      * numero copiato dalla rubrica col prefisso già dentro → identità `APP-LOGIN@39<num>_39`;
+      * numero copiato dalla rubrica col prefisso già dentro → identità `APP-LOGIN@39_39<num>`;
       * separatori dentro il numero: spazi, punti, trattini;
       * prefisso scritto `+39` o `0039` → `areaCode="+39"`, che il server non riconosce;
       * zero di accesso nazionale davanti al numero (Regno Unito, Germania, Francia…).
@@ -276,6 +293,15 @@ def _mint_token(hass: HomeAssistant, data: dict, code: str) -> tuple[bool, str]:
     """Conia il token dal codice OTP (executor) → core.session.confirm_otp (salva nel pending)."""
     from .core import session as SESSION
     return SESSION.confirm_otp(_ctx_del_flow(hass, data), code)
+
+
+def _mint_password(hass: HomeAssistant, data: dict, password: str) -> tuple[bool, str]:
+    """Conia il token con username+password (executor) → core.session.login_with_password.
+
+    La password NON è in `data` (né finirà mai in entry.data): arriva a parte e viene passata al
+    sottoprocesso solo via ambiente. Salva il token nel percorso "pending" come il ramo OTP."""
+    from .core import session as SESSION
+    return SESSION.login_with_password(_ctx_del_flow(hass, data), password)
 
 
 def _discover(hass: HomeAssistant, data: dict) -> tuple[bool, str, list[str], str]:
@@ -411,13 +437,14 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data.update(values)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
-        """Scelta del metodo di accesso: e-mail oppure numero di telefono (SMS).
+        """Scelta del metodo di accesso: e-mail (OTP), telefono (SMS OTP) o password.
 
-        Alcuni account Omoda/Jaecoo sono registrati col NUMERO e non hanno e-mail: per loro
-        il login e-mail fallisce. Il ramo telefono manda un codice via SMS."""
+        Alcuni account sono registrati col NUMERO e non hanno e-mail: per loro il login e-mail
+        fallisce e serve il ramo SMS. Il ramo PASSWORD (username+password, senza codici) è il più
+        comodo per chi ha impostato una password sull'account."""
         return self.async_show_menu(
             step_id="user",
-            menu_options=["login_email", "login_phone"],
+            menu_options=["login_email", "login_phone", "login_password"],
         )
 
     async def _submit_login(self, user_input: dict[str, Any], step_id: str, schema):
@@ -456,6 +483,55 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="login_email", data_schema=schema,
                                     description_placeholders={"reason": ""})
 
+    async def async_step_login_password(self, user_input: dict[str, Any] | None = None):
+        """Login con e-mail + password (ROPC), SENZA OTP: conia il token e scopre il VIN in un
+        colpo solo.
+
+        La password è una credenziale usa-e-getta: non entra in `self._data` e non viene mai
+        salvata nell'entry. Da qui la sessione vive sul `refresh_token`, come per l'OTP; se un
+        giorno access e refresh muoiono entrambi, la reauth richiede di nuovo la password
+        (riconosciuta dal marcatore `CONF_LOGIN_METHOD`)."""
+        schema = vol.Schema({
+            vol.Required(CONF_EMAIL): str,
+            vol.Required(CONF_PIN): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            vol.Required(CONF_PASSWORD): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            **self._region_fields(),
+        })
+        errors: dict[str, str] = {}
+        reason = ""
+        if user_input is not None:
+            password = user_input.get(CONF_PASSWORD, "")
+            # ⚠️ la password NON entra nei dati dell'entry: la si toglie subito e la si passa a parte
+            self._data.update({k: v for k, v in user_input.items() if k != CONF_PASSWORD})
+            ok, msg = await self.hass.async_add_executor_job(
+                _mint_password, self.hass, self._data, password)
+            if ok:
+                d_ok, tu, vins, detail = await self.hass.async_add_executor_job(
+                    _discover, self.hass, self._data)
+                if not d_ok or not vins:
+                    await self.hass.async_add_executor_job(_cleanup_pending, self.hass)
+                    errors["base"] = "no_vehicle"
+                    reason = _reason_line(detail)
+                    _LOGGER.warning("Omoda9: scoperta veicolo (password) fallita: %s", detail)
+                else:
+                    self._tuserid = tu
+                    self._vins = vins
+                    # marcatore per la reauth (NON la password): dice di richiedere la password
+                    self._data[CONF_LOGIN_METHOD] = LOGIN_METHOD_PASSWORD
+                    if len(vins) == 1:
+                        return await self._create_entry(vins[0])
+                    return await self.async_step_select_vehicle()
+            else:
+                await self.hass.async_add_executor_job(_cleanup_pending, self.hass)
+                errors["base"] = "password_invalid"
+                reason = _reason_line(msg)
+                _LOGGER.warning("Omoda9: login password fallito: %s", msg)
+            # ripropone i campi digitati MA né PIN né PASSWORD (credenziali, campi mascherati)
+            schema = self.add_suggested_values_to_schema(
+                schema, {k: v for k, v in user_input.items() if k not in (CONF_PIN, CONF_PASSWORD)})
+        return self.async_show_form(step_id="login_password", data_schema=schema, errors=errors,
+                                    description_placeholders={"reason": reason})
+
     async def async_step_login_phone(self, user_input: dict[str, Any] | None = None):
         """Login via SMS: numero di telefono + prefisso internazionale (Italia = 39)."""
         schema = vol.Schema({
@@ -488,7 +564,13 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ok, msg = await self.hass.async_add_executor_job(
                 _mint_token, self.hass, self._data, user_input["code"].strip()
             )
-            if ok:
+            # Anche se `confirm_otp` riporta KO, il token può ESSERE stato coniato (OTP valido):
+            # a fallire è allora il login post-conio, di norma perché l'account non ha veicoli.
+            # Distinguo i due casi dal fatto che un token sia stato scritto, così un login
+            # sull'account sbagliato non esce più come «OTP non valido».
+            minted = ok or await self.hass.async_add_executor_job(
+                _pending_token_minted, self.hass)
+            if minted:
                 d_ok, tu, vins, detail = await self.hass.async_add_executor_job(
                     _discover, self.hass, self._data
                 )
@@ -505,7 +587,7 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         return await self._create_entry(vins[0])
                     return await self.async_step_select_vehicle()
             else:
-                # OTP errato/scaduto: butta il pending eventualmente già scritto.
+                # Nessun token scritto → il CODICE è stato davvero rifiutato (errato/scaduto).
                 await self.hass.async_add_executor_job(_cleanup_pending, self.hass)
                 errors["base"] = "otp_invalid"
                 reason = _reason_line(msg)
@@ -716,6 +798,9 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         entry, coordinator = self._reauth_targets()
         if entry is None or coordinator is None:
             return self.async_abort(reason="reauth_no_entry")
+        # Account con login PASSWORD: la reauth re-inserisce la password (niente OTP/captcha).
+        if entry.data.get(CONF_LOGIN_METHOD) == LOGIN_METHOD_PASSWORD:
+            return await self.async_step_reauth_password()
         # La terza voce compare SOLO agli account SMS e SOLO se il ripiego non c'è già: è un
         # rimedio, non un passaggio obbligato, e va offerto come scelta esplicita perché costa
         # uno scaricamento. Prima l'installazione partiva da sola all'inizio del login e del
@@ -734,6 +819,37 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={"email": self._login_identity(entry),
                                       "reason": self._reauth_reason},
         )
+
+    async def async_step_reauth_password(self, user_input: dict[str, Any] | None = None):
+        """Reauth degli account password: re-inserire la password conia un token nuovo.
+
+        La password resta usa-e-getta: si passa a `coordinator._login_with_password` e non viene
+        salvata. Nessun OTP, nessun captcha — un solo campo."""
+        entry, coordinator = self._reauth_targets()
+        if entry is None or coordinator is None:
+            return self.async_abort(reason="reauth_no_entry")
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            password = (user_input.get(CONF_PASSWORD) or "").strip()
+            if not password:
+                errors["base"] = "password_required"
+            else:
+                ok, detail = await self.hass.async_add_executor_job(
+                    coordinator._login_with_password, password)
+                if ok:
+                    return self.async_update_reload_and_abort(entry, data=entry.data)
+                self._reauth_reason = _reason_line(detail)
+                errors["base"] = "password_invalid"
+                _LOGGER.warning("Omoda9: reauth password fallita: %s", detail)
+        return self.async_show_form(
+            step_id="reauth_password",
+            data_schema=vol.Schema({
+                vol.Required(CONF_PASSWORD): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+            }),
+            errors=errors,
+            description_placeholders={"email": self._login_identity(entry),
+                                      "reason": self._reauth_reason})
 
     async def async_step_install_fallback(self, user_input: dict[str, Any] | None = None):
         """Installa il client TLS di ripiego, su richiesta esplicita dell'utente.

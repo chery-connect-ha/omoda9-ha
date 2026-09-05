@@ -228,7 +228,7 @@ if __name__ == "__main__":
         # ⚠️ Il conio del token per gli account SMS NON si fa da qui. Le combinazioni che
         # `_combos_sms` prova (numero nudo, codice in chiaro, parametri in query) sono quelle
         # tentate PRIMA di sapere come funziona davvero, e il server le rifiuta tutte: la forma
-        # buona — identità composita `APP-LOGIN@<num>_<area>`, codice cifrato SM4, parametri
+        # buona — identità composita `APP-LOGIN@<area>_<num>`, codice cifrato SM4, parametri
         # nel body — è in `prova_token.build_params_mobile`, ricavata decompilando l'app e
         # confermata dal vivo. Lasciare qui un sottocomando che non può funzionare significa
         # che chi lo usa per diagnosticare conclude «il server rifiuta il mio codice».
