@@ -16,6 +16,7 @@
           "preset": "Preset marchio / regione",
           "email": "Email dell'account",
           "pin": "PIN di controllo veicolo",
+          "language": "Lingua (e-mail / SMS OTP)",
           "bff": "Endpoint BFF (regione)",
           "tenant_code": "Tenant code (avanzato)",
           "country_id": "Country ID (avanzato)",
@@ -37,6 +38,7 @@
           "phone": "Numero di telefono (senza prefisso)",
           "area_code": "Prefisso internazionale in cifre (es. 39)",
           "pin": "PIN di controllo veicolo",
+          "language": "Lingua (e-mail / SMS OTP)",
           "bff": "Endpoint BFF (regione)",
           "tenant_code": "Tenant code (avanzato)",
           "country_id": "Country ID (avanzato)",
@@ -167,6 +169,9 @@
   },
   "entity": {
     "binary_sensor": {
+      "a_casa": {
+        "name": "A casa"
+      },
       "alta_tensione_attiva": {
         "name": "Alta tensione attiva"
       },
@@ -357,6 +362,12 @@
       },
       "dati_auto_aggiornati": {
         "name": "Dati auto aggiornati"
+      },
+      "energia_ricarica_a_casa": {
+        "name": "Energia ricarica a casa"
+      },
+      "energia_ricarica_fuori_casa": {
+        "name": "Energia ricarica fuori casa"
       },
       "esito_comando": {
         "name": "Esito comando"
