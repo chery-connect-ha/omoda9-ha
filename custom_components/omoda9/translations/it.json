@@ -105,7 +105,7 @@
     "error": {
       "otp_send_failed": "Impossibile inviare il codice. Controlla email/telefono e PIN e riprova.",
       "otp_invalid": "Codice OTP non valido o scaduto.",
-      "no_vehicle": "Login riuscito ma nessun veicolo trovato su questo account.",
+      "no_vehicle": "Accesso riuscito, ma questo account non ha veicoli. Se l'auto è registrata su un altro accesso (es. la tua e-mail), usa quello.",
       "pin_required": "Inserisci il PIN di controllo veicolo.",
       "otp_required": "Inserisci il codice che hai ricevuto.",
       "phone_invalid": "Questo numero non sembra giusto. Scrivi solo le cifre del numero, senza prefisso internazionale e senza spazi; nell'altro campo metti solo le cifre del prefisso (Italia = 39).",

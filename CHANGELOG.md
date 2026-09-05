@@ -20,6 +20,9 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Un dato incompleto non fa più comparire un numero sbagliato.** Se in una lettura manca
   il valore di confronto, quel sensore tiene l'ultimo numero buono invece di mostrarne uno
   che potrebbe essere falso — e che sarebbe rimasto lì fino alla lettura dopo.
+- **Il login via SMS ora funziona, anche per gli account registrati solo col numero.** Chi accedeva col numero di telefono invece che con l'email otteneva sempre un errore, anche col codice giusto: l'integrazione componeva l'identità dell'account **nell'ordine sbagliato** (prefisso e numero invertiti) e coniava un token per un account fantasma vuoto, senza veicoli. Ora l'ordine è quello corretto — confermato sia dal vivo sia leggendo il programma dell'app ufficiale — e il login via SMS raggiunge il tuo account reale, con la tua auto.
+- **Un messaggio chiaro quando l'account non ha un'auto.** Se il codice era corretto ma su quell'account non risulta nessun veicolo, prima compariva «codice non valido», mandandoti a ricontrollare un OTP che invece andava benissimo. Adesso te lo diciamo com'è davvero: il codice è giusto, ma non c'è un'auto collegata a quell'account.
+- **Numero di telefono più protetto nei file di diagnostica.** La regola che nasconde il numero nei log è stata resa più robusta, così non può sfuggire per un caso di forma inattesa: nel dubbio nasconde di più, mai di meno.
 
 ### 🇬🇧 English
 
@@ -33,6 +36,9 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **An incomplete reading no longer produces a wrong number.** When the value needed for
   that comparison is missing, the sensor keeps the last good number instead of showing one
   that might be false — and that would have stayed on screen until the next reading.
+- **SMS sign-in now works, including for accounts registered with a phone number only.** Signing in with a phone number instead of an email always failed, even with the right code: the integration built the account identity **in the wrong order** (area code and number swapped) and minted a token for an empty phantom account with no vehicles. The order is now correct — confirmed both live and by reading the official app — so SMS sign-in reaches your real account and your car.
+- **A clear message when the account has no car.** If the code was correct but that account has no vehicle on it, it used to say "invalid code", sending you to re-check an OTP that was actually fine. Now it tells you what is really going on: the code is right, but there is no car linked to that account.
+- **Safer phone-number redaction in the diagnostics file.** The rule that hides the number in logs was hardened so it cannot slip through on an unexpected shape: when in doubt it masks more, never less.
 
 ## v1.13.0 — 2026-08-10
 
