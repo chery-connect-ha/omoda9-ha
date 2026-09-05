@@ -14,31 +14,43 @@
         "title": "Sign in with email",
         "description": "Enter your Omoda/Jaecoo account email and vehicle PIN. An OTP code will be sent to your email; VIN and account ID are detected automatically.{reason}",
         "data": {
+          "preset": "Brand / region preset",
           "email": "Account email",
           "pin": "Vehicle control PIN",
           "language": "Language (OTP emails / SMS)",
           "bff": "BFF endpoint (region)",
+          "tenant_code": "Tenant code (advanced)",
+          "country_id": "Country ID (advanced)",
           "tsp_host": "TSP console host (region)",
           "car_mqtt_host": "Vehicle MQTT broker host (region)",
           "car_mqtt_port": "Vehicle MQTT broker port (region)",
           "channel_id": "Channel ID (region)",
           "certs_src": "Folder with mutual-TLS certs to import (optional)"
+        },
+        "data_description": {
+          "preset": "Omoda/Jaecoo (Europe) and Chery (Europe) fill in everything automatically. Choose Custom to set the BFF endpoint, tenant code, country/channel IDs, MQTT host and certs by hand for any other region or brand."
         }
       },
       "login_phone": {
         "title": "Sign in with phone (SMS)",
         "description": "Enter the phone number registered on your Omoda/Jaecoo account, its country code (Italy = 39, without +) and the vehicle PIN. A verification code will be sent by SMS; VIN and account ID are detected automatically.{reason}",
         "data": {
+          "preset": "Brand / region preset",
           "phone": "Phone number (without country code)",
           "area_code": "Country code in digits (e.g. 39)",
           "pin": "Vehicle control PIN",
           "language": "Language (OTP emails / SMS)",
           "bff": "BFF endpoint (region)",
+          "tenant_code": "Tenant code (advanced)",
+          "country_id": "Country ID (advanced)",
           "tsp_host": "TSP console host (region)",
           "car_mqtt_host": "Vehicle MQTT broker host (region)",
           "car_mqtt_port": "Vehicle MQTT broker port (region)",
           "channel_id": "Channel ID (region)",
           "certs_src": "Folder with mutual-TLS certs to import (optional)"
+        },
+        "data_description": {
+          "preset": "Omoda/Jaecoo (Europe) and Chery (Europe) fill in everything automatically. Choose Custom to set the BFF endpoint, tenant code, country/channel IDs, MQTT host and certs by hand for any other region or brand."
         }
       },
       "otp": {
