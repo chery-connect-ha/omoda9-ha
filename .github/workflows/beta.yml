@@ -1,134 +1,79 @@
 name: Beta
 
-# Una pre-release INSTALLABILE tagliata da una pull request, per farla provare su
-# un'auto vera prima che il cambiamento entri.
+# An INSTALLABLE pre-release cut from `master`, so the assembled thing can be tried on a
+# real car before it is declared stable.
 #
-# Perché esiste. Il gate di questo progetto non è il merge ma la STABILE, e la
-# review di chi non programma è la prova sul campo sulla propria auto. Perché
-# quella regola sia esigibile, chi ha l'auto deve poter installare la PR — e fino
-# a oggi non poteva: `hacs.json` dichiara `zip_release`, quindi HACS installa solo
-# da una release che porta allegato `omoda9.zip`, e quell'asset veniva costruito e
-# caricato a mano una volta per release. L'unica strada era scaricare un branch e
-# copiare i file in `custom_components/` a mano: esattamente la barriera che tiene
-# fuori le persone la cui review vale di più.
+# Why it exists. The gate of this project is not the merge but the STABLE release, and the
+# review of someone who does not program is the field test on their own car. For that rule
+# to be exigible, the person with the car has to be able to install the code — and until
+# this workflow existed they could not: `hacs.json` declares `zip_release`, so HACS installs
+# only from a release carrying an `omoda9.zip` asset, and that asset was built and uploaded
+# by hand once per release. The only other route was cloning a branch and copying files into
+# `custom_components/` — exactly the barrier that filters out the people whose review is
+# worth most.
 #
-# Come si avvia: si mette l'etichetta `beta` sulla PR. Due tocchi dal browser di un
-# telefono — è deliberato, perché chi deve poterla chiedere non sempre ha un
-# computer sotto mano. `workflow_dispatch` resta come uscita di sicurezza.
+# WHY ONLY FROM `master`, AND NOT FROM A PULL REQUEST. This was tried the other way first,
+# on 24 August 2026: four pre-releases cut from four different branches, numbered beta.1 to
+# beta.4. It does not work, and the reason is in HACS itself
+# (`custom_components/hacs/repositories/base.py`, lines 1103-1114 and 385-388):
 #
-# E si avvia anche SENZA una PR: `workflow_dispatch` col campo vuoto taglia la beta
-# da `master`. Serve a collaudare l'INSIEME, che è la cosa che una beta per-PR non
-# può fare: quella prova «master di quando ho aperto il branch, più una modifica»,
-# mai le modifiche una accanto all'altra. E i guasti di questo progetto vivono lì —
-# il conteggio delle entità, le tre liste di traduzione che devono coincidere, le
-# capability: sono proprietà CONGIUNTE, che nessuna singola PR esercita. Il ciclo
-# che serve è: si mergia un lotto, si taglia una beta da master, la si prova su
-# un'auto vera, si passa al lotto dopo.
+#     releases = await self.get_releases(prerelease=True, returnlimit=30)   # GET /releases
+#     for release in releases:
+#         if release.draft: continue
+#         elif release.prerelease:
+#             if self.data.prerelease is None:
+#                 self.data.prerelease = release.tag_name    # the FIRST one it meets
+#     ...
+#     if self.data.show_beta and self.data.prerelease is not None:
+#         available = self.data.prerelease
 #
-# Chi può avviarla: solo chi ha accesso in scrittura, perché è GitHub a decidere
-# chi può etichettare. I tester non avviano niente: ricevono un link e installano.
+# `GET /releases` returns newest-created first, and HACS never sorts. So HACS offers the
+# most recently PUBLISHED pre-release, not the highest version — the version number does not
+# enter the decision at all. A tester with "show beta versions" on does not choose which
+# build they get: they get the last one published, whatever branch it came from. Cutting
+# betas from branches therefore produces a counter that rises while the content moves
+# sideways: beta.4 contained one pull request and none of the three before it.
+#
+# The consequence, and the rule this file now enforces: every published pre-release must be
+# coherent on its own, and only a build from `master` is. That also happens to be the thing
+# a per-PR beta could never do — test the changes NEXT TO EACH OTHER. The failures of this
+# project live exactly there: the entity count, the three translation lists that must agree,
+# the capabilities. Those are JOINT properties that no single pull request exercises.
+#
+# The cycle this supports: merge a batch, cut a beta from master, try it on a real car, move
+# to the next batch.
+#
+# What was lost with the per-PR build, and is not yet replaced: putting a change written for
+# a car nobody here owns in front of its owner BEFORE it is merged. See the discussion on
+# #43 — it needs a shape that is not a published pre-release of this repository.
+#
+# Who can start it: only people with write access, since only they can run a workflow.
+# Testers start nothing: they receive a link and install.
 
 on:
-  pull_request:
-    types: [opened, labeled]
   workflow_dispatch:
-    inputs:
-      pr:
-        description: "Numero della PR da cui tagliare la beta — vuoto = da master"
-        required: false
-        type: string
 
 permissions:
-  contents: write        # creare il tag e la pre-release
-  pull-requests: write   # scrivere il commento sulla PR
+  contents: write        # create the tag and the pre-release
 
 jobs:
-  # Il meccanismo si annuncia da solo nel momento in cui serve. Una riga in
-  # CONTRIBUTING.md non la rilegge nessuno: chi apre una PR fra due settimane non
-  # saprebbe che la beta si può chiedere, e saremmo di nuovo senza tester.
-  suggerimento:
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action == 'opened' &&
-      github.event.pull_request.user.type != 'Bot'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ricorda come si chiede una beta
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          # Solo se la PR tocca il codice dell'integrazione. Su una PR di soli
-          # documenti il suggerimento sarebbe un falso allarme, e un avviso che
-          # compare quando non serve smette di essere letto quando serve.
-          if ! gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only \
-               | grep -q '^custom_components/'; then
-            echo "PR di soli documenti: nessun suggerimento."
-            exit 0
-          fi
-
-          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body \
-          "Per far provare questa modifica sull'auto di qualcuno, metti l'etichetta \`beta\` a questa PR: esce una pre-release installabile da HACS (*Show beta versions*), e chi ha la vettura giusta può dire se l'auto ha fatto davvero quello che diciamo.
-
-          Serve soprattutto quando il cambiamento riguarda un modello che tu non possiedi: lì la tua prova non può falsificarlo, e la sola review possibile è quella di chi ha quella macchina."
-
   beta:
-    # MAI da un fork. Quello zip finisce installato in istanze Home Assistant che
-    # contengono le credenziali dell'auto di qualcuno, e pubblicato come release del
-    # repo canonico ha tutta l'aria dell'ufficiale. Da un fork la beta la taglia un
-    # membro a mano, dopo aver guardato cosa c'è dentro.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' &&
-       github.event.label.name == 'beta' &&
-       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
-      - name: Risolvi il bersaglio (una PR, oppure master) e rifiuta i fork
+      - name: Resolve the target — the head of master
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          NUM: ${{ github.event.pull_request.number || inputs.pr }}
         run: |
           set -euo pipefail
-
-          # Campo vuoto = build d'insieme da master. Nessuna PR da risolvere e nessun
-          # fork da rifiutare: `master` è per definizione un branch di questo repo, e ci
-          # si arriva solo passando dalla protezione del branch.
-          if [ -z "${NUM:-}" ]; then
-            sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha)
-            {
-              echo "numero="
-              echo "sha=$sha"
-              echo "titolo=tutto quello che è entrato finora"
-              echo "url=https://github.com/$GITHUB_REPOSITORY/commits/master"
-            } >> "$GITHUB_OUTPUT"
-            echo "Build d'insieme da master: $sha"
-            exit 0
-          fi
-
-          dati=$(gh pr view "$NUM" --repo "$GITHUB_REPOSITORY" \
-                 --json headRefOid,headRepository,headRepositoryOwner,title,url)
-          sha=$(echo "$dati"   | jq -r .headRefOid)
-          owner=$(echo "$dati" | jq -r .headRepositoryOwner.login)
-          nome=$(echo "$dati"  | jq -r .headRepository.name)
-          titolo=$(echo "$dati" | jq -r .title)
-          url=$(echo "$dati"   | jq -r .url)
-
-          # Il guard vale anche per workflow_dispatch, dove l'espressione `if` del
-          # job non ha un evento PR da cui leggere il repo di provenienza.
-          if [ "$owner/$nome" != "$GITHUB_REPOSITORY" ]; then
-            echo "::error::La PR #$NUM arriva dal fork $owner/$nome. Le beta si tagliano solo da branch di questo repo."
-            exit 1
-          fi
-
+          # No pull request to resolve and no fork to reject: `master` is by definition a
+          # branch of this repository, and the only way into it is through branch protection.
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha)
           {
-            echo "numero=$NUM"
             echo "sha=$sha"
-            echo "titolo=$titolo"
-            echo "url=$url"
+            echo "titolo=tutto quello che è entrato finora"
           } >> "$GITHUB_OUTPUT"
+          echo "Build d'insieme da master: $sha"
 
       - uses: actions/checkout@v7
         with:
@@ -159,15 +104,14 @@ jobs:
           if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
             piu_alta=$(printf '%s\n%s\n' "$base" "$stabile" | sort -V | tail -1)
             if [ "$base" = "$stabile" ] || [ "$piu_alta" = "$stabile" ]; then
-              echo "::error::Il manifest dichiara $base e l'ultima stabile è $stabile, quindi il tag sarebbe v$base-beta.N — che in semver ordina PRIMA di v$stabile e HACS mostrerebbe come più vecchio di quello che l'utente ha già installato. Alza \`version\` in custom_components/omoda9/manifest.json al numero con cui questa modifica uscirà (es. $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), fai commit sul branch della PR e rimetti l'etichetta \`beta\`."
+              echo "::error::Il manifest dichiara $base e l'ultima stabile è $stabile, quindi il tag sarebbe v$base-beta.N — che in semver ordina PRIMA di v$stabile e HACS mostrerebbe come più vecchio di quello che l'utente ha già installato. Alza \`version\` in custom_components/omoda9/manifest.json al numero con cui questa modifica uscirà (es. $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), mergia, e rilancia questo workflow."
               exit 1
             fi
           fi
 
-          # Il contatore è il primo libero fra i TAG (non fra le release: un tag può
-          # esistere senza release). Due PR che puntano alla stessa versione non
-          # collidono; a distinguerle è il titolo della release, non il tag, così il
-          # tag resta semver pulito e HACS lo ordina correttamente.
+          # The counter is the first free one among the TAGS (not among the releases: a tag
+          # can exist without a release). Since every beta now comes from `master`, the
+          # sequence is cumulative by construction: beta.N+1 contains everything beta.N had.
           esistenti=$(gh api "repos/$GITHUB_REPOSITORY/tags?per_page=100" --paginate --jq '.[].name' \
                       | grep -E "^v${base}-beta\.[0-9]+$" || true)
           n=1
@@ -208,40 +152,15 @@ jobs:
           TAG: ${{ steps.ver.outputs.tag }}
           VERSIONE: ${{ steps.ver.outputs.versione }}
           SHA: ${{ steps.pr.outputs.sha }}
-          NUM: ${{ steps.pr.outputs.numero }}
           TITOLO: ${{ steps.pr.outputs.titolo }}
-          URL: ${{ steps.pr.outputs.url }}
         run: |
           set -euo pipefail
 
-          # Le due modalità chiedono al tester due cose diverse, e la differenza va
-          # detta: da una PR si verifica UNA modifica, da master si verifica che le
-          # modifiche entrate finora reggano INSIEME. Chiedere «funziona?» senza dire
-          # quale delle due si sta guardando è come non chiedere niente.
-          if [ -n "$NUM" ]; then
-            intestazione="Build di prova della PR #${NUM} — **${TITOLO}**
-          ${URL}
-
-          Non è una release: è la PR resa installabile, così chi ha l'auto giusta può
-          dire se la macchina fa davvero quello che la PR dichiara."
-            titolo_release="${VERSIONE} — PR #${NUM}: ${TITOLO}"
-          else
-            stabile=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
-            confronto=""
-            if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
-              confronto="Cosa c'è dentro, rispetto all'ultima stabile:
+          stabile=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
+          confronto=""
+          if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
+            confronto="Cosa c'è dentro, rispetto all'ultima stabile:
           https://github.com/${GITHUB_REPOSITORY}/compare/${stabile}...master"
-            fi
-            intestazione="Build d'insieme da \`master\` — **${TITOLO}**
-
-          Non è una release, e non è una singola modifica: è tutto quello che è entrato
-          finora, provato **insieme**. È la prova che una beta per-PR non può dare, perché
-          quella verifica una modifica alla volta contro un master di giorni prima. Qui si
-          guardano le cose che nascono dalla combinazione: il numero di entità, i nomi che
-          spariscono in una lingua sola, due sensori che si contendono lo stesso campo.
-
-          ${confronto}"
-            titolo_release="${VERSIONE} — insieme, da master"
           fi
 
           # Le note si scrivono su un FILE, non dentro `$( )`. Un heredoc annidato in una
@@ -249,7 +168,14 @@ jobs:
           # rompe in silenzio quando il testo cambia: `--notes-file` prende lo stesso
           # contenuto senza passare dal parser due volte.
           cat > note-beta.md <<EOF
-          ${intestazione}
+          Build d'insieme da \`master\` — **${TITOLO}**
+
+          Non è una release, e non è una singola modifica: è tutto quello che è entrato
+          finora, provato **insieme**. Si guardano le cose che nascono dalla combinazione:
+          il numero di entità, i nomi che spariscono in una lingua sola, due sensori che si
+          contendono lo stesso campo.
+
+          ${confronto}
 
           **Come si installa.** In HACS, sulla scheda di questa integrazione: menù ⋮ →
           *Redownload* → attiva **Show beta versions** → scegli \`${VERSIONE}\` → riavvia
@@ -260,9 +186,8 @@ jobs:
 
           **Cosa serve sapere dopo.** Non "funziona", ma cosa ha fatto l'auto: il campo di
           stato che è cambiato, e l'ora. \`HTTP 200\` e \`operation.successful\` dicono che
-          il backend ha accettato — non che la vettura abbia eseguito. Scrivilo sulla PR,
-          insieme al modello, alla regione e a cosa NON hai potuto provare: anche quello
-          è un risultato.
+          il backend ha accettato — non che la vettura abbia eseguito. Apri una issue col
+          modello, la regione e cosa NON hai potuto provare: anche quello è un risultato.
 
           Commit: \`${SHA}\`
           EOF
@@ -271,23 +196,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$SHA" \
             --prerelease \
-            --title "$titolo_release" \
+            --title "${VERSIONE} — insieme, da master" \
             --notes-file note-beta.md
-
-      - name: Dillo sulla PR
-        # Da master non c'è nessuna PR su cui scriverlo: il link sta nella release, e
-        # chi ha lanciato il workflow lo ha già davanti.
-        if: steps.pr.outputs.numero != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.ver.outputs.tag }}
-          VERSIONE: ${{ steps.ver.outputs.versione }}
-          NUM: ${{ steps.pr.outputs.numero }}
-        run: |
-          set -euo pipefail
-          gh pr comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
-          "**Beta installabile: \`${VERSIONE}\`** → https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}
-
-          In HACS: ⋮ → *Redownload* → **Show beta versions** → \`${VERSIONE}\` → riavvia.
-
-          Chi la prova: dì cosa ha fatto **l'auto** — il campo di stato che è cambiato e l'ora — non che il comando è stato accettato. E dì cosa non hai potuto provare."

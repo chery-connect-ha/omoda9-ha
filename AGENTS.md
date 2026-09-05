@@ -164,11 +164,24 @@ Land it (small pull request, CI green), it ships to volunteers as a
 affected model has run it. Nothing waits on anybody's free time except the last
 step. Full rules in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-A pull request can also be made installable **before** it lands — label it
-`beta` and a pre-release is cut from it. Reach for that whenever the change is
-written for a car you do not own: your instance cannot disprove it, and this is
-what puts it in front of the person whose instance can, while there is still
-time to change it.
+**Pre-releases are cut from `master`, and only from `master`.** A maintainer runs
+`beta.yml`; it builds the head of `master` and publishes `v<version>-beta.N`. The
+sequence is cumulative by construction: beta.N+1 contains everything beta.N had.
+
+This used to work the other way — a `beta` label on a pull request built that branch —
+and it was removed on 5 September 2026 because HACS does not choose the way we assumed.
+It offers the **most recently published** pre-release, not the highest version
+(`hacs/repositories/base.py`, lines 1103-1114 and 385-388: `GET /releases` comes back
+newest-first and is never sorted). So a tester with *Show beta versions* on does not pick
+which build they get, and betas cut from branches make the counter rise while the content
+moves sideways. On 24 August beta.1 to beta.4 came from four different branches; beta.4
+held one pull request and none of the other three.
+
+**What this costs, and it is not yet solved.** There is now no way to put a change in front
+of the person who can disprove it *before* it is merged — which matters most for code
+written for a car nobody here owns, where the author's own instance cannot falsify it.
+If you are writing that kind of change, say so in the pull request and mark it
+`unverified-hardware`; the proof happens after the merge, on the next beta from `master`.
 
 **The version number is not yours to choose.** `manifest.json` carries the number of
 the **next** release, and exactly one pull request ever raises it: the first one opened
@@ -233,17 +246,16 @@ or two. Conflicts are the obvious reason and the least important one. The real
 reason is that **a branch that sits behind loses access to whatever arrived after
 it was cut, and finds out by nothing happening**:
 
-- on 24 August the `beta` label was applied to two pull requests in the same
-  minute. One published a pre-release; the other produced **no workflow run at
-  all and no message**. The workflow had landed on `master` a minute after that
-  branch's last commit;
+- on 24 August, when pre-releases were still cut from branches, the same request was
+  made on two pull requests in the same minute. One published; the other produced **no
+  workflow run at all and no message**, because the workflow had landed on `master` a
+  minute after that branch's last commit — a branch cannot run what it does not have;
 - a stale branch also carries stale CI. A green tick from five days ago says
   nothing about today's `master`, and GitHub may not even have recomputed whether
   the branch still merges.
 
-If you label a pull request and no run appears within a minute, the label did not
-take: push the branch and try again, or use `workflow_dispatch`, which runs from
-the default branch and does not depend on yours.
+A stale branch is also why a green tick proves less than it looks: CI that ran five days
+ago says nothing about today's `master`.
 
 **Save the work**
 
@@ -292,15 +304,17 @@ gh pr edit --add-label unverified-hardware
 **Get it onto a real car, before it lands**
 
 ```bash
-gh pr edit --add-label beta
+gh workflow run beta.yml --repo chery-connect-ha/omoda9-ha
 ```
 
-This publishes a pre-release built from the pull request, installable from HACS
-with *Show beta versions* on. Ask for it whenever the change touches a model
-nobody testing it here owns — including your own author's case, where the change
-is a no-op on your car and therefore unfalsifiable by you. Post the release link
-in the pull request and name who you are asking. Only write access can label, so
-a tester never has to run anything: they get a link.
+This publishes a pre-release built from the head of `master`, installable from HACS with
+*Show beta versions* on — everything merged so far, tried **together**. That is the check
+no single pull request can perform: the entity count, the three translation lists that must
+agree, two sensors contending for one field are all JOINT properties.
+
+Run it after merging a batch, then post the release link where the people with the relevant
+cars will see it and name who you are asking, saying which models the batch touched. Only
+write access can run a workflow, so a tester never has to run anything: they get a link.
 
 A beta is never cut from a fork. If this pull request comes from one, a member
 publishes it by hand after reading what is in it.
@@ -335,7 +349,7 @@ reads as disagreement.
 
 **Cutting a release** (maintainers)
 
-A pre-release from a pull request is the `beta` label — do not do it by hand.
+A pre-release is `gh workflow run beta.yml`, from `master` — do not do it by hand.
 
 For a **stable**, the archive is not optional. `hacs.json` sets `zip_release`
 with `omoda9.zip`, so HACS installs *only* from a release carrying that asset:
