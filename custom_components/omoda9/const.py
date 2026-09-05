@@ -67,6 +67,16 @@ DEFAULT_AREA_CODE = "39"
 CONF_PASSWORD = "password"          # campo del form, transitorio: MAI in entry.data
 CONF_LOGIN_METHOD = "login_method"  # "password" per gli account che accedono con la password
 LOGIN_METHOD_PASSWORD = "password"
+# Lingua delle chiamate al backend: guida l'header `Accept-Language`, che a sua volta decide la
+# lingua di e-mail OTP, SMS e messaggi del server (il backend non ha un parametro `lang` sul
+# codice: comanda l'header). Il valore memorizzato È il valore dell'header (`en-GB`/`it-IT`).
+#   * setup ESISTENTI (nessun campo `language`) → `LANGUAGE_FALLBACK` = it-IT: comportamento
+#     storico invariato;
+#   * setup NUOVI → il dropdown parte da `DEFAULT_LANGUAGE` = en-GB (questo fork è in inglese).
+CONF_LANGUAGE = "language"
+DEFAULT_LANGUAGE = "en-GB"       # default del dropdown per i NUOVI account
+LANGUAGE_FALLBACK = "it-IT"      # entry senza il campo → comportamento storico
+LANGUAGES = {"en-GB": "English", "it-IT": "Italiano"}   # valore-header → etichetta del dropdown
 
 # Identità veicolo per il device HA (nome dinamico: "Omoda 9", "Jaecoo 7"…). `vehicle_name`
 # = nickname/modello dall'app, salvato in entry.data (catturato al config flow o backfillato);
@@ -260,6 +270,17 @@ HV_ON_POLL_MAX = 90     # cap di sicurezza al numero di letture ravvicinate (~90
 # in ricarica una lettura realtime dà subito stato_ricarica/corrente_hv/tempo_residuo aggiornati.
 CHARGING_POLL_EVERY = 120   # secondi tra due letture realtime mentre la spina è collegata (carica)
 CHARGING_POLL_MAX = 300     # cap di sicurezza (~10h: copre una carica AC completa con margine)
+# Intervallo massimo (secondi) fra due campioni di ricarica ancora integrati nei contatori
+# di energia casa/fuori. Durante una carica il poll realtime gira ogni CHARGING_POLL_EVERY
+# (120 s); un buco piu' largo significa che l'auto si e' addormentata o ha smesso di
+# riportare, quindi NON si integra attraverso di esso — altrimenti si inventerebbe energia.
+# 300 s = si tollera un poll perso, si rifiutano i buchi di sonno.
+#
+# ATTENZIONE, difetto noto e portato di proposito senza correggerlo: su cariche AC lente con
+# polling rado quasi tutta la sessione cade nei buchi e il contatore SOTTOSTIMA. Caso reale
+# misurato sulla linea fork: 0,53 kWh contati contro ~8,2 kWh ricavati dal SoC. Correggerlo
+# e' un cambiamento a se', per non confondere il porting con il fix.
+CHARGE_ENERGY_MAX_GAP = 300
 # MARCIA (battito di rilevamento): l'auto IN MOVIMENTO non manda push MQTT (verificato dal vivo
 # 2026-06-24: a vettura in marcia la sessione MQTT è connessa ma non arriva alcun 5A02 → motore/
 # velocità restavano fermi al giorno prima) e il poll periodico "sveglia+leggi" è ogni ~ora. Senza

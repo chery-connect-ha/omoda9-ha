@@ -35,6 +35,9 @@ BFF          = os.environ.get("OMODA_BFF", "https://legend-oj.omodaauto.nl/api")
 TENANT_CODE  = os.environ.get("OMODA_TENANT_CODE", "300006")
 CHANNEL_ID   = os.environ.get("CHANNEL_ID", "1")
 COUNTRY_ID   = os.environ.get("OMODA_COUNTRY_ID", "1")
+# Lingua delle chiamate (header Accept-Language): decide la lingua di e-mail OTP/SMS/messaggi
+# server. Default it-IT (comportamento storico). Con `ctx` si usa `ctx.language`.
+ACCEPT_LANGUAGE = os.environ.get("OMODA_LANGUAGE", "it-IT")
 
 SIGN_NONCE   = "chery_legend_h5"                       # headerSignature nonce
 SIGN_SECRET  = "cX5fR8lJ6pK2xD4uH1eK4pY6wA4xO0sK"     # prod (ENV=0)
@@ -152,6 +155,7 @@ def headers_post(url_path: str, secret: str=SIGN_SECRET, nonce: str=SIGN_NONCE,
     channel_id = ctx.channel_id if ctx is not None else CHANNEL_ID
     country_id = ctx.country_id if ctx is not None else COUNTRY_ID
     tenant = ctx.tenant_code if ctx is not None else TENANT_CODE
+    accept_lang = getattr(ctx, "language", None) or ACCEPT_LANGUAGE if ctx is not None else ACCEPT_LANGUAGE
     # `DEPT-ID` è, per ammissione della mappa da cui è stato estratto, il PREFISSO del Paese:
     # Italia 39, Francia 33, Germania 49. Con l'arrivo del login via SMS il prefisso è
     # diventato un dato che l'utente sceglie, e restava scollegato da qui: a un tedesco si
@@ -171,7 +175,7 @@ def headers_post(url_path: str, secret: str=SIGN_SECRET, nonce: str=SIGN_NONCE,
     h = {
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept-Language": "it-IT",
+        "Accept-Language": accept_lang,
         "Accept-Encoding": "gzip, deflate",
         "agent": "android",
         "version": APP_VERSION,

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How this project works
+    url: https://github.com/chery-connect-ha/omoda9-ha/blob/master/CONTRIBUTING.md
+    about: Roles, how a change lands, and why field tests gate the stable release.
+  - name: How to run a field test
+    url: https://github.com/chery-connect-ha/omoda9-ha/blob/master/docs/field-test.md
+    about: You own one of these cars and want to help without writing code.

@@ -1,0 +1,51 @@
+{
+  "delivery_id": "2026-08-22_beta-per-pr",
+  "date": "2026-08-22",
+  "repo": "chery-connect-ha/omoda9-ha",
+  "intent": "Rendere esigibile la regola gia' concordata: il gate e' la stabile e la review di chi non programma e' la prova sul campo sulla propria auto. Finora era inesigibile perche' una PR non produceva nulla di installabile (hacs.json ha zip_release, HACS installa solo da una release con omoda9.zip allegato, e quell'asset era costruito a mano una volta per release). L'etichetta `beta` su una PR ora pubblica una pre-release installabile da HACS.",
+  "baseline": "29fef39 (v1.13.0, canon/master) per il workflow; d274493 (canon/process/contributing-and-agents) per i documenti",
+  "head": "dad3b95 (ci/beta-per-pr), 2e2b09d (process/contributing-and-agents)",
+  "delivered_as": "PR chery-connect-ha/omoda9-ha#12 (workflow, 3/3 check verdi) + commit sul branch di PR #11 (documenti)",
+  "units": [
+    {
+      "block": "security",
+      "path": ".github/workflows/beta.yml",
+      "lines": 216,
+      "note": "La parte che va letta con la lente giusta non e' il build: sono il guard sui fork e il blocco `permissions`. Quello zip finisce installato in istanze Home Assistant che contengono le credenziali dell'auto di qualcuno, e pubblicato dal repo canonico ha l'aria dell'ufficiale, quindi un contributore esterno non deve poter far uscire un artefatto con quel timbro; il guard e' doppio (espressione `if` del job per l'evento label, piu' un controllo esplicito nello step per il ramo workflow_dispatch, dove non c'e' un evento PR da cui leggere il repo di provenienza). Poi: contatore `n` come primo tag libero perche' due PR sulla stessa versione non collidano; numero PR nel titolo e non nel tag, per non rompere semver e l'ordinamento HACS; versione timbrata nel manifest DENTRO lo zip. Il job `suggerimento` e' l'anti-rumore: commenta solo su PR che toccano custom_components/ e mai sotto i bot.",
+      "reading_estimate_minutes": 13
+    },
+    {
+      "block": "prose",
+      "path": "AGENTS.md",
+      "lines": 44,
+      "note": "Tre modifiche. Due additive (quando chiedere una beta, e il fatto che una PR puo' essere resa installabile prima di atterrare). La terza e' una CORREZIONE che vale piu' delle altre due: la sezione 'Cutting a pre-release' diceva `gh release create --prerelease --generate-notes` senza allegare lo zip, istruzione che con zip_release produce una release elencata da HACS e poi non installabile. Sostituita con lo snippet che costruisce l'archivio dai soli file tracciati, nel layout verificato contro l'asset di v1.13.0.",
+      "reading_estimate_minutes": 5
+    },
+    {
+      "block": "prose",
+      "path": "CONTRIBUTING.md",
+      "lines": 10,
+      "note": "Due innesti nel testo esistente, entrambi nel punto in cui il documento gia' parlava di pre-release: la beta puo' precedere il merge, e serve soprattutto dove l'autore e' impotente (codice scritto per un'auto che non possiede e' un no-op sulla sua). Nessuna regola nuova: rende operativo cio' che il documento gia' affermava.",
+      "reading_estimate_minutes": 2
+    }
+  ],
+  "excluded": [
+    {
+      "what": "Verifica che HACS elenchi e installi davvero la pre-release",
+      "why": "Richiede un'istanza Home Assistant; /Volumes/config non era montato. Verificato solo che l'archivio riproduce l'asset reale di v1.13.0 voce per voce (53 file, contenuto di custom_components/omoda9 appiattito alla radice) e che il workflow parte e si astiene sugli eventi giusti - la PR #12 lo ha esercitato su se stessa. Oggi vale 'il backend ha risposto OK', non 'l'auto l'ha fatto'. Dichiarato nel corpo di #12 e in un commento."
+    },
+    {
+      "what": "Automazione dello zip per le release STABILI",
+      "why": "Stessa trappola, ma scope diverso: la stabile ha anche i field test come precondizione, e mescolarla qui avrebbe reso #12 una PR su due cose. Documentato lo snippet manuale corretto in AGENTS.md e segnalato come follow-up nel corpo di #12."
+    },
+    {
+      "what": "Le sei risposte ai contributor (#3, #4, #5, #7 divisl, #8 Sisku, #11 GurliGebis) e il sollecito a Caslinovich su #7",
+      "why": "Erano il piano della sessione e la sessione si e' chiusa prima. Il lavoro di lettura del codice per #4 e #5 e' pero' fatto (vedi diario): non va rifatto, va solo scritto. Tracciato come AI-027."
+    },
+    {
+      "what": "Bump dei permessi di GurliGebis e abilitazione dei Projects",
+      "why": "Trovato durante la sessione che ha solo `read` sul canonico, quindi non puo' nemmeno etichettare una PR - cioe' non puo' usare il meccanismo appena costruito. Va fatto prima di proporgli di guidare i Projects. Tracciato come AI-028."
+    }
+  ],
+  "reading_estimate_minutes_total": 20
+}
