@@ -149,6 +149,12 @@ def probe_once(host: str, port: int, material: dict[str, bytes] | None) -> dict:
     # of US, and the integration already runs with tls_insecure_set(True).
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
+    # Floor at TLS 1.2. PROTOCOL_TLS_CLIENT alone still permits 1.0 and 1.1, which this
+    # probe has no use for: the broker negotiates 1.3, and the measurement that matters
+    # here is whether the connection SURVIVES the handshake, not which version carried it.
+    # Saying so explicitly also keeps py/insecure-protocol switched on for the whole
+    # repository, where it guards the part that actually talks to a car.
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
 
     tmpdir = None
     if material:
