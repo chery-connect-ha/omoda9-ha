@@ -691,6 +691,51 @@ def _limita_temperatura(body: dict, caps: dict | None) -> None:
         return
 
 
+def _setpoint_da_posizione(body: dict, caps: dict | None) -> None:
+    """Da posizione estrema (LO/HI) a temperatura IMPOSTABILE. Modifica il corpo sul posto.
+
+    Serve **solo** al corpo che nasce dalla ricomposizione di una macro (`permessi.ricomponi`),
+    dove la stessa chiave cambia significato attraversando la porta: nella macro `temperature` è
+    la posizione LO — «il massimo freddo che quest'auto sa fare», che per costruzione sta FUORI
+    dall'intervallo impostabile — mentre su `airControl` è un setpoint, cioè un valore che deve
+    starci dentro.
+
+    ⚠️ Non basta `_limita_temperatura`, ed è un errore in cui si cade leggendo il suo nome. Quella
+    prova prima l'intervallo impostabile e poi ripiega su LO/HI, e **su questo percorso il ripiego
+    è un no-op garantito**: il valore in ingresso *è* LO, quindi appartiene sempre a LO..HI. Due
+    forme di scheda molto comuni scivolavano quindi attraverso il controllo intatte:
+      * scheda assente (`caps` vuoto) ⇒ partiva il `15.0` **cablato per l'Omoda 9**;
+      * vettura che dichiara solo gli estremi e non il range ⇒ partiva il suo LO (anche `12.0`).
+    In entrambi i casi «Raffredda tutto» spediva una temperatura che il componente stesso, dalla
+    card del clima, non lascerebbe impostare. Il corpo **misurato** che il backend accetta porta
+    `16.0`, non `15.0` (issue #1, 2026-08-11).
+
+    ⚠️ Qui, unico punto del componente, si usa un valore di ripiego quando la vettura non dichiara
+    nulla — altrove la regola è «se il backend tace non si tocca niente». La differenza è che il
+    valore da correggere **non l'ha scelto nessuno**: è una posizione che abbiamo spostato noi in
+    un campo che vuole altro. Il ripiego non è inventato: è lo stesso intervallo che la card del
+    clima offre all'utente su una vettura che non dichiara il proprio (`const.CLIMA_*_DEFAULT`).
+    Sull'Omoda 9 questa funzione non gira mai: lì la macro non viene ricomposta."""
+    if "temperature" not in body:
+        return
+    # Import pigro: `const` è puro dato (zero import, zero riferimenti a Home Assistant), ma
+    # tenerlo qui evita di legare l'import di `core/` all'inizializzazione del pacchetto.
+    from ..const import CLIMA_MAX_DEFAULT, CLIMA_MIN_DEFAULT
+
+    caps = caps or {}
+    try:
+        valore = float(body["temperature"])
+        basso = float(caps.get("clima_min", CLIMA_MIN_DEFAULT))
+        alto = float(caps.get("clima_max", CLIMA_MAX_DEFAULT))
+    except (TypeError, ValueError):
+        return
+    if basso > alto:                 # scheda incoerente: meglio non inventare un intervallo
+        return
+    corretta = min(max(valore, basso), alto)
+    if corretta != valore:
+        body["temperature"] = f"{corretta:.1f}"
+
+
 def send(ctx, cmd_key, emit=lambda m: None, params=None, avvisa=None):
     """Invia un comando. emit(str) riceve i passaggi (per pubblicarli su HA).
        `params` (opzionale) = override/aggiunte al body del catalogo PRIMA dei campi
@@ -804,6 +849,14 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None, avvisa=None):
             # `airControl`, che è l'unica destinazione possibile del ripiego — sarebbe una riga
             # che non fa mai nulla. La temperatura la sistema `_limita_temperatura`.
             if endpoint != c.get("endpoint"):
+                # ⚠️ Le due porte da cui si può arrivare qui portano una `temperature` di natura
+                # diversa e vanno curate in modo diverso. Dall'INSTRADAMENTO arriva il 21.0 di
+                # comodo di `BASE_AIRCONTROL`, che è già un setpoint: lo sistema
+                # `_limita_temperatura`. Dalla RICOMPOSIZIONE arriva la posizione LO della macro,
+                # che un setpoint non è — e che `_limita_temperatura` da sola lascia passare
+                # intatta, perché il suo ripiego su LO..HI contiene LO per costruzione.
+                if c.get("endpoint") in permessi.RICOMPONI:
+                    _setpoint_da_posizione(body, ctx.caps)
                 _limita_temperatura(body, ctx.caps)
                 _adatta_durata(endpoint, body, ctx.caps)
 
