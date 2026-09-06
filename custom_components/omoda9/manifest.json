@@ -3,6 +3,7 @@
   "name": "Omoda 9 / Jaecoo",
   "codeowners": ["@Caslinovich"],
   "config_flow": true,
+  "dependencies": ["http"],
   "documentation": "https://github.com/chery-connect-ha/omoda9-ha",
   "integration_type": "device",
   "iot_class": "cloud_push",

@@ -1,0 +1,22 @@
+{
+  "delivery_id": "2026-08-25_queue-rules",
+  "repo": "sw_artifacts",
+  "baseline": "c23fad6",
+  "head": "d442450 (PR #43), 314635b (PR #46), f3b30b6 (su PR #40)",
+  "intent": "Togliere due cause di attrito nella coda delle PR: la beta che collauda solo una modifica alla volta, e la versione del manifest contesa da tutte le PR aperte. Piu' la regola sulla lingua delle interazioni GitHub.",
+  "units": [
+    {"block": "logic", "path": ".github/workflows/beta.yml",
+     "why": "Modalita' nuova (campo vuoto = da master) e sostituzione dell'heredoc dentro $( ) con --notes-file. Quel costrutto si rompeva quando cambiava il testo: da rileggere per convincersi che le due modalita' non si contaminino.",
+     "estimate_min": 12},
+    {"block": "security", "path": ".github/workflows/version-guard.yml",
+     "why": "File nuovo. Quattro rami decisionali, uno dei quali FALLISCE una PR: se sbaglia, blocca lavoro legittimo. Da leggere pensando ai falsi positivi.",
+     "estimate_min": 10},
+    {"block": "contract", "path": "AGENTS.md",
+     "why": "Due regole nuove che vincolano tutti. Il testo E' il contratto: si legge per verificare che non prometta piu' di quanto l'enforcer mantenga (CHANGELOG.md resta conteso, e il testo lo dice).",
+     "estimate_min": 8}
+  ],
+  "excluded": [
+    {"what": "Test automatici sui due workflow", "why": "Non esiste modo di eseguire un workflow da un branch. Verificati con bash -n su tutti i blocchi e con esecuzione a stub di entrambe le modalita' e dei quattro casi del guard. La prova vera e' la prima esecuzione reale, ed e' dichiarata come tale nelle PR."}
+  ],
+  "total_estimate_min": 30
+}

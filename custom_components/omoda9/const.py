@@ -59,6 +59,25 @@ CONF_PHONE = "phone"
 CONF_AREA_CODE = "area_code"     # prefisso internazionale in sole cifre (Italia = 39)
 DEFAULT_AREA_CODE = "39"
 
+# Login con USERNAME + PASSWORD (ROPC): alternativa all'OTP (email/SMS). La password è una
+# CREDENZIALE usa-e-getta: serve SOLO a coniare il token al setup/reauth e NON viene mai salvata
+# in entry.data (da lì la sessione vive sul refresh_token, come per l'OTP). `login_method` è un
+# marcatore salvato nell'entry — NON la password — così la reauth sa chiedere di nuovo la password
+# invece di un OTP. Vedi `core/session.login_with_password`.
+CONF_PASSWORD = "password"          # campo del form, transitorio: MAI in entry.data
+CONF_LOGIN_METHOD = "login_method"  # "password" per gli account che accedono con la password
+LOGIN_METHOD_PASSWORD = "password"
+# Lingua delle chiamate al backend: guida l'header `Accept-Language`, che a sua volta decide la
+# lingua di e-mail OTP, SMS e messaggi del server (il backend non ha un parametro `lang` sul
+# codice: comanda l'header). Il valore memorizzato È il valore dell'header (`en-GB`/`it-IT`).
+#   * setup ESISTENTI (nessun campo `language`) → `LANGUAGE_FALLBACK` = it-IT: comportamento
+#     storico invariato;
+#   * setup NUOVI → il dropdown parte da `DEFAULT_LANGUAGE` = en-GB (questo fork è in inglese).
+CONF_LANGUAGE = "language"
+DEFAULT_LANGUAGE = "en-GB"       # default del dropdown per i NUOVI account
+LANGUAGE_FALLBACK = "it-IT"      # entry senza il campo → comportamento storico
+LANGUAGES = {"en-GB": "English", "it-IT": "Italiano"}   # valore-header → etichetta del dropdown
+
 # Identità veicolo per il device HA (nome dinamico: "Omoda 9", "Jaecoo 7"…). `vehicle_name`
 # = nickname/modello dall'app, salvato in entry.data (catturato al config flow o backfillato);
 # è anche un'OPZIONE per l'override manuale. model/brand restano solo in entry.data.
@@ -195,6 +214,12 @@ CONF_TSP_HOST = "tsp_host"
 CONF_CAR_MQTT_HOST = "car_mqtt_host"
 CONF_CAR_MQTT_PORT = "car_mqtt_port"
 CONF_CHANNEL_ID = "channel_id"
+# TENANT-CODE e countryId: fin qui erano cablati ai valori Omoda/Jaecoo dentro `CoreCtx`
+# (300006 / 1) e non arrivavano dal config entry. Sono diversi PER MARCHIO sullo stesso
+# gateway "legend": senza esporli non si poteva puntare l'integrazione al tenant Chery
+# (300001 / 2). Ora fanno parte dei parametri di regione, valorizzati dai preset qui sotto.
+CONF_TENANT_CODE = "tenant_code"
+CONF_COUNTRY_ID = "country_id"
 
 # Provisioning certificati mutual-TLS MQTT (FASE 3c). Cartella (dentro il filesystem di HA)
 # da cui importare i 4 cert nella certs_dir per-entry. Vuoto = i cert si mettono a mano.
@@ -209,6 +234,36 @@ DEFAULTS = {
     CONF_CAR_MQTT_HOST: "tspemqx-app-eu.cheryinternational.com",
     CONF_CAR_MQTT_PORT: 8083,
     CONF_CHANNEL_ID: "1",
+    CONF_TENANT_CODE: "300006",
+    CONF_COUNTRY_ID: "1",
+}
+
+# ── Preset marchio/regione ───────────────────────────────────────────────────────────────
+# Chery International serve Omoda/Jaecoo e Chery dallo STESSO backend "legend": il broker MQTT,
+# la TSP console e i certificati mutual-TLS sono comuni per regione; a cambiare per marchio sono
+# solo il gateway BFF, il TENANT-CODE, il channelId e il countryId. I valori Chery EU sono stati
+# ricavati dall'app Chery EU ufficiale (`com.chery.eu.chery`, .env.prod), che è lo stesso
+# applicativo `chery_legend` da cui è nata questa integrazione. Scegliere un preset riempie quei
+# quattro campi; "custom" lascia intatto ciò che l'utente ha digitato (altre regioni/marchi).
+CONF_PRESET = "preset"
+PRESET_OMODA_JAECOO_EU = "omoda_jaecoo_eu"
+PRESET_CHERY_EU = "chery_eu"
+PRESET_CUSTOM = "custom"
+DEFAULT_PRESET = PRESET_OMODA_JAECOO_EU
+
+PRESETS = {
+    PRESET_OMODA_JAECOO_EU: {
+        CONF_BFF: "https://legend-oj.omodaauto.nl/api",
+        CONF_TENANT_CODE: "300006",
+        CONF_CHANNEL_ID: "1",
+        CONF_COUNTRY_ID: "1",
+    },
+    PRESET_CHERY_EU: {
+        CONF_BFF: "https://eu-chery.cheryinternational.com/api",
+        CONF_TENANT_CODE: "300001",
+        CONF_CHANNEL_ID: "2",
+        CONF_COUNTRY_ID: "2",
+    },
 }
 
 # Costante app condivisa (non un segreto utente): seed per derivare la password MQTT
