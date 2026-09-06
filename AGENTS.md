@@ -24,12 +24,12 @@ vehicle turns out to accept.
 Where the truth lives, in order of authority:
 
 1. `docs/design/domain-model.md` — what the integration talks about. The code
-   implements it; it is not a description of the code. *(Proposed in #6.)*
+   implements it; it is not a description of the code.
 2. `docs/design/architecture.md` — where things live and which way dependencies
-   point. *(Proposed in #6.)*
+   point.
 3. `tests/` — what is actually guaranteed. `tests/test_entity_count.py` already
    enforces that no refactor quietly costs a user an entity;
-   `tests/test_architecture.py` enforces the layering *(proposed in #6)*.
+   `tests/test_architecture.py` enforces the layering.
 
 If your change contradicts one of these, the document wins, or the document
 changes in the same pull request. Never leave them disagreeing in silence.
