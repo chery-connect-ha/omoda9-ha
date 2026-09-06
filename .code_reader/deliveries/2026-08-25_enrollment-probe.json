@@ -1,0 +1,56 @@
+{
+  "delivery_id": "2026-08-25_enrollment-probe",
+  "repo": "sw_artifacts",
+  "baseline": "46426c6",
+  "head": "cc2406d (PR #47)",
+  "intent": "Falsificare l'ipotesi che il certificato mTLS bundlato sia materiale di bootstrap verso un enrollment per-device. Quattro probe read-only indipendenti piu' il report. Nessuna modifica al runtime dell'integrazione.",
+  "units": [
+    {
+      "block": "intent",
+      "path": "docs/enrollment-findings.md",
+      "why": "Il ragionamento e la conclusione. Si legge PRIMA del codice: senza, i quattro script sembrano quattro cose scollegate. Contiene il punto che decide tutto — un handshake completato senza certificato NON prova che il certificato sia inutile.",
+      "estimate_min": 20
+    },
+    {
+      "block": "logic",
+      "path": "tools/enrollment_probe/step2_tls_probe.py",
+      "why": "Il piu' importante e il piu' facile da leggere male. Tre varianti (nessun cert / bundle / self-signed) e l'attesa passiva DOPO l'handshake, che e' l'unica cosa che distingue accettato da rifiutato. La funzione verdict() codifica la lettura.",
+      "estimate_min": 15
+    },
+    {
+      "block": "logic",
+      "path": "tools/enrollment_probe/step3_response_scan.py",
+      "why": "Tocca la sessione reale. Da leggere per verificare che non rinnovi il token (lavora su una copia) e che la redazione regga: si stampa forma, mai valore.",
+      "estimate_min": 12
+    },
+    {
+      "block": "logic",
+      "path": "tools/enrollment_probe/step1_cert_inspect.py",
+      "why": "Parsing X.509 e confronto cross-regione. Meccanico, ma le euristiche in looks_per_device() sono giudizio.",
+      "estimate_min": 8
+    },
+    {
+      "block": "logic",
+      "path": "tools/enrollment_probe/step4_keygen_scan.py",
+      "why": "Grep strutturata. Legge poco, ma SKIP_PARTS e' sostanza: esclude se stesso e il report, e senza quell'esclusione i falsi positivi passano da 1 a 14.",
+      "estimate_min": 6
+    },
+    {
+      "block": "prose",
+      "path": "tools/enrollment_probe/README.md",
+      "why": "Le regole di sicurezza che gli script rispettano, in un posto solo.",
+      "estimate_min": 4
+    }
+  ],
+  "excluded": [
+    {
+      "what": "custom_components/",
+      "why": "Non toccato di proposito: il task escludeva modifiche al runtime."
+    },
+    {
+      "what": "L'output dei probe",
+      "why": "Contiene dati dell'account; vive solo su disco, mai nel repo."
+    }
+  ],
+  "total_estimate_min": 65
+}

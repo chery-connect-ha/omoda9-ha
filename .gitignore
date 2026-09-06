@@ -13,10 +13,20 @@ omoda9_diag.off
 # --- runtime / dati locali ---
 data/
 venv/
+.venv/
+.venv-test/
 __pycache__/
 *.pyc
 *.bak
 *.bak_*
+
+# --- tooling: local registers and personal patterns, never tracked ---
+# tools/private-patterns.txt holds the very strings check-secrets.sh exists to catch
+# (a surname inside an e-mail, home paths, machine names): committing it publishes them.
+DEROGATIONS.log
+DEROGHE.log
+COMMENTI.log
+tools/private-patterns.txt
 
 # IDE
 .vscode/

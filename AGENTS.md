@@ -45,6 +45,14 @@ someone for whom it worked.
 refactor. If the entity count changes, that is a deliberate, announced change —
 and the test will stop you first.
 
+**Never leave a language behind.** Anything that adds or renames a user-visible label or
+an error message touches **three** files: `strings.json`, `translations/en.json` and
+`translations/it.json`. A key present in one and missing in another produces an entity
+with **no name at all** — but only for the people using that language, so whoever wrote
+the change never sees it. `tests/test_traduzioni_complete.py` compares the key sets and
+fails if they diverge; it checks that you did not forget a file, not that you translated
+anything, so a key is only really done when the text is in the right language.
+
 **No Home Assistant imports in `core/`.** The protocol logic must be exercisable
 without Home Assistant installed. This is what lets the sandbox test a change
 without an instance, and it is the rule the whole suite rests on.
@@ -62,6 +70,43 @@ adding one, you have found an architecture problem: say so instead of encoding i
 
 **The suite stays green.** Not "green after a follow-up" — green in the pull
 request that changes the behaviour.
+
+## Before you write a rule, ask what would enforce it
+
+You will be asked to write rules — into this file, into `CONTRIBUTING.md`, into a pull
+request description. **A written rule is free and a tool is not**, so the gap between what
+the documents claim and what the repository actually permits widens on its own, silently,
+until somebody tries to follow the rule and hits a wall.
+
+When that happens it does not look like a rule being broken. It looks like a person not
+bothering.
+
+This project collected five of these in a single day, 24 August 2026:
+
+- `CONTRIBUTING.md` said the review that counts is somebody running the change on their own
+  car — while a pull request produced **nothing anyone could install**;
+- both documents told people to use the labels `beta`, `unverified-hardware` and
+  `merged-unread`, and **none of the three existed**. Two maintainers had just agreed to use
+  one: they would have got an error;
+- a maintainer proposed GitHub Projects while **Projects were disabled** and he had
+  read-only access;
+- another had built the executable form of these rules on his own machine, so his pull
+  requests were better documented than everyone else's — not through more care, but because
+  he had a gate and nobody else did;
+- and `AGENTS.md` forbids AI co-authorship trailers while one maintainer's tooling adds one
+  to every commit by default.
+
+So, when you write a rule:
+
+- **name the thing that enforces it** — a test, a CI job, a label that exists, a template
+  field. If the honest answer is "whoever reads this will remember", it is not a rule, it is
+  a hope, and hopes should be written as advice rather than as requirements;
+- **ship it in the same change.** `tests/test_traduzioni_complete.py` arrived in the same
+  commit as the rule about the three language files, and it started green — a rule that is
+  already true, pinned so it cannot quietly stop being true;
+- **check the thing exists before telling somebody to use it.** Open the settings, list the
+  labels, read the permissions. It takes a minute and it is the difference between an
+  instruction and an error message.
 
 ## The discipline that matters most: don't overstate evidence
 
@@ -125,12 +170,43 @@ written for a car you do not own: your instance cannot disprove it, and this is
 what puts it in front of the person whose instance can, while there is still
 time to change it.
 
+**The version number is not yours to choose.** `manifest.json` carries the number of
+the **next** release, and exactly one pull request ever raises it: the first one opened
+after a stable ships. Everybody else adds their entry to the existing `## v<next>`
+section of `CHANGELOG.md` and leaves `manifest.json` alone.
+
+Bumping per pull request looks harmless and is not. On 25 August 2026 three branches
+each set `1.14.0` and each opened their own `## v1.14.0` section. The first merged; the
+other two went from mergeable to conflicting in the same minute, and two more were
+carrying the same collision behind them. Five pull requests, one line, three authors,
+every one of whom had to be asked to redo work that was already correct. It is also a
+question you cannot answer alone: whether your change is a patch or a minor depends on
+what ships beside it, which you do not know when you open the branch.
+
+This does **not** make `CHANGELOG.md` uncontended — everyone still writes into the same
+section. But that is an ordinary additive conflict instead of one line carrying three
+different values.
+
+⚠️ **The one time you do raise it.** After a stable ships, the next pull request must,
+or no beta can be cut from anything: `beta.yml` refuses to build a pre-release whose
+manifest is not ahead of the latest stable, because in semver `v1.13.0-beta.1` sorts
+*before* `v1.13.0` and HACS would offer it as a downgrade. The workflow fails loudly and
+names the number to use — but doing it on purpose beats being told off by CI.
+
+*What enforces it:* `.github/workflows/version-guard.yml` fails a pull request that
+changes the version while the next number is already set. Per the section above, this
+rule ships with the thing that holds it up rather than with a request to remember it.
+
 ## The commands
 
-`master` is protected: no direct pushes. Everything below assumes the remote is
-called `origin`. Replace `<name>` placeholders.
+`master` is protected and it is the only long-lived branch. There is no `develop`:
+everything is cut from `master` and comes back to it as a pull request. Nobody pushes to
+it, including the people who could. Replace `<name>` placeholders.
 
-**Once, to get set up**
+**Once, to get set up. Which of the two you are decides everything after it.**
+
+*If you have write access here* (you are one of the maintainers), clone the repository
+itself and work in branches of it:
 
 ```bash
 git clone https://github.com/chery-connect-ha/omoda9-ha.git
@@ -138,23 +214,55 @@ cd omoda9-ha
 gh auth status || gh auth login     # the GitHub CLI, for pull requests
 ```
 
-**Start a piece of work — always from an up-to-date `master`**
+*If you do not* (you are contributing from outside, which is the normal case), you cannot
+push a branch here at all. Fork first, and keep a second remote pointing at this
+repository so you can stay current with it:
 
 ```bash
-git fetch origin
-git switch -c fix/<short-name> origin/master
+gh repo fork chery-connect-ha/omoda9-ha --clone     # creates your fork and clones it
+cd omoda9-ha
+git remote -v                                       # origin = your fork, upstream = here
+```
+
+**Do not commit on the `master` of your fork.** It is the one mistake that costs you
+something you cannot undo cheaply, and it has two separate consequences.
+
+The first is that a pull request opened from `master` follows that branch, so every later
+commit you make lands inside the open pull request, and you can have only one going at a
+time.
+
+The second destroyed somebody's work here on 6 September 2026, so it is written down in
+detail rather than as a warning. **Do not sync your fork while your own commits are on its
+`master`.** Once this repository's `master` has moved, your fork cannot fast-forward, and
+the Sync fork button in the browser offers "Discard commits" as the way through. Taking it
+does exactly what it says: the commits go, the pull request empties, and GitHub closes it
+in the same second. Nothing warns you first, and asking someone to "bring `master` into
+your branch" without giving them the commands leads them straight to that button.
+
+Branch, always, even for a single file. Then syncing your fork is harmless, because your
+work is not on the branch being synced.
+
+**Start a piece of work: always from an up-to-date `master`, never from your own.**
+
+```bash
+git fetch upstream                                  # or `origin` if you cloned directly
+git switch -c fix/<short-name> upstream/master      # or `origin/master`
 ```
 
 Name it for the behaviour, not the file: `fix/charge-energy-undercount`, not
 `fix/coordinator`.
 
-**Keep it current while it is open — not only when it conflicts**
+**Keep it current while it is open, not only when it conflicts**
 
 ```bash
-git fetch origin
-git merge origin/master
+git fetch upstream                                  # or `origin` if you cloned directly
+git merge upstream/master                           # or `origin/master`
 git push
 ```
+
+This is not tidiness. `master` requires a branch to be current before it can be merged, so
+a branch that sits behind is not mergeable no matter how green its checks are, and the
+person who finds out is you, at the end.
 
 Do this whenever `master` has moved and your branch has been open more than a day
 or two. Conflicts are the obvious reason and the least important one. The real
@@ -200,6 +308,15 @@ CI be the gate — that is why CI exists — but say so in the pull request.
 git push -u origin HEAD
 gh pr create --fill
 ```
+
+**Put `Closes #12` in the body when the pull request finishes an issue.** GitHub then
+closes it on merge, and links the two forever. Without it somebody has to remember, and
+nobody does: on 24 August this repository had fifteen issues of which exactly one was
+closed — by the single pull request that carried the line.
+
+Use it only when the merge really finishes the issue. If it fixes part of one, write
+`Relates to #12` and say in the body what is left, so the issue outlives the merge instead
+of being closed on a half-answer.
 
 Then fill in the field-test block in the template. If you did not test on
 hardware, say it there rather than leaving it blank:

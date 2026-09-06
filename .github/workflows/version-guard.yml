@@ -1,0 +1,71 @@
+name: Version guard
+
+# Exactly one pull request raises `manifest.json`: the first one opened after a stable
+# ships. Everybody else adds their entry to the section already open and leaves the
+# version alone. The rule lives in AGENTS.md; this workflow is the thing that holds it
+# up, because a rule without one is a hope (AGENTS.md, "Before you write a rule").
+#
+# Why it exists, in one line: on 25 August 2026 three branches each declared `1.14.0`
+# and each opened their own changelog section. The first merged; the other two went
+# from mergeable to conflicting in the same minute, and two more were carrying the same
+# collision behind them. Five pull requests, one line, three authors.
+#
+# This file is in English, unlike its neighbours, and deliberately: the message below is
+# read by whoever trips over it, and not all of us read Italian.
+#
+# What it does NOT do: judge whether the number chosen is the right one. When the version
+# is due to be raised — that is, when the manifest is still sitting on the last stable —
+# any number passes, because which one it should be is a release decision, not a
+# workflow's.
+
+on:
+  pull_request:
+    paths:
+      - "custom_components/omoda9/manifest.json"
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Only one pull request raises the version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          MANIFEST=custom_components/omoda9/manifest.json
+
+          new=$(jq -r .version "$MANIFEST")
+          base=$(git show "$BASE:$MANIFEST" | jq -r .version)
+
+          if [ "$new" = "$base" ]; then
+            echo "Version unchanged ($base): nothing to check."
+            exit 0
+          fi
+
+          # The version DID change. That is legitimate only if the number had not been
+          # raised yet since the last stable — that is, if the base manifest was still
+          # sitting on it. `releases/latest` excludes pre-releases, which is what we
+          # want here: a beta does not open a version, it accompanies one.
+          stable=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null | sed 's/^v//' || true)
+
+          if [ -z "$stable" ] || [ "$stable" = "null" ]; then
+            echo "No stable release published yet: the first number is chosen here."
+            exit 0
+          fi
+
+          if [ "$base" = "$stable" ]; then
+            echo "The manifest was still on the last stable ($stable) and this pull request opens $new."
+            echo "It is the first one after the release, so raising it is its job."
+            exit 0
+          fi
+
+          echo "::error file=$MANIFEST::The next release already has its number: $base, opened by the first pull request after stable $stable. This one changes it to $new, and whoever merges second inherits a conflict on a single line. Put \"version\": \"$base\" back in the manifest and add your entry to the ## v$base section already in CHANGELOG.md. If this really has to ship as a release of its own, say so on the pull request — that is a release decision, not this check's. The rule is in AGENTS.md, 'The version number is not yours to choose'." >&2
+          exit 1

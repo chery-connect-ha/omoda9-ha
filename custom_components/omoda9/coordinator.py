@@ -34,7 +34,9 @@ from .const import (
     DOMAIN, CAR_SEED, DEFAULT_AWAKE_WINDOW, DEFAULT_SESSION_EVERY, CERT_FILES,
     CONF_VIN, CONF_TUSERID, CONF_PIN, CONF_EMAIL, CONF_CERTS_SRC,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
+    CONF_LANGUAGE, LANGUAGE_FALLBACK,
     CONF_BFF, CONF_TSP_HOST, CONF_CAR_MQTT_HOST, CONF_CAR_MQTT_PORT, CONF_CHANNEL_ID,
+    CONF_TENANT_CODE, CONF_COUNTRY_ID,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING, DEFAULT_POLL_NORMAL_MIN,
     DEFAULT_POLL_CHARGING_MIN, POLL_WAKE_WAIT, COMMAND_SETTLE_S, COMMAND_QUEUE_WAIT,
     HV_ON_POLL_EVERY, HV_ON_POLL_MAX,
@@ -300,11 +302,17 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         self.tsp_host = cfg[CONF_TSP_HOST]
         self.pin = cfg.get(CONF_PIN, "")
         self.bff = cfg[CONF_BFF]
+        # tenant/countryId per-marchio (default = Omoda/Jaecoo). `cfg` parte da DEFAULTS, quindi
+        # gli entry esistenti (senza queste chiavi) restano sui valori storici.
+        self.tenant_code = str(cfg.get(CONF_TENANT_CODE, DEFAULTS[CONF_TENANT_CODE]))
+        self.country_id = str(cfg.get(CONF_COUNTRY_ID, DEFAULTS[CONF_COUNTRY_ID]))
         self.email = cfg.get(CONF_EMAIL, "")
         # login via SMS (alternativa all'email): se il telefono è valorizzato, la
         # riautenticazione userà il ramo mobile. area_code = prefisso in cifre.
         self.phone = cfg.get(CONF_PHONE, "")
         self.area_code = str(cfg.get(CONF_AREA_CODE, DEFAULT_AREA_CODE) or DEFAULT_AREA_CODE)
+        # lingua (Accept-Language): assente negli entry esistenti → it-IT (comportamento storico)
+        self.language = str(cfg.get(CONF_LANGUAGE) or LANGUAGE_FALLBACK)
 
         # identità veicolo per il device HA. Priorità: override manuale (opzioni) →
         # valore salvato in entry.data (config flow / backfill) → None (→ fallback in entity.py).
@@ -1080,6 +1088,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             email=self.email,
             phone=self.phone,
             area_code=self.area_code,
+            language=self.language,
             token_path=self.token_path,
             # taskId nella config dir per-VIN: sopravvive agli update HACS e non è
             # condiviso fra veicoli.
@@ -1088,6 +1097,8 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             tsp_host=self.tsp_host,
             bff=self.bff,
             channel_id=self.channel_id,
+            tenant_code=self.tenant_code,
+            country_id=self.country_id,
             mint_taskid=os.environ.get("OMODA_MINT_TASKID", "1") not in ("0", "", "false", "no"),
             # Capability della vettura con nomi NEUTRI: `core/` è autonomo e non importa nulla
             # dal package padre, quindi non può conoscere le chiavi `DATA_*` di const.py.
@@ -1900,3 +1911,9 @@ class Omoda9Coordinator(DataUpdateCoordinator):
     def _confirm_otp(self, code: str) -> tuple[bool, str]:
         from .core import session as SESSION
         return SESSION.confirm_otp(self.ctx, code or "")
+
+    def _login_with_password(self, password: str) -> tuple[bool, str]:
+        """Reauth degli account password: riconia il token con la password (usa-e-getta, mai
+        salvata) e ricontrolla la sessione. Speculare a `_confirm_otp` per il ramo OTP."""
+        from .core import session as SESSION
+        return SESSION.login_with_password(self.ctx, password or "")
