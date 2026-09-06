@@ -116,6 +116,35 @@ l'app ufficiale dall'account. È una scelta tua, quindi parte **spento**:
   l'integrazione smette di interrogare il server: il rischio che l'account Chery
   venga bloccato cala molto, ma non sparisce → **correggi il PIN, non riprovare**.
 
+## Card per la dashboard
+
+L'integrazione include una card personalizzata e la **carica da sola** — dopo un riavvio
+compare in **Aggiungi card → Personalizzate → "Chery Card"** (nessuna risorsa da aggiungere a
+mano). È un riepilogo curato: nome del veicolo, batteria %, stato di ricarica, autonomia stimata
+e avvisi (gomme, batteria scarica, offline) mostrati **solo quando c'è qualcosa che non va**.
+
+La configurazione minima funziona già:
+
+```yaml
+type: custom:chery-card
+```
+
+Opzioni (tutte facoltative):
+
+| Opzione | Cosa fa |
+|---|---|
+| `title` | Titolo dell'intestazione (default: il nome del veicolo) |
+| `image` | URL dell'immagine di intestazione (ha la precedenza su quella nelle opzioni dell'integrazione) |
+| `show_all: true` | Elenca anche tutte le altre entità, raggruppate |
+| `entities: [...]` | Aggiunge righe tue (id delle entità) |
+
+**La card mostra "Errore di configurazione" nell'app (ma funziona su desktop)?** L'integrazione
+carica la card da sola, ma l'app companion non sempre la recepisce. **Aggiungi la risorsa a mano
+una volta** e funziona: **Impostazioni → Dashboard → ⋮ (in alto a destra) → Risorse → + Aggiungi
+risorsa**, URL `/omoda9_card/chery-card.js`, tipo **Modulo JavaScript**. Poi chiudi e riapri del
+tutto l'app (se resta lo stato vecchio, prima **Configurazione app → Debug → Reimposta cache del
+frontend**). La risorsa si aggiunge una volta sola; vale per tutte le dashboard.
+
 ## Cambiare le impostazioni in seguito
 
 **Impostazioni → Dispositivi e servizi → Omoda 9 / Jaecoo → ⋮ → Riconfigura**
@@ -195,7 +224,7 @@ o telefono) + OTP. Catena orchestrata dal config flow (codice in
 |---|---|---|
 | invio OTP (email) | `login_omoda.py invia <email>` | risolve il captcha del gateway (§2) e fa partire il codice via **email** |
 | invio OTP (SMS) | `login_omoda.py invia-sms <numero-senza-prefisso> <prefisso>` | idem via `sendSmsCode` — l'unico endpoint dietro un WAF Aliyun che filtra sull'**impronta TLS**, gestito da `tls_client.py` |
-| conio token | `prova_token.py <email> <code>` | chiama `/auth/oauth2/token` replicando l'app (cifratura SM4) e salva il token. Per gli account col numero l'identità è la composita `APP-LOGIN@<numero>_<area>` |
+| conio token | `prova_token.py <email> <code>` | chiama `/auth/oauth2/token` replicando l'app (cifratura SM4) e salva il token. Per gli account col numero l'identità è la composita `APP-LOGIN@<area>_<numero>` (prima il prefisso, poi il numero — confermato in `UserService::phoneVerifyLogin`) |
 | orchestrazione | `session.py` | espone `request_otp()` / `confirm_otp(code)` / `check()` / `refresh()` |
 
 Il **PIN non c'entra con l'accesso**: è l'OTP a coniare il token, il PIN firma

@@ -180,7 +180,7 @@ REALTIME_ASLEEP = {"code": "A07900"}
 # Sono omesse le 98 voci FIGLIE del ramo 1 (stato veicolo, `parentId` 101): verificate tutte a 1,
 # e nessun comando le tocca. Restano le altre 182 — i comandi dei rami 2/3/4 più le cinque radici,
 # fra cui il 101 stesso — che sono quelle che decidono.
-# Fonte grezza: /root/omoda9-project/45_capability/permessi_jaecoo7_phev_eu.json
+# Fonte grezza: la lista permessi letta su un Jaecoo 7 PHEV EU (canale privato, mai in questo repo).
 JAECOO7_PHEV_EU = {
     1: 1, 2: 1, 3: 1, 4: 1, 101: 1, 201: 0, 202: 1, 203: 1,
     204: 1, 205: 1, 206: 1, 207: 1, 208: 1, 209: 1, 210: 0, 211: 1,

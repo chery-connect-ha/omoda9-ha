@@ -1,0 +1,12 @@
+version: 2
+
+# NB: the Python runtime dependencies live in
+# custom_components/omoda9/manifest.json ("requirements"), which Dependabot's
+# pip ecosystem cannot parse. Those are audited by the pip-audit job in
+# .github/workflows/pip-audit.yml. Here we only keep the pinned GitHub Actions fresh.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5

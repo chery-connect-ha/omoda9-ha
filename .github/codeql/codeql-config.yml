@@ -1,0 +1,35 @@
+name: "Omoda / Jaecoo CodeQL config"
+
+# This integration speaks a proprietary OMODA / Chery cloud protocol. The excluded queries below
+# only ever produce false positives here; each exclusion is justified. EVERYTHING ELSE
+# (injection, path traversal, SSRF, deserialization, etc.) stays ON.
+#
+#   py/weak-sensitive-data-hashing
+#     The gateway MANDATES MD5/SHA request signatures, MD5(PIN), and an MD5 MQTT-password
+#     derivation. These are the server's REQUIRED interop wire formats, not local security
+#     controls — there is no stronger primitive the server would accept. (usedforsecurity=False
+#     does not satisfy this CodeQL query, hence the exclusion.)
+#
+#   py/weak-cryptographic-algorithm
+#     The captcha uses AES/ECB/PKCS7 because the AJ-Captcha server issues a per-request key and
+#     expects exactly that mode. Not our choice; cannot change without breaking login.
+#
+#   py/clear-text-logging-sensitive-data
+#     The hits this query produces here are developer CLI / self-test scaffolding inside
+#     `__main__` blocks (e.g. core/provision.py) that do NOT run under Home Assistant and print
+#     masked or mock data. That is the reason for the exclusion, and it is the only one.
+#
+#     Deliberately NOT claimed: that runtime logging can never contain a credential. The
+#     justification carried over from the fork line said exactly that, and `SECURITY.md` no
+#     longer does — sign-in runs in a subprocess whose stdout AND stderr are captured and
+#     logged, so what a failure path carries is a property of the error rather than of our
+#     logging, and this query does not follow that path anyway. Excluding it is about noise,
+#     not about a guarantee. Keep new runtime logging secret-free in review, and treat a
+#     credential reaching a log as a security issue through the private channel.
+query-filters:
+  - exclude:
+      id: py/weak-sensitive-data-hashing
+  - exclude:
+      id: py/weak-cryptographic-algorithm
+  - exclude:
+      id: py/clear-text-logging-sensitive-data

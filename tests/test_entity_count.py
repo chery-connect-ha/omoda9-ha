@@ -34,8 +34,8 @@ from custom_components.omoda9.const import (
 # che l'auto ci manda già a ogni sonda (`appointmentTravelSetVOS`) e che finora buttavamo via.
 # Nessuna chiamata nuova verso il cloud: solo un campo che smettevamo di ignorare.
 ATTESO = {
-    "binary_sensor": 26,
-    "sensor": 39,
+    "binary_sensor": 27,
+    "sensor": 41,
     "button": 14,
     "switch": 18,
     "cover": 3,
@@ -46,7 +46,28 @@ ATTESO = {
     "text": 1,
     "time": 1,
 }
-TOTALE_ATTESO = 107
+# 107 -> 110 il 2026-08-24: portati dalla linea fork i due contatori di energia di ricarica
+# (casa/fuori) e il binary sensor "A casa". Cambiamento DELIBERATO e annunciato: questo numero
+# e' il criterio di accettazione che @Caslinovich ha adottato per le fette architetturali, e
+# non deve muoversi per caso.
+#
+# DUE COSE CHE QUESTO NUMERO NON DICE PIU', e che chi lo legge dopo non indovinerebbe.
+#
+# 1. "N entita', zero unavailable" ha smesso di essere un segnale pulito. Quelle tre sono le
+#    PRIME entita' del progetto che possono essere `unavailable` PER DISEGNO: tutte e tre
+#    dipendono da `coordinator.poll_enabled`, SPENTO su un'installazione nuova, e su
+#    contatori che integrano nel tempo uno zero fermo sarebbe piu' ingannevole. Finora
+#    `unavailable` significava "entita' orfana rimasta da un cambio di tipo" ed era il modo
+#    per accorgersene: da qui in avanti, tre unavailable sono normali.
+#
+# 2. Due delle tre sono contate su un profilo che nessuno ha ancora dimostrato di poter
+#    esercitare. I contatori leggono `chargingPower`, classificato BEV-only in
+#    `_RT_SENSORI_BEV` sulla base di una cattura del 2026-06-25 presa ad auto SCOLLEGATA,
+#    dove quel campo non poteva esserci comunque. Non esiste alcuna cattura di un'Omoda 9
+#    fatta durante una carica. Se `chargingPower` arrivasse anche su una PHEV quella lista ha
+#    una voce di troppo; se non arrivasse, i due contatori vanno nel ramo BEV. Serve UN frame
+#    di sola lettura da un'auto attaccata alla spina.
+TOTALE_ATTESO = 110
 
 
 def test_totale_dichiarato_coerente():
