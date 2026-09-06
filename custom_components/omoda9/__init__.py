@@ -11,6 +11,7 @@ entità sono in via di completamento (vedi SHARING_TODO.md → roadmap component
 from __future__ import annotations
 
 import logging
+import os
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -19,6 +20,45 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .const import DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
+
+# Custom Lovelace card: static-served from this package and auto-loaded on the frontend so it
+# appears in the card picker without the user adding a dashboard resource by hand. Il percorso
+# URL è legato al DOMINIO (`/omoda9_card`), non al marchio: così non collide con la card di
+# un'altra integrazione della piattaforma (es. `omoda_jaecoo`) installata sulla stessa macchina.
+# L'elemento invece è `chery-card` (marchio), distinto da `omoda-card`.
+_CARD_PATH = f"/{DOMAIN}_card"
+_CARD_URL = f"{_CARD_PATH}/chery-card.js"
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Serve e auto-carica la card Lovelace, UNA volta per istanza di Home Assistant.
+
+    Guardato con `hass.data[f"{DOMAIN}_card"]` perché con due veicoli configurati
+    `async_setup_entry` gira due volte, e registrare lo stesso static path / URL JS due volte
+    fa rumore (o errore). Se il frontend non è caricato (headless) la card resta comunque
+    usabile aggiungendo la risorsa a mano — quindi il fallimento non deve rompere il setup."""
+    if getattr(hass, "http", None) is None or hass.data.get(f"{DOMAIN}_card"):
+        return
+    from homeassistant.components.http import StaticPathConfig
+
+    lovelace_dir = os.path.join(os.path.dirname(__file__), "lovelace")
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(_CARD_PATH, lovelace_dir, False)]
+    )
+    try:
+        from homeassistant.components.frontend import add_extra_js_url
+        from homeassistant.loader import async_get_integration
+
+        # La query di versione invalida la cache del browser sulla card a ogni aggiornamento:
+        # senza, si continua a vedere la VECCHIA card (il modulo è cachato duro dal frontend).
+        try:
+            version = (await async_get_integration(hass, DOMAIN)).version
+        except Exception:  # noqa: BLE001
+            version = ""
+        add_extra_js_url(hass, f"{_CARD_URL}?v={version}" if version else _CARD_URL)
+    except Exception:  # noqa: BLE001 — frontend non caricato (headless) → card usabile a mano
+        pass
+    hass.data[f"{DOMAIN}_card"] = True
 
 # P2-2: il "cuore di protocollo" è ora il sotto-pacchetto `.core`, importato normalmente
 # (`from .core import commands`). Sono spariti — e con loro un'intera classe di problemi:
@@ -46,6 +86,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(detail)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    # Card Lovelace: registrata una volta sola (no-op dal secondo veicolo in poi).
+    await _async_register_card(hass)
 
     # Il monitor diagnostico va armato PRIMA del primo controllo sessione. È quel
     # controllo a decidere se aprire la riautenticazione, ed è esattamente l'evento che si

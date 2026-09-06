@@ -52,6 +52,13 @@ MIN_NASCOSTE = 2
 
 OSCURATO = "***"
 
+# Un prefisso internazionale ha 1–3 cifre (E.164): è lo stesso limite che il config flow
+# impone in ingresso (`config_flow._MAX_CIFRE_PREFISSO`). Duplicato qui di proposito — `core/`
+# non importa il layer di Home Assistant — così la mascheratura resta autonoma. Serve a
+# `identita_mobile`: il PRIMO campo dell'identità composita si ristampa solo se è davvero un
+# prefisso; qualunque altra cosa (un dominio, un nome) va mascherata.
+MAX_CIFRE_PREFISSO = 3
+
 
 def solo_cifre(valore) -> str:
     return "".join(ch for ch in str(valore or "") if ch.isdigit())
@@ -98,12 +105,29 @@ def indirizzo_email(valore) -> str:
     return f"{locale[0]}{OSCURATO}@{dominio}"
 
 
+def _e_prefisso(campo: str) -> bool:
+    """Il primo campo dell'identità è un prefisso internazionale solo se sono 1–3 cifre. Tutto
+    il resto — un dominio come `rossi.it`, un nome — non lo si conosce e va mascherato: nel
+    dubbio si nasconde di più."""
+    return campo.isdigit() and 1 <= len(campo) <= MAX_CIFRE_PREFISSO
+
+
 def identita_mobile(valore) -> str:
-    """`APP-LOGIN@<numero>_<prefisso>` → `APP-LOGIN@***1234_39`.
+    """`APP-LOGIN@<prefisso>_<numero>` → `APP-LOGIN@39_***1234`.
 
     Tiene la FORMA dell'identità composita — che è poi ciò che si sta verificando quando si
     legge un log di login — e butta il numero. Se la stringa non ha la forma attesa non si
-    tira a indovinare: si maschera tutto tranne la coda."""
+    tira a indovinare: si maschera tutto tranne la coda.
+
+    ⚠️ ORDINE: l'identità è `<prefisso>_<numero>` (prefisso prima, numero dopo — vedi
+    `prova_token.build_params_mobile`, confermato nel decompilato: `UserService::phoneVerifyLogin`
+    costruisce `APP-LOGIN@{areaCode}_{number}`). Il pezzo da OSCURARE è il SECONDO (il numero).
+
+    ⚠️ Il PRIMO campo NON si ristampa «perché è il primo»: position è proprio l'assunzione che ha
+    prodotto il bug dell'ordine invertito. Lo si ristampa solo se è DAVVERO un prefisso di
+    chiamata (`_e_prefisso`: 1–3 cifre). Con un ingresso malformato come `mario@rossi.it_39` il
+    primo campo sarebbe `rossi.it` — un dominio, non un prefisso — e uscirebbe in chiaro; qui
+    viene mascherato insieme al resto. L'unico errore possibile diventa mascherare troppo."""
     s = str(valore or "")
     testa, chiocciola, coda = s.rpartition("@")
     # ⚠️ La testa si ristampa SOLO se è il modulo che ci aspettiamo. `rpartition` da sola non
@@ -118,8 +142,11 @@ def identita_mobile(valore) -> str:
     modulo_noto = bool(chiocciola) and testa.isascii() and testa.isupper() \
         and testa.replace("-", "").isalpha()
     corpo = coda if chiocciola else s
-    num, sep, area = corpo.rpartition("_")
+    area, sep, num = corpo.partition("_")         # ordine: <prefisso>_<numero>
     prefisso_testa = f"{testa}@" if modulo_noto else ""
     if not sep:                                   # forma inattesa: nessuna deduzione
         return f"{prefisso_testa}{numero(corpo)}"
-    return f"{prefisso_testa}{numero(num)}{sep}{area}"
+    if _e_prefisso(area):                         # primo campo = prefisso vero → si ristampa
+        return f"{prefisso_testa}{area}{sep}{numero(num)}"
+    # primo campo NON è un prefisso (dominio, nome, numero fuori posto): si maschera anche quello
+    return f"{prefisso_testa}{numero(area)}{sep}{numero(num)}"

@@ -14,8 +14,8 @@ Header: Authorization=<userToken>, timestamp=<ms>, Content-Type=application/json
 
 ⚠️  Ogni send() col taskId valido ATTUA sull'auto. È pensato per essere invocato SOLO
     dal tap di Rino su un pulsante in Home Assistant (= suo consenso esplicito).
-    Catalogo body ricostruito 1:1 dagli envelope reali in
-    /root/omoda9_capture_20260620/command_envelopes.txt.
+    Catalogo body ricostruito 1:1 dagli envelope reali catturati dall'app ufficiale
+    (materiale di cattura: canale privato, mai in questo repo).
 """
 import os
 import json

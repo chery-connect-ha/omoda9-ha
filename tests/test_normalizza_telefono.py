@@ -2,7 +2,7 @@
 
 Perché questo file esiste. Quella funzione è dichiarata dal codice stesso come l'unico
 passaggio di pulizia: «da qui in poi viaggiano in entry.data, nell'ambiente dei sottoprocessi
-e nell'identità `APP-LOGIN@<num>_<area>`, e a valle nessuno li tocca più». Non aveva un solo
+e nell'identità `APP-LOGIN@<area>_<num>`, e a valle nessuno li tocca più». Non aveva un solo
 test, e conteneva tre difetti che la suite non poteva vedere perché l'unico numero usato dai
 fixture è proprio quello che la funzione trattava bene:
 

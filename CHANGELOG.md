@@ -10,6 +10,51 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ### 🇮🇹 Italiano
 
+- **«Autonomia benzina (miglia)» ora capisce da sola in che unità parla l'auto.** È un
+  sensore di diagnostica, e finora dava per scontato che quel dato arrivasse in miglia —
+  cosa vera sulla Omoda 9, ma dedotta da due sole letture di una sola macchina. Su un
+  modello che lo mandasse in chilometri, Home Assistant avrebbe convertito un numero già
+  metrico e mostrato **un'autonomia più lunga di una volta e mezza**. Adesso il confronto
+  con l'autonomia benzina normale, che arriva sempre in chilometri, dice quale delle due
+  cose sta succedendo. Sulla Omoda 9 non cambia niente: il numero è identico a prima.
+- **Un dato incompleto non fa più comparire un numero sbagliato.** Se in una lettura manca
+  il valore di confronto, quel sensore tiene l'ultimo numero buono invece di mostrarne uno
+  che potrebbe essere falso — e che sarebbe rimasto lì fino alla lettura dopo.
+- **Il login via SMS ora funziona, anche per gli account registrati solo col numero.** Chi accedeva col numero di telefono invece che con l'email otteneva sempre un errore, anche col codice giusto: l'integrazione componeva l'identità dell'account **nell'ordine sbagliato** (prefisso e numero invertiti) e coniava un token per un account fantasma vuoto, senza veicoli. Ora l'ordine è quello corretto — confermato sia dal vivo sia leggendo il programma dell'app ufficiale — e il login via SMS raggiunge il tuo account reale, con la tua auto.
+- **Un messaggio chiaro quando l'account non ha un'auto.** Se il codice era corretto ma su quell'account non risulta nessun veicolo, prima compariva «codice non valido», mandandoti a ricontrollare un OTP che invece andava benissimo. Adesso te lo diciamo com'è davvero: il codice è giusto, ma non c'è un'auto collegata a quell'account.
+- **Numero di telefono più protetto nei file di diagnostica.** La regola che nasconde il numero nei log è stata resa più robusta, così non può sfuggire per un caso di forma inattesa: nel dubbio nasconde di più, mai di meno.
+- **Puoi accedere con la password dell'account, senza aspettare nessun codice.** Finora
+  l'unica strada era il codice OTP via e-mail o SMS, e per chi quel codice non lo riceve
+  più era un muro: l'integrazione non si poteva proprio configurare. Adesso la prima
+  schermata offre una terza voce, «Accedi con password»: e-mail, password e PIN del
+  veicolo, e l'auto compare senza passare da nessun codice. La password serve **solo** per
+  entrare e non viene mai salvata: da lì in poi la sessione vive sul token, esattamente
+  come con l'OTP. E se un giorno la sessione scade, ti viene richiesta la password invece
+  di mandarti a caccia di un codice.
+- **Un menù a tendina sceglie marchio e regione al posto tuo.** L'integrazione si
+  presentava al server sempre come Omoda, quindi un account Chery non veniva riconosciuto e
+  bisognava indovinare a mano quattro parametri tecnici. Ora si sceglie «Omoda / Jaecoo
+  (Europa)» oppure «Chery (Europa)» e vengono compilati da soli; «Custom» resta per
+  qualsiasi altra regione o marchio, con i campi a vista come prima. *Nessuno di noi ha un
+  account Chery: la strada Omoda/Jaecoo è quella provata, l'altra è scritta seguendo il
+  programma dell'app ufficiale e aspetta la prima persona che la usi davvero.*
+- **Puoi scegliere in che lingua l'auto ti scrive.** Le e-mail e gli SMS col codice, e i
+  messaggi che il server restituisce quando qualcosa va storto, seguono la lingua dichiarata
+  al momento dell'accesso: prima era fissa. Ora c'è un menù a tendina, inglese o italiano.
+  Chi ha già l'integrazione configurata non deve fare niente e non vede alcun cambiamento;
+  la scelta riguarda le configurazioni nuove.
+- **La scheda per la dashboard arriva insieme all'integrazione.** Prima andava scaricata a
+  parte e registrata a mano fra le risorse di Lovelace, passaggio che si sbaglia facilmente
+  e che non tutti hanno voglia di fare. Adesso è inclusa e si carica da sola: basta
+  aggiungere una scheda di tipo `custom:chery-card`. Trova da sé le entità della tua auto,
+  quindi senza configurazione mostra già foto, batteria, autonomia, stato di ricarica e gli
+  avvisi (gomme, batteria bassa, auto irraggiungibile) solo quando c'è qualcosa che non va.
+- **Due contatori separati per l'energia caricata a casa e fuori, più un sensore che dice se
+  l'auto è a casa.** Servono a rispondere alla domanda «quanto mi costa davvero»: l'energia
+  presa dalla tua presa e quella presa altrove finiscono in due totali distinti, utilizzabili
+  nel pannello Energia di Home Assistant. ⚠️ **Funzionano solo con l'aggiornamento automatico
+  acceso**: i contatori si costruiscono campionando la potenza di ricarica a ogni lettura, e
+  senza letture periodiche non c'è niente da sommare.
 - **«Raffredda tutto» ora fa qualcosa anche sulle auto che quel comando non ce l'hanno.** Su alcune vetture il costruttore non autorizza affatto il pulsante unico «raffredda tutto»: premendolo si otteneva soltanto un errore, e non c'era niente da fare. I suoi **pezzi**, però, quella stessa auto li autorizza benissimo, presi uno per uno: il climatizzatore e la ventilazione dei sedili anteriori. Adesso, quando il comando unico è negato, l'integrazione lo rifà da sé in un'unica richiesta che l'auto accetta — la stessa identica cosa che otterresti accendendo a mano il clima e poi i sedili dall'app ufficiale. Quello che la tua vettura non consente resta fuori, e **in «Esito comando» trovi quante funzioni sono rimaste indietro** invece di doverlo indovinare da un sedile che resta tiepido; se nella riga ci sta anche il loro nome te lo scriviamo, e per esteso ci sono comunque sempre nel registro. (Lo spazio è poco davvero: Home Assistant concede 255 caratteri a un messaggio, esito compreso.)
 - **Provato su un'auto vera, non solo sulla carta — l'accensione.** Il proprietario di una Jaecoo 7 (l'auto da cui è nata tutta questa storia) ha spedito a mano la richiesta ricomposta a vettura ferma: accettata, ed è uscito a toccare i cuscini — **i due sedili anteriori ventilavano davvero**. Lo **spegnimento** è il gemello simmetrico di quella richiesta, ma quello nessuno l'ha ancora provato: se la tua auto lo rifiutasse, l'interruttore non ti direbbe «spento» per finta — resta com'era e leggi l'errore.
 - **Sulla sua auto i sedili posteriori restano fuori, e ci ha detto che non è una rinuncia:** su quella vettura i sedili di dietro non sono né riscaldati né ventilati. Vale la pena dirlo perché lo ha verificato lui a bordo: **noi non possiamo dedurre da questo elenco cosa la tua auto abbia o non abbia montato**, e non ci proviamo.
@@ -18,6 +63,51 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ### 🇬🇧 English
 
+- **"Petrol range (miles)" now works out for itself which unit the car is speaking.** It is
+  a diagnostic sensor, and until now it assumed that reading arrived in miles — true on the
+  Omoda 9, but worked out from two readings of a single car. On a model sending kilometres
+  instead, Home Assistant would have converted an already-metric number and shown **a range
+  half again as long as the real one**. It now compares against the ordinary petrol range,
+  which always arrives in kilometres, and that comparison settles which case it is. On an
+  Omoda 9 nothing changes: the number is identical to before.
+- **An incomplete reading no longer produces a wrong number.** When the value needed for
+  that comparison is missing, the sensor keeps the last good number instead of showing one
+  that might be false — and that would have stayed on screen until the next reading.
+- **SMS sign-in now works, including for accounts registered with a phone number only.** Signing in with a phone number instead of an email always failed, even with the right code: the integration built the account identity **in the wrong order** (area code and number swapped) and minted a token for an empty phantom account with no vehicles. The order is now correct — confirmed both live and by reading the official app — so SMS sign-in reaches your real account and your car.
+- **A clear message when the account has no car.** If the code was correct but that account has no vehicle on it, it used to say "invalid code", sending you to re-check an OTP that was actually fine. Now it tells you what is really going on: the code is right, but there is no car linked to that account.
+- **Safer phone-number redaction in the diagnostics file.** The rule that hides the number in logs was hardened so it cannot slip through on an unexpected shape: when in doubt it masks more, never less.
+- **You can sign in with your account password, without waiting for any code.** Until now
+  the only way in was an OTP code by e-mail or SMS, and for anyone who no longer receives
+  that code it was a wall: the integration simply could not be set up. The first screen now
+  offers a third option, "Sign in with password": account e-mail, password and vehicle PIN,
+  and the car appears without any code at all. The password is used **only** to get in and
+  is never stored: from there the session lives on the token, exactly as it does with OTP.
+  And if the session expires one day, you are asked for the password instead of being sent
+  hunting for a code.
+- **A dropdown picks your brand and region for you.** The integration always introduced
+  itself to the server as Omoda, so a Chery account was not recognised and four technical
+  parameters had to be guessed by hand. You now choose "Omoda / Jaecoo (Europe)" or
+  "Chery (Europe)" and they fill themselves in; "Custom" remains for any other region or
+  brand, with the fields on show as before. *None of us owns a Chery account: the
+  Omoda/Jaecoo path is the tested one, the other is written from reading the official app
+  and is waiting for the first person to actually use it.*
+- **You can choose which language the car writes to you in.** The e-mails and texts carrying
+  the code, and the messages the server returns when something goes wrong, follow the
+  language declared at sign-in: it used to be fixed. There is now a dropdown, English or
+  Italian. If you already have the integration set up, you need do nothing and will see no
+  change; the choice applies to new setups.
+- **The dashboard card now ships with the integration.** It used to be a separate download
+  that you registered by hand among the Lovelace resources, a step which is easy to get
+  wrong and which not everybody wants to take. It is now included and loads itself: add a
+  card of type `custom:chery-card`. It finds your car's entities on its own, so with no
+  configuration at all it already shows photo, battery, range, charging state, and the
+  warnings (tyres, low battery, car unreachable) only when something is actually wrong.
+- **Two separate counters for energy charged at home and away, plus a sensor saying whether
+  the car is at home.** They exist to answer "what is this actually costing me": energy
+  taken from your own socket and energy taken elsewhere land in two distinct totals, usable
+  in the Home Assistant Energy dashboard. ⚠️ **They only work with automatic updating
+  switched on**: the counters are built by sampling charging power at each reading, and with
+  no periodic readings there is nothing to add up.
 - **"Cool everything" now does something even on cars that do not have that command.** On some vehicles the manufacturer does not authorise the single "cool everything" button at all: pressing it produced nothing but an error, and there was no way round it. Its **constituent parts**, however, are perfectly authorised on that same car, taken one at a time: the climate control and the front seat ventilation. Now, when the single command is denied, the integration rebuilds it itself into one request the car does accept — exactly the same thing you would get by switching on the climate and then each seat by hand in the official app. Whatever your car does not allow is left out, and **"Command result" tells you how many functions were left behind** instead of leaving you to work it out from a seat that stays lukewarm; if their names fit in the line we write those too, and in full they are always in the log. (Space really is tight: Home Assistant allows a message 255 characters, result included.)
 - **Tested on a real car, not only on paper — switching on.** The owner of a Jaecoo 7 (the car this whole story started from) sent the recomposed request by hand with the vehicle parked: accepted — and he went out and put a hand on the cushions: **both front seats really were ventilating**. **Switching off** is the symmetrical twin of that request, but nobody has tried that one yet: if your car refused it, the switch would not falsely claim "off" — it stays as it was and you read the error.
 - **On his car the rear seats stay out, and he told us that is no loss:** on that vehicle the rear seats are neither heated nor ventilated. Worth saying because he checked it in the car himself: **we cannot infer from this list what your car does or does not have fitted**, and we do not try.
