@@ -68,6 +68,60 @@ people expect. Redact before you paste. Fixture data is synthetic.
 at runtime — not a new branch, class, or `if model == …`. If you find yourself
 adding one, you have found an architecture problem: say so instead of encoding it.
 
+**Write the code in English — identifiers, comments and docstrings.** The people
+maintaining this live in Italy, the UK, Denmark, Austria and Poland, and the prose around
+the project is already English: commit messages, pull requests, `CONTRIBUTING.md`, this
+file. The reasoning *inside* the code is the one place that is not, and it is the place a
+new maintainer has to understand before they can change anything safely.
+
+**Going forward, not retroactively.** Roughly 1,400 comments and 290 docstrings here are in
+Italian, and they are the best asset this codebase has — measured, dated, specific. Machine
+translating them would destroy exactly what makes them worth reading. So:
+
+- **new code is English**, including variable and function names;
+- **a block you are already editing becomes English** as part of that change — if you touch
+  the lines, translate the paragraph you touched, and do it yourself rather than with a
+  tool that will smooth away the detail;
+- **everything else stays as it is** until somebody has a reason to touch it. A rule that
+  makes the whole repository non-compliant on the day it is written gets ignored by the
+  end of the week.
+
+**Two things this rule does not cover**, deliberately:
+
+- **entity translation keys and `entity_id` slugs** (`autonomia_benzina`,
+  `carburante_residuo`, …), of which **91 out of 107 are currently Italian**. Those are
+  user-visible identifiers: renaming one changes an `entity_id` and breaks somebody's
+  automations, dashboards and long-term statistics. Never as a side effect of tidying.
+
+  **They are not excluded forever, though — they are booked for the one moment when they
+  are free.** The HA domain rename (`omoda9` → `chery_connect`) changes every `entity_id`
+  in the integration anyway, and costs every user one reconfiguration. Renaming the slug at
+  the same time costs them nothing on top of a migration they are already doing; renaming it
+  at any other time is a second break for no reason. So the whole set moves **in that
+  release and in no other**, listed in its notes, with an old → new table so people can fix
+  their automations in one pass. See step 3 of #10;
+- **the user-facing Italian in `translations/it.json` and in command-result text**, which is
+  a translation and is supposed to be in Italian.
+
+**The same rule covers everything you write on GitHub**: issues and their titles,
+comments, review comments — not only the commit messages and pull request text the hook
+below already refuses. Not as a matter of taste, but of who can read the queue.
+@GurliGebis is building the merged repository and offered to handle the HACS
+default-store submission, and has no Italian; @JackRonan, @ThomasMeyer1970, @Sisku and
+@kowi4 all write in English. An Italian title on a pull request asks them to review code
+through a thread they cannot read, and today several of the open ones do exactly that.
+
+The exception is the one directly above, and the test is **who the sentence is addressed
+to**: a collaborator, or somebody driving the car. `translations/it.json`, the Italian
+half of `CHANGELOG.md` and command-result text stay Italian — they are translations doing
+their job, and they are not to be "fixed".
+
+**What enforces it: a reader, not a test.** No check can tell whether a comment is English,
+so this is one of the few rules here that depends on somebody noticing in review. That is
+stated rather than hidden — see *Before you write a rule, ask what would enforce it* above.
+The one automated piece is the hook that already refuses non-English commit messages and
+pull request text.
+
 **The suite stays green.** Not "green after a follow-up" — green in the pull
 request that changes the behaviour.
 
