@@ -225,9 +225,22 @@ git remote -v                                       # origin = your fork, upstre
 ```
 
 **Do not commit on the `master` of your fork.** It is the one mistake that costs you
-something you cannot undo cheaply: a pull request opened from `master` follows that branch,
-so every later commit you make lands inside the open pull request, and you can have only
-one going at a time. Branch, always, even for a single file.
+something you cannot undo cheaply, and it has two separate consequences.
+
+The first is that a pull request opened from `master` follows that branch, so every later
+commit you make lands inside the open pull request, and you can have only one going at a
+time.
+
+The second destroyed somebody's work here on 6 September 2026, so it is written down in
+detail rather than as a warning. **Do not sync your fork while your own commits are on its
+`master`.** Once this repository's `master` has moved, your fork cannot fast-forward, and
+the Sync fork button in the browser offers "Discard commits" as the way through. Taking it
+does exactly what it says: the commits go, the pull request empties, and GitHub closes it
+in the same second. Nothing warns you first, and asking someone to "bring `master` into
+your branch" without giving them the commands leads them straight to that button.
+
+Branch, always, even for a single file. Then syncing your fork is harmless, because your
+work is not on the branch being synced.
 
 **Start a piece of work: always from an up-to-date `master`, never from your own.**
 
