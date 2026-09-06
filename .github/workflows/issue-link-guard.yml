@@ -1,0 +1,60 @@
+name: Issue link guard
+
+# Every pull request that touches the integration says what it closes. The rule is in
+# AGENTS.md ("Put `Closes #12` in the body"), the template already has the line, and until
+# now nothing noticed when the line was left empty: eleven merges on 5-6 September, two
+# carried it. See #60 for the measurement.
+#
+# The point is not bookkeeping. Without the link, the issue outlives the fix and somebody
+# reopens the conversation months later, or worse, an issue somebody is waiting on stays
+# open after the thing they asked for has shipped.
+#
+# This file is in English, like `version-guard.yml` and for the same reason: the message
+# below is read by whoever trips over it, and not all of us read Italian.
+#
+# It runs on EVERY pull request, not only on the ones touching `custom_components/`.
+# Scoping it to code was tried on paper first and caught one of the five that prompted it:
+# the other four were documentation and a changelog, and two of those had more reason to
+# start as an issue than the code one did. With the `No issue:` escape costing a single
+# written line, there is no case for a narrower net.
+#
+# What it does NOT do: check that the issue exists, that it is open, or that it is the
+# right one. Those need judgement. This is a grep, and it is deliberately one.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: The body says what this finishes, or why it finishes nothing
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          # Three accepted forms. The third is not a loophole, it is the reason the other
+          # two stay honest: a defect found while doing something else does not always
+          # deserve an issue opened in front of it, and a check with no way out gets
+          # worked around instead of followed. What it costs is one written sentence.
+          if printf '%s' "$BODY" | grep -qiE '(clos(e|es|ed)|fix(e|es|ed)?|resolv(e|es|ed))[[:space:]]+#[0-9]+'; then
+            echo "Declares an issue it closes."
+            exit 0
+          fi
+          if printf '%s' "$BODY" | grep -qiE 'relates[[:space:]]+to[[:space:]]+#[0-9]+'; then
+            echo "Declares an issue it moves along."
+            exit 0
+          fi
+          # `No issue:` must be followed by an actual reason, not left bare.
+          if printf '%s' "$BODY" | grep -qiE 'no[[:space:]]+issue:[[:space:]]*[^[:space:]]+'; then
+            echo "Declares deliberately no issue, with a reason."
+            exit 0
+          fi
+
+          echo "::error::This pull request touches custom_components/ and its body does not say what it finishes. Add ONE of these lines: 'Closes #<n>' if it finishes an issue; 'Relates to #<n>' if it moves one along, saying in the body what is left; or 'No issue: <reason>' if there deliberately is not one, with the reason written out. The last form is not a formality to be filled with 'none' - it is what stops the other two from being skipped. The rule is in AGENTS.md, and #60 has the measurement that made this a check rather than a request." >&2
+          exit 1
