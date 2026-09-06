@@ -23,6 +23,38 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Il login via SMS ora funziona, anche per gli account registrati solo col numero.** Chi accedeva col numero di telefono invece che con l'email otteneva sempre un errore, anche col codice giusto: l'integrazione componeva l'identità dell'account **nell'ordine sbagliato** (prefisso e numero invertiti) e coniava un token per un account fantasma vuoto, senza veicoli. Ora l'ordine è quello corretto — confermato sia dal vivo sia leggendo il programma dell'app ufficiale — e il login via SMS raggiunge il tuo account reale, con la tua auto.
 - **Un messaggio chiaro quando l'account non ha un'auto.** Se il codice era corretto ma su quell'account non risulta nessun veicolo, prima compariva «codice non valido», mandandoti a ricontrollare un OTP che invece andava benissimo. Adesso te lo diciamo com'è davvero: il codice è giusto, ma non c'è un'auto collegata a quell'account.
 - **Numero di telefono più protetto nei file di diagnostica.** La regola che nasconde il numero nei log è stata resa più robusta, così non può sfuggire per un caso di forma inattesa: nel dubbio nasconde di più, mai di meno.
+- **Puoi accedere con la password dell'account, senza aspettare nessun codice.** Finora
+  l'unica strada era il codice OTP via e-mail o SMS, e per chi quel codice non lo riceve
+  più era un muro: l'integrazione non si poteva proprio configurare. Adesso la prima
+  schermata offre una terza voce, «Accedi con password»: e-mail, password e PIN del
+  veicolo, e l'auto compare senza passare da nessun codice. La password serve **solo** per
+  entrare e non viene mai salvata: da lì in poi la sessione vive sul token, esattamente
+  come con l'OTP. E se un giorno la sessione scade, ti viene richiesta la password invece
+  di mandarti a caccia di un codice.
+- **Un menù a tendina sceglie marchio e regione al posto tuo.** L'integrazione si
+  presentava al server sempre come Omoda, quindi un account Chery non veniva riconosciuto e
+  bisognava indovinare a mano quattro parametri tecnici. Ora si sceglie «Omoda / Jaecoo
+  (Europa)» oppure «Chery (Europa)» e vengono compilati da soli; «Custom» resta per
+  qualsiasi altra regione o marchio, con i campi a vista come prima. *Nessuno di noi ha un
+  account Chery: la strada Omoda/Jaecoo è quella provata, l'altra è scritta seguendo il
+  programma dell'app ufficiale e aspetta la prima persona che la usi davvero.*
+- **Puoi scegliere in che lingua l'auto ti scrive.** Le e-mail e gli SMS col codice, e i
+  messaggi che il server restituisce quando qualcosa va storto, seguono la lingua dichiarata
+  al momento dell'accesso: prima era fissa. Ora c'è un menù a tendina, inglese o italiano.
+  Chi ha già l'integrazione configurata non deve fare niente e non vede alcun cambiamento;
+  la scelta riguarda le configurazioni nuove.
+- **La scheda per la dashboard arriva insieme all'integrazione.** Prima andava scaricata a
+  parte e registrata a mano fra le risorse di Lovelace, passaggio che si sbaglia facilmente
+  e che non tutti hanno voglia di fare. Adesso è inclusa e si carica da sola: basta
+  aggiungere una scheda di tipo `custom:chery-card`. Trova da sé le entità della tua auto,
+  quindi senza configurazione mostra già foto, batteria, autonomia, stato di ricarica e gli
+  avvisi (gomme, batteria bassa, auto irraggiungibile) solo quando c'è qualcosa che non va.
+- **Due contatori separati per l'energia caricata a casa e fuori, più un sensore che dice se
+  l'auto è a casa.** Servono a rispondere alla domanda «quanto mi costa davvero»: l'energia
+  presa dalla tua presa e quella presa altrove finiscono in due totali distinti, utilizzabili
+  nel pannello Energia di Home Assistant. ⚠️ **Funzionano solo con l'aggiornamento automatico
+  acceso**: i contatori si costruiscono campionando la potenza di ricarica a ogni lettura, e
+  senza letture periodiche non c'è niente da sommare.
 
 ### 🇬🇧 English
 
@@ -39,6 +71,38 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **SMS sign-in now works, including for accounts registered with a phone number only.** Signing in with a phone number instead of an email always failed, even with the right code: the integration built the account identity **in the wrong order** (area code and number swapped) and minted a token for an empty phantom account with no vehicles. The order is now correct — confirmed both live and by reading the official app — so SMS sign-in reaches your real account and your car.
 - **A clear message when the account has no car.** If the code was correct but that account has no vehicle on it, it used to say "invalid code", sending you to re-check an OTP that was actually fine. Now it tells you what is really going on: the code is right, but there is no car linked to that account.
 - **Safer phone-number redaction in the diagnostics file.** The rule that hides the number in logs was hardened so it cannot slip through on an unexpected shape: when in doubt it masks more, never less.
+- **You can sign in with your account password, without waiting for any code.** Until now
+  the only way in was an OTP code by e-mail or SMS, and for anyone who no longer receives
+  that code it was a wall: the integration simply could not be set up. The first screen now
+  offers a third option, "Sign in with password": account e-mail, password and vehicle PIN,
+  and the car appears without any code at all. The password is used **only** to get in and
+  is never stored: from there the session lives on the token, exactly as it does with OTP.
+  And if the session expires one day, you are asked for the password instead of being sent
+  hunting for a code.
+- **A dropdown picks your brand and region for you.** The integration always introduced
+  itself to the server as Omoda, so a Chery account was not recognised and four technical
+  parameters had to be guessed by hand. You now choose "Omoda / Jaecoo (Europe)" or
+  "Chery (Europe)" and they fill themselves in; "Custom" remains for any other region or
+  brand, with the fields on show as before. *None of us owns a Chery account: the
+  Omoda/Jaecoo path is the tested one, the other is written from reading the official app
+  and is waiting for the first person to actually use it.*
+- **You can choose which language the car writes to you in.** The e-mails and texts carrying
+  the code, and the messages the server returns when something goes wrong, follow the
+  language declared at sign-in: it used to be fixed. There is now a dropdown, English or
+  Italian. If you already have the integration set up, you need do nothing and will see no
+  change; the choice applies to new setups.
+- **The dashboard card now ships with the integration.** It used to be a separate download
+  that you registered by hand among the Lovelace resources, a step which is easy to get
+  wrong and which not everybody wants to take. It is now included and loads itself: add a
+  card of type `custom:chery-card`. It finds your car's entities on its own, so with no
+  configuration at all it already shows photo, battery, range, charging state, and the
+  warnings (tyres, low battery, car unreachable) only when something is actually wrong.
+- **Two separate counters for energy charged at home and away, plus a sensor saying whether
+  the car is at home.** They exist to answer "what is this actually costing me": energy
+  taken from your own socket and energy taken elsewhere land in two distinct totals, usable
+  in the Home Assistant Energy dashboard. ⚠️ **They only work with automatic updating
+  switched on**: the counters are built by sampling charging power at each reading, and with
+  no periodic readings there is nothing to add up.
 
 ## v1.13.0 — 2026-08-10
 
