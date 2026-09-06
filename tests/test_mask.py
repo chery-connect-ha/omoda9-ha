@@ -69,28 +69,44 @@ def test_email_malformata_non_esce_mai(valore):
 # ───────────────────────── identità composita ─────────────────────────
 
 def test_identita_tiene_la_forma_e_butta_il_numero():
-    """La forma `APP-LOGIN@<num>_<area>` è ciò che si sta verificando quando si legge un log
-    di login: va conservata, il numero no."""
-    assert mask.identita_mobile("APP-LOGIN@3001234567_39") == "APP-LOGIN@***4567_39"  # PHONE_PLACEHOLDER
+    """La forma `APP-LOGIN@<prefisso>_<numero>` è ciò che si sta verificando quando si legge un
+    log di login: la si conserva, il numero no. Ordine confermato nel decompilato
+    (`UserService::phoneVerifyLogin` costruisce `APP-LOGIN@{areaCode}_{number}`)."""
+    assert mask.identita_mobile("APP-LOGIN@39_3001234567") == "APP-LOGIN@39_***4567"  # PHONE_PLACEHOLDER
 
 def test_identita_di_forma_inattesa_non_tira_a_indovinare():
-    assert mask.identita_mobile("3001234567") == "***4567"            # PHONE_PLACEHOLDER
-    assert mask.identita_mobile("APP-LOGIN@12_39") == "APP-LOGIN@***_39"  # PHONE_PLACEHOLDER
+    assert mask.identita_mobile("3001234567") == "***4567"               # PHONE_PLACEHOLDER
+    assert mask.identita_mobile("APP-LOGIN@39_12") == "APP-LOGIN@39_***"  # numero troppo corto -> ***  # PHONE_PLACEHOLDER
     assert mask.identita_mobile("") == mask.OSCURATO
+
+def test_identita_maschera_il_primo_campo_se_non_e_un_prefisso():
+    """Regressione (feedback di Rino): rendere la mascheratura posizionale — stampare SEMPRE il
+    primo campo — faceva uscire il dominio di un ingresso malformato `mario@rossi.it_39` come
+    `rossi.it_***`. Il primo campo si ristampa solo se è un vero prefisso di chiamata (1–3
+    cifre); un dominio, un nome o un numero finito lì per errore vengono mascherati. L'unico
+    verso in cui si può sbagliare è mascherare troppo."""
+    assert mask.identita_mobile("mario@rossi.it_39") == "***_***"
+    assert "rossi.it" not in mask.identita_mobile("mario@rossi.it_39")
+    # numero intero finito per errore nel PRIMO campo (ordine invertito): non deve uscire intero
+    assert "3001234567" not in mask.identita_mobile("APP-LOGIN@3001234567_39")  # PHONE_PLACEHOLDER
+    # un prefisso vero (1–3 cifre) invece SÌ resta leggibile, è la forma che si sta verificando
+    assert mask.identita_mobile("APP-LOGIN@393_3001234567") == "APP-LOGIN@393_***4567"  # PHONE_PLACEHOLDER
 
 
 # ──────────────────── le due copie del pattern e-mail ────────────────────
 
 @pytest.mark.parametrize("ingresso,vietato", [
     ("mario@rossi.it_39", "mario"),      # la «testa» non è il modulo: non va ristampata
+    ("mario@rossi.it_39", "rossi.it"),   # e nemmeno il dominio: era una regressione (primo campo in chiaro)
     ("A@B@C_39", "B"),                   # chiocciole multiple
     ("mario.rossi@example.com", "mario"),
+    ("APP-LOGIN@3001234567_39", "3001234567"),  # ordine invertito: il numero intero non deve uscire  # PHONE_PLACEHOLDER
 ])
 def test_identita_non_ristampa_una_testa_che_non_e_il_modulo(ingresso, vietato):
     """`rpartition('@')` da sola non verifica NULLA: prendeva per «modulo» qualunque cosa
     precedesse l'ultima chiocciola e la ristampava in chiaro. Con un valore che arriva grezzo
     dall'ambiente (`OMODA_PHONE` non passa dalla normalizzazione del config flow) usciva un
-    indirizzo intero."""
+    indirizzo intero. Stesso principio sul PRIMO campo del corpo: non è un prefisso ⇒ mascherato."""
     assert vietato not in mask.identita_mobile(ingresso)
 
 

@@ -1,0 +1,77 @@
+{
+  "delivery_id": "2026-08-19_process-contributing-agents",
+  "date": "2026-08-19",
+  "repo": "chery-connect-ha/omoda9-ha",
+  "intent": "Pubblicare l'impianto di collaborazione come regola scritta, in risposta a due obiezioni reali: 'la mia approvazione sarebbe una firma, non una review' (Caslinovich, non sviluppatore) e il rischio che una regola uniforme separi un contributore dal proprio lavoro. Nessun codice runtime toccato: solo prosa e template.",
+  "baseline": "29fef39 (v1.13.0, canon/master)",
+  "head": "d274493",
+  "delivered_as": "PR chery-connect-ha/omoda9-ha#11",
+  "units": [
+    {
+      "block": "intent",
+      "path": "CONTRIBUTING.md",
+      "lines": 191,
+      "note": "La prima schermata ('In one page') e' il documento: le quattro cose tenute separate (strumento / protocollo / catalogo / integrazione) e i tre tempi di una modifica. Il resto e' dettaglio. Il pezzo che porta il peso e' la tabella del gate proporzionale al raggio d'azione, e la riga 'merge mai bloccato, stable si'.",
+      "reading_estimate_minutes": 11
+    },
+    {
+      "block": "contract",
+      "path": "AGENTS.md",
+      "lines": 226,
+      "note": "Contratto verso gli agenti dei maintainer, non verso gli umani. Due meta': invarianti (fail open, niente segreti, niente nomi di modello come percorsi di codice, core/ senza HA) e ricette git/gh letterali incluso il recupero da 'ho committato su master'. La sezione da leggere davvero e' 'don't overstate evidence': la domanda 'hai visto l'auto farlo?' e' l'unico controllo contro il danno che raggiunge uno sconosciuto.",
+      "reading_estimate_minutes": 13
+    },
+    {
+      "block": "prose",
+      "path": "docs/field-test.md",
+      "lines": 154,
+      "note": "Il metodo di Caslinovich reso procedura: due livelli (backend accetta vs auto agisce), variabile singola, predizione scritta prima, conferma sul campo di stato. Contiene la riga a quattro campi che unifica report e catalogo, e la sezione 'due strumenti' che assegna sandbox e istanza HA a tipi di claim diversi.",
+      "reading_estimate_minutes": 9
+    },
+    {
+      "block": "prose",
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "lines": 37,
+      "note": "Blocco evidenza a quattro alternative mutuamente esclusive: verificato su hardware / solo backend / non testabile da me / nessun comportamento runtime. E' il punto in cui la disciplina diventa un campo da compilare.",
+      "reading_estimate_minutes": 2
+    },
+    {
+      "block": "prose",
+      "path": ".github/ISSUE_TEMPLATE/",
+      "lines": 145,
+      "note": "bug_report.yml, field_test.yml, config.yml. I dropdown modello/regione esistono per alimentare la matrice di #9 senza tenerla a mano; field_test.yml e' l'unico modo che un non-sviluppatore ha di contribuire una prova.",
+      "reading_estimate_minutes": 5
+    },
+    {
+      "block": "prose",
+      "path": ".github/copilot-instructions.md",
+      "lines": 8,
+      "note": "Solo puntatore ad AGENTS.md.",
+      "reading_estimate_minutes": 1
+    }
+  ],
+  "excluded": [
+    {
+      "what": "CODEOWNERS",
+      "why": "I path che nominerebbe (platform/, transport/) non esistono finche' non atterrano le fette di #6. Scritto ora sarebbe una mappa di cartelle inesistenti."
+    },
+    {
+      "what": "CLAUDE.md nel repo",
+      "why": "Canonico AGENTS.md, neutro rispetto al tool. In piu' la regola globale dell'utente vieta CLAUDE.md dentro le directory di progetto."
+    },
+    {
+      "what": "Sezione sullo split in repo separati (sandbox/protocollo/integrazione)",
+      "why": "Idea dell'utente, valutata e ritirata da lui stesso: sono strati, non repo. Il ragionamento e' nel diario di sessione e nella memory, non nel repo pubblico."
+    },
+    {
+      "what": "Traduzione italiana di CONTRIBUTING/AGENTS",
+      "why": "Il repo tiene README.it.md ma la lingua condivisa del gruppo e' l'inglese (Jack e Gurli non leggono italiano). Da valutare solo se qualcuno la chiede."
+    }
+  ],
+  "not_delivered_here": [
+    {
+      "what": "chery-connect-ha/protocol-notes (README + tools/redact_check.py, ~90 righe)",
+      "why": "Repo privato separato, fuori da questo repo per costruzione. Debito di lettura trascurabile e non condiviso col gruppo."
+    }
+  ]
+}

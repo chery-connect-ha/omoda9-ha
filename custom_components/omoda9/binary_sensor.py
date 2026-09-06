@@ -21,7 +21,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, FIELDS_AS_RICH_ENTITY
 from .coordinator import SENSORS
-from .entity import Omoda9Entity, field_on
+from .entity import Omoda9Entity, car_zone, field_on
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEntitiesCallback) -> None:
@@ -34,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     ents.append(Omoda9Online(coord))
     ents.append(Omoda9Awake(coord))
     ents.append(Omoda9Session(coord))
+    ents.append(Omoda9ACasa(coord))
     # — avvisi dal canale realtime (Round B): gomme + batteria scarica —
     for suffix, name, field, dc in _RT_BINARIES:
         ents.append(Omoda9RealtimeBinary(coord, name, suffix, field, dc))
@@ -143,6 +144,37 @@ class Omoda9RealtimeBinary(_Omoda9RestoreBinary):
     def _live_is_on(self) -> bool | None:
         rt = self.coordinator.data.get("realtime") or {}
         return field_on(rt[self._field]) if self._field in rt else None
+
+
+class Omoda9ACasa(Omoda9Entity, BinarySensorEntity):
+    """Se l'auto si trova dentro la zona `home` di Home Assistant, dalla sua posizione GPS
+    viva — stessa logica di zona del device_tracker. ON = a casa, OFF = fuori, `unknown`
+    finche' non c'e' un fix utilizzabile.
+
+    Comodo per automazioni e schede che vogliono il booleano senza interpretare lo stato del
+    device_tracker: risponde con la zona piu' PICCOLA che contiene l'auto, quindi in un
+    garage disegnato dentro casa dice `off`. E' la convenzione di Home Assistant e resta.
+
+    I contatori di energia NON usano questa funzione ma `in_zona_casa`, che chiede il
+    contenimento in `zone.home`: le due domande sono diverse e tenerle diverse e' voluto —
+    la presenza dice dove sei, l'energia dice a chi va addebitata."""
+
+    _attr_device_class = BinarySensorDeviceClass.PRESENCE
+    _attr_icon = "mdi:home-map-marker"
+
+    def __init__(self, coord) -> None:
+        super().__init__(coord, "Omoda9 A casa", "at_home", entity_id_format=ENTITY_ID_FORMAT)
+
+    @property
+    def available(self) -> bool:
+        # Deriva dalla posizione: con l'aggiornamento automatico spento il fix GPS non viene
+        # rinfrescato e questo riporterebbe un casa/fuori potenzialmente vecchio.
+        return bool(self.coordinator.poll_enabled)
+
+    @property
+    def is_on(self) -> bool | None:
+        zona = car_zone(self.hass, self.coordinator.data.get("position"))
+        return None if zona is None else zona == "home"
 
 
 class Omoda9Awake(Omoda9Entity, BinarySensorEntity):

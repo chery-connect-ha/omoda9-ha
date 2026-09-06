@@ -170,6 +170,33 @@ written for a car you do not own: your instance cannot disprove it, and this is
 what puts it in front of the person whose instance can, while there is still
 time to change it.
 
+**The version number is not yours to choose.** `manifest.json` carries the number of
+the **next** release, and exactly one pull request ever raises it: the first one opened
+after a stable ships. Everybody else adds their entry to the existing `## v<next>`
+section of `CHANGELOG.md` and leaves `manifest.json` alone.
+
+Bumping per pull request looks harmless and is not. On 25 August 2026 three branches
+each set `1.14.0` and each opened their own `## v1.14.0` section. The first merged; the
+other two went from mergeable to conflicting in the same minute, and two more were
+carrying the same collision behind them. Five pull requests, one line, three authors,
+every one of whom had to be asked to redo work that was already correct. It is also a
+question you cannot answer alone: whether your change is a patch or a minor depends on
+what ships beside it, which you do not know when you open the branch.
+
+This does **not** make `CHANGELOG.md` uncontended — everyone still writes into the same
+section. But that is an ordinary additive conflict instead of one line carrying three
+different values.
+
+⚠️ **The one time you do raise it.** After a stable ships, the next pull request must,
+or no beta can be cut from anything: `beta.yml` refuses to build a pre-release whose
+manifest is not ahead of the latest stable, because in semver `v1.13.0-beta.1` sorts
+*before* `v1.13.0` and HACS would offer it as a downgrade. The workflow fails loudly and
+names the number to use — but doing it on purpose beats being told off by CI.
+
+*What enforces it:* `.github/workflows/version-guard.yml` fails a pull request that
+changes the version while the next number is already set. Per the section above, this
+rule ships with the thing that holds it up rather than with a request to remember it.
+
 ## The commands
 
 `master` is protected: no direct pushes. Everything below assumes the remote is

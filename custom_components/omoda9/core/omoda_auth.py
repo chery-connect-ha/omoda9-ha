@@ -35,6 +35,9 @@ BFF          = os.environ.get("OMODA_BFF", "https://legend-oj.omodaauto.nl/api")
 TENANT_CODE  = os.environ.get("OMODA_TENANT_CODE", "300006")
 CHANNEL_ID   = os.environ.get("CHANNEL_ID", "1")
 COUNTRY_ID   = os.environ.get("OMODA_COUNTRY_ID", "1")
+# Lingua delle chiamate (header Accept-Language): decide la lingua di e-mail OTP/SMS/messaggi
+# server. Default it-IT (comportamento storico). Con `ctx` si usa `ctx.language`.
+ACCEPT_LANGUAGE = os.environ.get("OMODA_LANGUAGE", "it-IT")
 
 SIGN_NONCE   = "chery_legend_h5"                       # headerSignature nonce
 SIGN_SECRET  = "cX5fR8lJ6pK2xD4uH1eK4pY6wA4xO0sK"     # prod (ENV=0)
@@ -111,6 +114,29 @@ def sm4_code(code: str, transform: str="plain") -> str:
     ct = sm4_ecb_encrypt_pkcs7(s.encode("utf-8"))
     return base64.b64encode(ct).decode()
 
+# ── AES-128-CBC del login diretto con password (grant_type=password) ──────────
+# La password NON usa SM4 (che cifra il codice OTP): il login diretto la cifra con
+# AES-128-CBC/PKCS7, key=IV costante dell'app. Modo CBC confermato via uprobe kernel-side
+# (RE: protocol-notes `00-start-here/RE_METHOD_AND_SNIFFING.md` §2.3), e il body cifrato così
+# è stato verificato dal vivo il 2026-08-24 (conia il token; il corpo in chiaro dà
+# `IllegalBlockSizeException`, quello cifrato SM4 dà `BadPaddingException`). È una costante
+# universale della PIATTAFORMA — la stessa per ogni account, estratta da `libapp.so` — non una
+# credenziale per-account.
+AES_PWD_KEY = b"w9R8Ag1KiL0pvMHc"
+
+def aes_cbc_password(password: str) -> str:
+    """`base64( AES-128-CBC/PKCS7( password ) )` con key=IV=`AES_PWD_KEY`.
+
+    È la forma con cui l'app manda la password nel login diretto: il server la DECIFRA
+    (`needDecode=1`). Mandare questo nel BODY tiene la password fuori dalla URL — quindi fuori
+    dal messaggio di un'eccezione `urllib3` e dai log di Home Assistant — e cifrata, quindi fuori
+    anche dai log d'accesso di Chery. Import di `Crypto` locale: `pycryptodome` è già una
+    dipendenza del manifest (lo usa `captcha_solver`), ma non serve a chi non fa login-password."""
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import pad
+    c = AES.new(AES_PWD_KEY, AES.MODE_CBC, AES_PWD_KEY)
+    return base64.b64encode(c.encrypt(pad(password.encode("utf-8"), AES.block_size))).decode()
+
 # ── Firma app (POST: mappa valori vuota -> niente brackets/keys) ──────────────
 def sign_post(url_path: str, ts_ms: int=None, secret: str=SIGN_SECRET, nonce: str=SIGN_NONCE):
     ts = ts_ms if ts_ms is not None else int(time.time()*1000)
@@ -129,6 +155,7 @@ def headers_post(url_path: str, secret: str=SIGN_SECRET, nonce: str=SIGN_NONCE,
     channel_id = ctx.channel_id if ctx is not None else CHANNEL_ID
     country_id = ctx.country_id if ctx is not None else COUNTRY_ID
     tenant = ctx.tenant_code if ctx is not None else TENANT_CODE
+    accept_lang = getattr(ctx, "language", None) or ACCEPT_LANGUAGE if ctx is not None else ACCEPT_LANGUAGE
     # `DEPT-ID` è, per ammissione della mappa da cui è stato estratto, il PREFISSO del Paese:
     # Italia 39, Francia 33, Germania 49. Con l'arrivo del login via SMS il prefisso è
     # diventato un dato che l'utente sceglie, e restava scollegato da qui: a un tedesco si
@@ -148,7 +175,7 @@ def headers_post(url_path: str, secret: str=SIGN_SECRET, nonce: str=SIGN_NONCE,
     h = {
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept-Language": "it-IT",
+        "Accept-Language": accept_lang,
         "Accept-Encoding": "gzip, deflate",
         "agent": "android",
         "version": APP_VERSION,
