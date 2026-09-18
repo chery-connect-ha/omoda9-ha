@@ -118,15 +118,22 @@
         "title": "Sign in with password",
         "description": "Enter your account email, password and vehicle PIN — no OTP code needed. VIN and account ID are detected automatically. The password is used once to sign in and is never stored.{reason}",
         "data": {
+          "preset": "Brand / region preset",
           "email": "Account email",
           "pin": "Vehicle control PIN",
           "password": "Account password",
+          "language": "Language (OTP emails / SMS)",
           "bff": "BFF endpoint (region)",
+          "tenant_code": "Tenant code (advanced)",
+          "country_id": "Country ID (advanced)",
           "tsp_host": "TSP console host (region)",
           "car_mqtt_host": "Vehicle MQTT broker host (region)",
           "car_mqtt_port": "Vehicle MQTT broker port (region)",
           "channel_id": "Channel ID (region)",
           "certs_src": "Folder with mutual-TLS certs to import (optional)"
+        },
+        "data_description": {
+          "preset": "Omoda/Jaecoo (Europe) and Chery (Europe) fill in everything automatically. Choose Custom to set the BFF endpoint, tenant code, country/channel IDs, MQTT host and certs by hand for any other region or brand."
         }
       },
       "reauth_password": {

@@ -23,6 +23,45 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Il login via SMS ora funziona, anche per gli account registrati solo col numero.** Chi accedeva col numero di telefono invece che con l'email otteneva sempre un errore, anche col codice giusto: l'integrazione componeva l'identità dell'account **nell'ordine sbagliato** (prefisso e numero invertiti) e coniava un token per un account fantasma vuoto, senza veicoli. Ora l'ordine è quello corretto — confermato sia dal vivo sia leggendo il programma dell'app ufficiale — e il login via SMS raggiunge il tuo account reale, con la tua auto.
 - **Un messaggio chiaro quando l'account non ha un'auto.** Se il codice era corretto ma su quell'account non risulta nessun veicolo, prima compariva «codice non valido», mandandoti a ricontrollare un OTP che invece andava benissimo. Adesso te lo diciamo com'è davvero: il codice è giusto, ma non c'è un'auto collegata a quell'account.
 - **Numero di telefono più protetto nei file di diagnostica.** La regola che nasconde il numero nei log è stata resa più robusta, così non può sfuggire per un caso di forma inattesa: nel dubbio nasconde di più, mai di meno.
+- **Puoi accedere con la password dell'account, senza aspettare nessun codice.** Finora
+  l'unica strada era il codice OTP via e-mail o SMS, e per chi quel codice non lo riceve
+  più era un muro: l'integrazione non si poteva proprio configurare. Adesso la prima
+  schermata offre una terza voce, «Accedi con password»: e-mail, password e PIN del
+  veicolo, e l'auto compare senza passare da nessun codice. La password serve **solo** per
+  entrare e non viene mai salvata: da lì in poi la sessione vive sul token, esattamente
+  come con l'OTP. E se un giorno la sessione scade, ti viene richiesta la password invece
+  di mandarti a caccia di un codice.
+- **Un menù a tendina sceglie marchio e regione al posto tuo.** L'integrazione si
+  presentava al server sempre come Omoda, quindi un account Chery non veniva riconosciuto e
+  bisognava indovinare a mano quattro parametri tecnici. Ora si sceglie «Omoda / Jaecoo
+  (Europa)» oppure «Chery (Europa)» e vengono compilati da soli; «Custom» resta per
+  qualsiasi altra regione o marchio, con i campi a vista come prima. *Nessuno di noi ha un
+  account Chery: la strada Omoda/Jaecoo è quella provata, l'altra è scritta seguendo il
+  programma dell'app ufficiale e aspetta la prima persona che la usi davvero.*
+- **Puoi scegliere in che lingua l'auto ti scrive.** Le e-mail e gli SMS col codice, e i
+  messaggi che il server restituisce quando qualcosa va storto, seguono la lingua dichiarata
+  al momento dell'accesso: prima era fissa. Ora c'è un menù a tendina, inglese o italiano.
+  Chi ha già l'integrazione configurata non deve fare niente e non vede alcun cambiamento;
+  la scelta riguarda le configurazioni nuove.
+- **La scheda per la dashboard arriva insieme all'integrazione.** Prima andava scaricata a
+  parte e registrata a mano fra le risorse di Lovelace, passaggio che si sbaglia facilmente
+  e che non tutti hanno voglia di fare. Adesso è inclusa e si carica da sola: basta
+  aggiungere una scheda di tipo `custom:chery-card`. Trova da sé le entità della tua auto,
+  quindi senza configurazione mostra già foto, batteria, autonomia, stato di ricarica e gli
+  avvisi (gomme, batteria bassa, auto irraggiungibile) solo quando c'è qualcosa che non va.
+- **Due contatori separati per l'energia caricata a casa e fuori, più un sensore che dice se
+  l'auto è a casa.** Servono a rispondere alla domanda «quanto mi costa davvero»: l'energia
+  presa dalla tua presa e quella presa altrove finiscono in due totali distinti, utilizzabili
+  nel pannello Energia di Home Assistant. ⚠️ **Funzionano solo con l'aggiornamento automatico
+  acceso**: i contatori si costruiscono campionando la potenza di ricarica a ogni lettura, e
+  senza letture periodiche non c'è niente da sommare.
+- **Quando un comando viene rifiutato, adesso ti diciamo perché.** Se prima di mandare un comando l'integrazione deve saltare o adattare qualcosa — una funzione che il costruttore non autorizza sulla tua auto, una durata che la tua vettura non accetta — te lo scrive in «Esito comando». Fino a ieri però quella spiegazione compariva **solo quando il comando riusciva**: nel caso opposto, che è proprio quello in cui serve, restava scritto solo l'errore nudo e il motivo finiva unicamente nel registro tecnico, dove nessuno lo va a cercare. Adesso la spiegazione resta attaccata all'esito in entrambi i casi. E non ripetiamo più il nome del comando davanti alla spiegazione, visto che l'esito lo dice già come prima cosa: erano i caratteri che mancavano perché la frase ci stesse tutta nello spazio che Home Assistant concede. Su un'Omoda 9 quasi tutti questi avvisi non escono affatto — riguardano funzioni che il costruttore nega su altre vetture — ma **uno lo vedrai anche tu**: se imposti la durata del clima su un valore che l'auto non ammette (il cursore arriva a 30 minuti, l'Omoda 9 ne accetta 5, 10 o 15) e il comando viene rifiutato, per esempio perché l'auto è occupata, adesso accanto all'errore leggi anche quale durata è stata usata. Prima, in quel caso, restava solo l'errore.
+- **Un avviso o si legge intero o non c'è.** Quando gli avvisi non entrano tutti nella riga te ne diciamo il numero. Restava però un caso in cui, per far posto a quel conteggio, l'ultimo avviso veniva accorciato a metà parola: proprio la cosa che questa regola vuole evitare, perché una frase tagliata sembra completa. Adesso l'avviso che non ci sta per intero esce dalla riga e va a ingrossare il conteggio.
+- **«Raffredda tutto» ora fa qualcosa anche sulle auto che quel comando non ce l'hanno.** Su alcune vetture il costruttore non autorizza affatto il pulsante unico «raffredda tutto»: premendolo si otteneva soltanto un errore, e non c'era niente da fare. I suoi **pezzi**, però, quella stessa auto li autorizza benissimo, presi uno per uno: il climatizzatore e la ventilazione dei sedili anteriori. Adesso, quando il comando unico è negato, l'integrazione lo rifà da sé in un'unica richiesta che l'auto accetta — la stessa identica cosa che otterresti accendendo a mano il clima e poi i sedili dall'app ufficiale. Quello che la tua vettura non consente resta fuori, e **in «Esito comando» trovi quante funzioni sono rimaste indietro** invece di doverlo indovinare da un sedile che resta tiepido; se nella riga ci sta anche il loro nome te lo scriviamo, e per esteso ci sono comunque sempre nel registro. (Lo spazio è poco davvero: Home Assistant concede 255 caratteri a un messaggio, esito compreso.)
+- **Provato su un'auto vera, non solo sulla carta — l'accensione.** Il proprietario di una Jaecoo 7 (l'auto da cui è nata tutta questa storia) ha spedito a mano la richiesta ricomposta a vettura ferma: accettata, ed è uscito a toccare i cuscini — **i due sedili anteriori ventilavano davvero**. Lo **spegnimento** è il gemello simmetrico di quella richiesta, ma quello nessuno l'ha ancora provato: se la tua auto lo rifiutasse, l'interruttore non ti direbbe «spento» per finta — resta com'era e leggi l'errore.
+- **Sulla sua auto i sedili posteriori restano fuori, e ci ha detto che non è una rinuncia:** su quella vettura i sedili di dietro non sono né riscaldati né ventilati. Vale la pena dirlo perché lo ha verificato lui a bordo: **noi non possiamo dedurre da questo elenco cosa la tua auto abbia o non abbia montato**, e non ci proviamo.
+- **Il freddo sì, il caldo no — e non è una dimenticanza.** «Riscalda tutto» non viene ricomposto allo stesso modo, perché fra le cose che accende c'è il volante riscaldato, e per il volante non sappiamo quale strada alternativa l'auto accetterebbe: tirare a indovinare rischierebbe di far fallire tutto il resto. Su tutte le vetture che conosciamo, del resto, il comando del caldo è già autorizzato e gli basta la potatura che c'era già.
+- **Su un'Omoda 9 non cambia assolutamente nulla.** Lì il comando del costruttore è autorizzato e funziona: quando la via ufficiale è aperta non la sostituiamo mai con una nostra imitazione.
 
 ### 🇬🇧 English
 
@@ -39,6 +78,45 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **SMS sign-in now works, including for accounts registered with a phone number only.** Signing in with a phone number instead of an email always failed, even with the right code: the integration built the account identity **in the wrong order** (area code and number swapped) and minted a token for an empty phantom account with no vehicles. The order is now correct — confirmed both live and by reading the official app — so SMS sign-in reaches your real account and your car.
 - **A clear message when the account has no car.** If the code was correct but that account has no vehicle on it, it used to say "invalid code", sending you to re-check an OTP that was actually fine. Now it tells you what is really going on: the code is right, but there is no car linked to that account.
 - **Safer phone-number redaction in the diagnostics file.** The rule that hides the number in logs was hardened so it cannot slip through on an unexpected shape: when in doubt it masks more, never less.
+- **You can sign in with your account password, without waiting for any code.** Until now
+  the only way in was an OTP code by e-mail or SMS, and for anyone who no longer receives
+  that code it was a wall: the integration simply could not be set up. The first screen now
+  offers a third option, "Sign in with password": account e-mail, password and vehicle PIN,
+  and the car appears without any code at all. The password is used **only** to get in and
+  is never stored: from there the session lives on the token, exactly as it does with OTP.
+  And if the session expires one day, you are asked for the password instead of being sent
+  hunting for a code.
+- **A dropdown picks your brand and region for you.** The integration always introduced
+  itself to the server as Omoda, so a Chery account was not recognised and four technical
+  parameters had to be guessed by hand. You now choose "Omoda / Jaecoo (Europe)" or
+  "Chery (Europe)" and they fill themselves in; "Custom" remains for any other region or
+  brand, with the fields on show as before. *None of us owns a Chery account: the
+  Omoda/Jaecoo path is the tested one, the other is written from reading the official app
+  and is waiting for the first person to actually use it.*
+- **You can choose which language the car writes to you in.** The e-mails and texts carrying
+  the code, and the messages the server returns when something goes wrong, follow the
+  language declared at sign-in: it used to be fixed. There is now a dropdown, English or
+  Italian. If you already have the integration set up, you need do nothing and will see no
+  change; the choice applies to new setups.
+- **The dashboard card now ships with the integration.** It used to be a separate download
+  that you registered by hand among the Lovelace resources, a step which is easy to get
+  wrong and which not everybody wants to take. It is now included and loads itself: add a
+  card of type `custom:chery-card`. It finds your car's entities on its own, so with no
+  configuration at all it already shows photo, battery, range, charging state, and the
+  warnings (tyres, low battery, car unreachable) only when something is actually wrong.
+- **Two separate counters for energy charged at home and away, plus a sensor saying whether
+  the car is at home.** They exist to answer "what is this actually costing me": energy
+  taken from your own socket and energy taken elsewhere land in two distinct totals, usable
+  in the Home Assistant Energy dashboard. ⚠️ **They only work with automatic updating
+  switched on**: the counters are built by sampling charging power at each reading, and with
+  no periodic readings there is nothing to add up.
+- **When a command is refused, we now tell you why.** If the integration has to skip or adapt something before sending a command — a function the manufacturer does not authorise on your car, a duration your car does not accept — it writes that in "Command result". Until now, though, the explanation only appeared **when the command succeeded**: in the opposite case, which is exactly the one where it is needed, all you got was the bare error, and the reason went only to the technical log, where nobody goes looking. The explanation now stays attached to the result either way. And the command's name is no longer repeated in front of the explanation, since the result already opens with it: those were the characters missing for the sentence to fit in the space Home Assistant allows. On an Omoda 9 almost none of these notices appear at all — they concern functions the manufacturer denies on other cars — but **one of them you will see too**: if you set the climate duration to a value the car does not accept (the slider goes to 30 minutes, an Omoda 9 takes 5, 10 or 15) and the command is then refused, for instance because the car is busy, you now read alongside the error which duration was actually used. Before, in that case, only the error was left.
+- **A warning is either readable in full or not there at all.** When the warnings do not all fit in the line we tell you how many there are. One case remained, though, where making room for that count chopped the last warning mid-word: precisely what this rule exists to prevent, because a cut sentence looks complete. Now a warning that does not fit whole leaves the line and adds to the count instead.
+- **"Cool everything" now does something even on cars that do not have that command.** On some vehicles the manufacturer does not authorise the single "cool everything" button at all: pressing it produced nothing but an error, and there was no way round it. Its **constituent parts**, however, are perfectly authorised on that same car, taken one at a time: the climate control and the front seat ventilation. Now, when the single command is denied, the integration rebuilds it itself into one request the car does accept — exactly the same thing you would get by switching on the climate and then each seat by hand in the official app. Whatever your car does not allow is left out, and **"Command result" tells you how many functions were left behind** instead of leaving you to work it out from a seat that stays lukewarm; if their names fit in the line we write those too, and in full they are always in the log. (Space really is tight: Home Assistant allows a message 255 characters, result included.)
+- **Tested on a real car, not only on paper — switching on.** The owner of a Jaecoo 7 (the car this whole story started from) sent the recomposed request by hand with the vehicle parked: accepted — and he went out and put a hand on the cushions: **both front seats really were ventilating**. **Switching off** is the symmetrical twin of that request, but nobody has tried that one yet: if your car refused it, the switch would not falsely claim "off" — it stays as it was and you read the error.
+- **On his car the rear seats stay out, and he told us that is no loss:** on that vehicle the rear seats are neither heated nor ventilated. Worth saying because he checked it in the car himself: **we cannot infer from this list what your car does or does not have fitted**, and we do not try.
+- **Cooling yes, heating no — and that is not an oversight.** "Heat everything" is not rebuilt the same way, because among the things it switches on is the heated steering wheel, and for the steering wheel we do not know which alternative route the car would accept: guessing could make everything else fail too. On every vehicle we know of, besides, the heating command is already authorised and the pruning that was already there is enough for it.
+- **On an Omoda 9 nothing changes at all.** There the manufacturer's command is authorised and works: when the official route is open we never replace it with an imitation of our own.
 
 ## v1.13.0 — 2026-08-10
 
