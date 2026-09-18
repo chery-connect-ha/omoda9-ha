@@ -29,8 +29,8 @@ Adding a car should mean adding rows, not adding code paths.
 **How a change moves.** It **lands** — cheaply if it only touches your own car's
 data, with one read by somebody else if it touches shared code, and labelled
 `unverified-hardware` if it is written for a car none of us owns. It **ships as a
-pre-release** — on merge, or from the pull request itself if you label it `beta`
-— so you have your own work on your own car the same day. It becomes
+pre-release** cut from `master` after the merge, so you have your own work on your own
+car the same day. It becomes
 **stable** only once someone who owns each affected model has run it. Merging is
 never blocked. Only the last step is.
 
@@ -123,12 +123,19 @@ versions* for this repository in HACS and has them on their own car the same day
 This is deliberate: nobody in this project should ever be separated from work they
 just did because they are waiting on somebody else's free time.
 
-**And it can ship before it lands.** Put the label `beta` on a pull request and a
-pre-release is built from it, installable the same way. That is what carries a
-change to the one person who can disprove it *while there is still time to change
-it* — which matters most exactly where the author is powerless: code written for a
-car they do not own is, on their own car, a no-op. It is two taps in a phone
-browser, and only write access can do it, so a tester never runs anything.
+**Every pre-release comes from `master`, and contains everything merged so far.** A
+maintainer runs the `Beta` workflow after a batch lands. It is deliberately not built from
+individual branches: HACS offers whoever has *Show beta versions* on the **last pre-release
+published**, not the highest version, so builds cut from separate branches would hand
+testers a rising number with sideways content. On 24 August that is exactly what happened,
+and it is why the mechanism changed.
+
+**What we lost with it, honestly.** There is no longer a way to try a change *before* it is
+merged. That mattered most for code written for a car its author does not own — on their own
+instance it is a no-op, so they cannot disprove it. For now such changes land marked
+`unverified-hardware` and are proven on the next beta from `master`. If you can think of a
+shape that restores the pre-merge test without publishing an incoherent pre-release, say so:
+it is an open problem, not a settled trade.
 
 ### 3. It becomes stable
 
@@ -197,6 +204,24 @@ question as who can review what.
   an untested path may do is fail to help.
 
 ## The mechanics
+
+**If this is your first change here, start with the shape of the repository, because
+getting it wrong costs you a rewrite rather than a correction.** There is one long-lived
+branch, `master`, and no `develop`. It is protected: nobody pushes to it, maintainers
+included, and everything arrives as a pull request. If you are contributing from outside,
+you cannot push a branch here at all, so you fork first and open the pull request from
+your fork.
+
+The part people get wrong, and it has already cost somebody their work here: **do not
+commit on the `master` of your own fork.** Make a branch, even for a one-file change.
+
+Two things go wrong otherwise. A pull request opened from `master` follows that branch, so
+anything you commit afterwards lands inside the open pull request. And the moment this
+repository's `master` moves ahead of yours, syncing your fork can no longer fast-forward,
+so the button offers to discard your commits instead: take it and the work is gone and the
+pull request closes itself. On a branch, syncing your fork is harmless.
+
+`AGENTS.md` has the exact commands for both cases, fork and clone.
 
 If you are working with a coding agent — and most of us are — point it at
 [`AGENTS.md`](AGENTS.md) before it touches anything. It carries the invariants
