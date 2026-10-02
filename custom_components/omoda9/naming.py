@@ -63,6 +63,7 @@ ENGLISH_KEYS: dict[str, str] = {
     "clima_riscalda_on":              "heat_everything",      # Heat everything
     "conferma_otp":                   "confirm_otp",          # Confirm OTP
     "finestrini_ventila":             "vent_windows",         # Vent windows
+    "tetto_ventila":                  "vent_sunroof",         # Vent sunroof
     "localizza":                      "locate_car_gps",       # Locate car (GPS)
     "richiedi_codice_otp":            "request_otp_code",     # Request OTP code
     "sveglia_auto":                   "wake_car",             # Wake car

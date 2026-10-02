@@ -318,6 +318,9 @@
       "vent_windows": {
         "name": "Ventila finestrini"
       },
+      "vent_sunroof": {
+        "name": "Ventila tetto"
+      },
       "locate_car_gps": {
         "name": "Localizza auto (GPS)"
       },

@@ -274,6 +274,9 @@
       "vent_windows": {
         "name": "Ramen ventileren"
       },
+      "vent_sunroof": {
+        "name": "Zonnedak ventileren"
+      },
       "locate_car_gps": {
         "name": "Auto lokaliseren (GPS)"
       },

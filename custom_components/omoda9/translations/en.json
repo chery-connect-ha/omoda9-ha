@@ -318,6 +318,9 @@
       "vent_windows": {
         "name": "Vent windows"
       },
+      "vent_sunroof": {
+        "name": "Vent sunroof"
+      },
       "locate_car_gps": {
         "name": "Locate car (GPS)"
       },

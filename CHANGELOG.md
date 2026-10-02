@@ -20,6 +20,12 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ### 🇬🇧 English
 
+- **New "Vent sunroof" button: the sunroof can now be tilted, not only opened or closed.**
+  It works like "Vent windows": one press moves the sunroof to the tilt / vent position, and
+  the usual close on the sunroof card brings it back down. Full open and close are
+  unchanged. This adds one entity, `button.chery_connect_vent_sunroof`. *The command was
+  found and tested on a Jaecoo 7 PHEV by the person who reported it; this change has not
+  yet been tried on other models.*
 - **"Petrol range (miles)" now works out for itself which unit the car is speaking.** It is
   a diagnostic sensor, and until now it assumed that reading arrived in miles — true on the
   Omoda 9, but worked out from two readings of a single car. On a model sending kilometres
@@ -94,6 +100,13 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Three sensors that only exist on a battery-electric car kept their old Italian names, and had no translation at all.** Charging power, WLTP range and electric efficiency are created only once the car has confirmed it is battery-only, which happens after the first setup - so they were not present when the renaming table was built, and they were never in the translation files either. They now have English ids like everything else, and a name in every language. If you have them, they are renamed automatically at the next start, and your history follows.
 
 ### 🇮🇹 Italiano
+
+- **Nuovo pulsante «Ventila tetto»: il tetto ora si può anche inclinare, non solo aprire o
+  chiudere.** Funziona come «Ventila finestrini»: una pressione porta il tetto in posizione
+  inclinata / ventilazione, e la normale chiusura della card del tetto lo richiude. Apertura
+  e chiusura complete non cambiano. Si aggiunge un'entità, `button.chery_connect_vent_sunroof`.
+  *Il comando è stato trovato e provato su una Jaecoo 7 PHEV da chi l'ha segnalato; su altri
+  modelli non è ancora stato provato.*
 
 - **«Autonomia benzina (miglia)» ora capisce da sola in che unità parla l'auto.** È un
   sensore di diagnostica, e finora dava per scontato che quel dato arrivasse in miglia —
