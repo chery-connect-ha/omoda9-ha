@@ -36,7 +36,7 @@ from custom_components.omoda9.const import (
 ATTESO = {
     "binary_sensor": 27,
     "sensor": 41,
-    "button": 14,
+    "button": 15,
     "switch": 18,
     "cover": 3,
     "number": 2,
@@ -67,7 +67,11 @@ ATTESO = {
 #    fatta durante una carica. Se `chargingPower` arrivasse anche su una PHEV quella lista ha
 #    una voce di troppo; se non arrivasse, i due contatori vanno nel ramo BEV. Serve UN frame
 #    di sola lettura da un'auto attaccata alla spina.
-TOTALE_ATTESO = 110
+#
+# 110 -> 111 on 2026-10-02: `button.chery_connect_vent_sunroof` ("Vent sunroof", command
+# `tetto_ventila`, skylightControl controlType 2). A deliberate extra button, the sunroof
+# counterpart of `button.chery_connect_vent_windows`; the sunroof cover is unchanged.
+TOTALE_ATTESO = 111
 
 
 def test_totale_dichiarato_coerente():
@@ -119,8 +123,8 @@ def test_pulsanti_dal_catalogo_comandi(core):
     assert not orfani, f"comandi 'ricchi' che non esistono nel catalogo: {orfani}"
 
     pulsanti = catalogo - COMMANDS_AS_RICH_ENTITY
-    assert len(pulsanti) == 9, (
-        f"i pulsanti generati dal catalogo sono {len(pulsanti)}, attesi 9. "
+    assert len(pulsanti) == 10, (
+        f"i pulsanti generati dal catalogo sono {len(pulsanti)}, attesi 10. "
         f"Se hai aggiunto un comando, valuta se va in COMMANDS_AS_RICH_ENTITY "
         f"(lock/switch/cover) o se è davvero un pulsante nuovo. Attuali: {sorted(pulsanti)}"
     )

@@ -20,6 +20,12 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ### 🇬🇧 English
 
+- **New "Vent sunroof" button: the sunroof can now be tilted, not only opened or closed.**
+  It works like "Vent windows": one press moves the sunroof to the tilt / vent position, and
+  the usual close on the sunroof card brings it back down. Full open and close are
+  unchanged. This adds one entity, `button.chery_connect_vent_sunroof`. *The command was
+  found and tested on a Jaecoo 7 PHEV by the person who reported it; this change has not
+  yet been tried on other models.*
 - **"Petrol range (miles)" now works out for itself which unit the car is speaking.** It is
   a diagnostic sensor, and until now it assumed that reading arrived in miles — true on the
   Omoda 9, but worked out from two readings of a single car. On a model sending kilometres
@@ -87,7 +93,22 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Already deleted the old `omoda_jaecoo` integration? Your history is still there.** Removing an integration takes its entities out of Home Assistant's registry; it does **not** delete the data. Long-term statistics and state history stay in the database, orphaned but intact, and Home Assistant still remembers every entity it removed. There is now an action for exactly this: **Recover history from a removed omoda_jaecoo installation** (Developer tools, Actions), which moves the statistics and the history onto the entities of this integration. Nothing to reinstall, and the old integration does not need to exist any more. Run it with *dry run* on first. One warning on timing: the recorder eventually purges orphaned data, so this is a matter of days, not forever.
 
+- **Recovering from an `omoda_jaecoo` installation now brings the state history too, not only the statistics.** If you already ran the recovery on an earlier beta, run it again: it will pick up what was left behind, and it will not touch what it already moved. The first time this ran on a real migration, the long-term statistics came across and the state history did not, for every entity that already existed under its new name - which is every entity, if you set up the integration before recovering. Graphs went back to July, the history panel started that evening. Both now move.
+
+- **The history recovery now actually moves the history.** The previous attempt tried to clear the shorter series out of the way with the recorder's purge, which does not work: purging deletes the states but leaves the row that blocks the rename, so every single entity failed with `already in use` and the report said it had succeeded. It now moves the shorter history aside under a parked name instead of deleting it, which works and destroys nothing. If you ran the recovery before, run it again.
+
+- **Three sensors that only exist on a battery-electric car kept their old Italian names, and had no translation at all.** Charging power, WLTP range and electric efficiency are created only once the car has confirmed it is battery-only, which happens after the first setup - so they were not present when the renaming table was built, and they were never in the translation files either. They now have English ids like everything else, and a name in every language. If you have them, they are renamed automatically at the next start, and your history follows.
+
+- **Internal: the integration no longer asks to install `requests` and `pillow`.** Home Assistant already ships both, and its validator now rejects a custom integration that lists them, which would have blocked this release. Nothing changes on your installation: the integration uses the copies Home Assistant already has.
+
 ### 🇮🇹 Italiano
+
+- **Nuovo pulsante «Ventila tetto»: il tetto ora si può anche inclinare, non solo aprire o
+  chiudere.** Funziona come «Ventila finestrini»: una pressione porta il tetto in posizione
+  inclinata / ventilazione, e la normale chiusura della card del tetto lo richiude. Apertura
+  e chiusura complete non cambiano. Si aggiunge un'entità, `button.chery_connect_vent_sunroof`.
+  *Il comando è stato trovato e provato su una Jaecoo 7 PHEV da chi l'ha segnalato; su altri
+  modelli non è ancora stato provato.*
 
 - **«Autonomia benzina (miglia)» ora capisce da sola in che unità parla l'auto.** È un
   sensore di diagnostica, e finora dava per scontato che quel dato arrivasse in miglia —
@@ -155,6 +176,14 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Vieni dalla vecchia installazione `omoda_jaecoo`? Il tuo storico puo' venire con te.** Per Home Assistant quella linea e' un'altra integrazione, quindi configurando questa ti ritrovi entita' nuove e vuote mentre anni di letture restano attaccati all'installazione che stai per togliere. Adesso c'e' un modo per adottarle: disattiva la vecchia integrazione, poi chiama l'azione **Adotta le entita' dell'installazione omoda_jaecoo** (Strumenti per sviluppatori, Azioni). Lanciala prima con *dry run* acceso, che non cambia niente e ti dice cosa farebbe. 96 entita' su 101 passano col loro storico; le cinque che non possono sono elencate nel rapporto col motivo - due perche' le due linee le hanno fatte di tipo diverso, tre perche' qui non esistono affatto. Niente e' automatico e niente succede se non lo chiedi tu.
 
 - **Hai gia' cancellato la vecchia integrazione `omoda_jaecoo`? Il tuo storico e' ancora li'.** Togliere un'integrazione elimina le sue entita' dal registro di Home Assistant; **non** elimina i dati. Statistiche a lungo termine e cronologia restano nel database, orfane ma intatte, e Home Assistant ricorda ancora tutte le entita' che ha tolto. Adesso c'e' un'azione apposta: **Recupera lo storico da un'installazione omoda_jaecoo rimossa** (Strumenti per sviluppatori, Azioni), che sposta statistiche e cronologia sulle entita' di questa integrazione. Niente da reinstallare, e la vecchia integrazione non serve che esista piu'. Lanciala prima con *dry run* acceso. Un avvertimento sui tempi: il recorder prima o poi ripulisce i dati orfani, quindi si parla di giorni, non di sempre.
+
+- **Il recupero da un'installazione `omoda_jaecoo` adesso porta con se' pure la cronologia degli stati, non solo le statistiche.** Se avevi gia' lanciato il recupero su una beta precedente, rilancialo: riprende quello che era rimasto indietro e non tocca cio' che aveva gia' spostato. La prima volta che ha girato su una migrazione vera, le statistiche a lungo termine sono passate e la cronologia no, per ogni entita' che esisteva gia' col nome nuovo - cioe' tutte, se hai configurato l'integrazione prima di recuperare. I grafici tornavano a luglio, il pannello Cronologia partiva da quella sera. Adesso si spostano entrambe.
+
+- **Il recupero della cronologia adesso la sposta davvero.** Il tentativo precedente cercava di togliere di mezzo la cronologia piu' corta con il purge del recorder, e non funziona: il purge cancella gli stati ma lascia la riga che blocca la rinomina, quindi tutte le entita' fallivano con `already in use` e il rapporto diceva di avercela fatta. Adesso la cronologia corta viene spostata di lato sotto un nome parcheggio invece che cancellata: funziona e non distrugge niente. Se avevi gia' lanciato il recupero, rilancialo.
+
+- **Tre sensori che esistono solo su un'auto elettrica erano rimasti coi vecchi nomi italiani, e non avevano nessuna traduzione.** Potenza di ricarica, autonomia WLTP ed efficienza elettrica nascono solo dopo che l'auto ha confermato di essere solo elettrica, cosa che avviene a configurazione gia' fatta: non c'erano nella tabella dei nomi, e nei file di traduzione non c'erano mai stati. Adesso hanno identificativi inglesi come tutto il resto e un nome in ogni lingua. Se li hai, vengono rinominati da soli al prossimo avvio e lo storico li segue.
+
+- **Lavoro interno: l'integrazione non chiede piu' di installare `requests` e `pillow`.** Home Assistant li include gia' entrambi, e il suo validatore adesso rifiuta un'integrazione custom che li elenca, cosa che avrebbe bloccato questo rilascio. Sulla tua installazione non cambia niente: l'integrazione usa le copie che Home Assistant ha gia'.
 
 ## v1.13.0 — 2026-08-10
 

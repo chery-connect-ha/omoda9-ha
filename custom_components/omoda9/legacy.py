@@ -288,6 +288,39 @@ def _rinomina_cronologia(hass, vecchio: str, nuovo: str) -> None:
     get_instance(hass).async_update_states_metadata(vecchio, new_entity_id=nuovo)
 
 
+async def _ha_cronologia(hass, entity_id: str) -> bool:
+    """Se di questa entita' il recorder ha ancora almeno uno stato registrato."""
+    from homeassistant.components.recorder import get_instance
+    from homeassistant.components.recorder.history import get_last_state_changes
+    righe = await get_instance(hass).async_add_executor_job(
+        get_last_state_changes, hass, 1, entity_id)
+    return bool(righe.get(entity_id))
+
+
+def _sposta_di_lato(hass, entity_id: str) -> str:
+    """Toglie di mezzo la cronologia corta spostandola su un nome libero, invece di
+    cancellarla.
+
+    Prima di qui si provava con `recorder.purge_entities`, e NON funziona: quel servizio
+    mette in coda un compito e cancella gli STATI, ma la riga in `states_meta` resta - ed e'
+    quella che blocca la rinomina. Misurato il 27 settembre 2026 su un'istanza vera: 96
+    righe `Cannot migrate history ... because the new entity_id is already in use`, tutte
+    dopo un purge che era andato a buon fine.
+
+    Spostare di lato riesce dove cancellare fallisce, e ha due vantaggi sopra la cancellazione:
+    la cronologia corta non viene distrutta ma solo archiviata sotto un nome che nessuno
+    guarda, e l'operazione usa la stessa identica API della rinomina, quindi o riescono
+    entrambe o non si e' rotto niente.
+
+    Il nome di parcheggio non puo' collidere con niente: non e' un entity_id che questa
+    integrazione produca, e non e' in `deleted_entities`, quindi un secondo giro non lo
+    scambia per un candidato."""
+    dominio, _, oggetto = entity_id.partition(".")
+    parcheggio = f"{dominio}.{oggetto}_superseded"
+    _rinomina_cronologia(hass, entity_id, parcheggio)
+    return parcheggio
+
+
 async def recupera_storico(hass, entry, *, dry_run: bool = True) -> dict:
     """Recupera i DATI della linea `omoda_jaecoo` quando le sue entita' non ci sono piu'.
 
@@ -357,10 +390,26 @@ async def recupera_storico(hass, entry, *, dry_run: bool = True) -> dict:
                 _rinomina_statistiche(hass, morta.entity_id, nuovo_id)
             rapporto["statistiche"].append((morta.entity_id, nuovo_id))
 
-        # CRONOLOGIA degli stati. Non passa dalle stesse tabelle e si perde per conto suo,
-        # quindi si tratta a parte: un'entita' puo' avere l'una senza l'altra.
-        if not dry_run:
-            _rinomina_cronologia(hass, morta.entity_id, nuovo_id)
-        rapporto["cronologia"].append((morta.entity_id, nuovo_id))
+        # CRONOLOGIA degli stati. Non passa dalle stesse tabelle delle statistiche e si
+        # perde per conto suo, quindi si tratta a parte: un'entita' puo' avere l'una senza
+        # l'altra.
+        #
+        # Questo ramo il 27 settembre 2026 non aveva la disciplina che ha quello sopra, e
+        # il risultato si e' visto al primo uso su un'istanza vera: trenta entita' con le
+        # statistiche da luglio e la cronologia da quella sera. Il recorder, quando il
+        # nome di destinazione e' gia' occupato, scrive "Cannot migrate history ... already
+        # in use" e lascia tutto com'era - senza eccezioni e senza test rossi.
+        #
+        # Le due condizioni sotto non sono simmetria per eleganza. La prima evita di
+        # lavorare a vuoto; la SECONDA e' quella che conta, perche' senza di lei un secondo
+        # lancio purgherebbe la cronologia appena recuperata scambiandola per la gemella
+        # corta di turno. Un recupero che si mangia il proprio risultato e' peggio di
+        # nessun recupero.
+        if await _ha_cronologia(hass, morta.entity_id):
+            if not dry_run:
+                if await _ha_cronologia(hass, nuovo_id):
+                    _sposta_di_lato(hass, nuovo_id)
+                _rinomina_cronologia(hass, morta.entity_id, nuovo_id)
+            rapporto["cronologia"].append((morta.entity_id, nuovo_id))
 
     return rapporto

@@ -198,3 +198,53 @@ jobs:
             --prerelease \
             --title "${VERSIONE} — insieme, da master" \
             --notes-file note-beta.md
+
+      - name: Una sola pre-release visibile alla volta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # PERCHE' ESISTE QUESTO PASSO. HACS offre la PRIMA pre-release non-draft che
+          # incontra scorrendo `GET /releases` (hacs/repositories/base.py, 1103-1114), e
+          # quell'ordine non e' quello che si crede. Misurato il 27 settembre 2026 su
+          # questo repository:
+          #
+          #   v1.14.0-beta.9    created 10:48
+          #   v1.14.0-beta.8    created 10:11
+          #   v1.14.0-beta.7    created 09:14
+          #   v1.14.0-beta.10   created 12:25   <- l'ultima, e arriva QUARTA
+          #
+          # Non e' la data di pubblicazione, non e' la data del commit, e non e' un
+          # confronto di versione. Il risultato: appena il contatore passa da 9 a 10, HACS
+          # continua a offrire la 9 e la 10 e' invisibile. Nove build in cui sembrava
+          # funzionare, e il difetto si presenta alla decima.
+          #
+          # La cura non e' capire l'ordinamento di GitHub: e' non dipenderne. Se di
+          # pre-release non-draft ce n'e' UNA, quella viene servita, qualunque sia
+          # l'ordine. Le precedenti diventano draft: restano nel repository, i tag
+          # restano, e si possono ripubblicare in un clic se servono davvero.
+          #
+          # Una beta e' una build di collaudo, non un archivio. Tenerne dieci visibili non
+          # serviva a nessuno e costava esattamente questo.
+          vecchie=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
+                    --jq ".[] | select(.draft == false and .prerelease == true) | select(.tag_name != \"$TAG\") | .tag_name")
+          if [ -z "$vecchie" ]; then
+            echo "nessuna pre-release precedente da nascondere."
+            exit 0
+          fi
+          for t in $vecchie; do
+            echo "  $t -> draft"
+            gh release edit "$t" --repo "$GITHUB_REPOSITORY" --draft
+          done
+
+          # Verifica, invece di fidarsi: e' il controllo che avrebbe preso il difetto.
+          visibili=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+                     --jq "[.[] | select(.draft == false and .prerelease == true)] | length")
+          prima=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+                  --jq "[.[] | select(.draft == false and .prerelease == true)][0].tag_name")
+          echo "pre-release visibili: $visibili, la prima e': $prima"
+          if [ "$visibili" != "1" ] || [ "$prima" != "$TAG" ]; then
+            echo "::error::HACS servirebbe $prima invece di $TAG. Il taglio e' andato, ma la beta non e' raggiungibile."
+            exit 1
+          fi

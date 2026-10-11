@@ -199,6 +199,12 @@ COMMANDS = [
                    "name": "Apri tetto", "icon": "mdi:car-select", "group": "Finestrini e tetto"}),
     ("tetto_chiudi", {"endpoint": "skylightControl", "body": {"controlType": "0", "skylightType": "1"},
                    "name": "Chiudi tetto", "icon": "mdi:car-select", "group": "Finestrini e tetto"}),
+    # Sunroof tilt / vent position: same endpoint, controlType "2" (the official app's
+    # controlTiltUp action sends swi="2"). A button of its own, like `finestrini_ventila`:
+    # it maps on neither open nor close, and the sunroof cover's close brings it back.
+    # Reported working on a Jaecoo 7 PHEV in the field-test issue.
+    ("tetto_ventila", {"endpoint": "skylightControl", "body": {"controlType": "2", "skylightType": "1"},
+                   "name": "Ventila tetto", "icon": "mdi:weather-windy", "group": "Finestrini e tetto"}),
 
     # — Ricarica EV —
     # Ricarica IMMEDIATA avvio/stop (endpoint chargeStartStopControl, bean CVChargeStartStopBean

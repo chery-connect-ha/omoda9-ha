@@ -24,8 +24,9 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN, CERT_FILES
+from .const import DATA_POWER_TYPE, DOMAIN, CERT_FILES
 from .core import mask
 
 # Chiavi da oscurare ovunque compaiano (config entry + eventuali dict annidati).
@@ -160,6 +161,29 @@ async def async_get_config_entry_diagnostics(
     fields = data.get("fields")
     if isinstance(fields, dict):
         fields = _scrub_vin(async_redact_data(dict(fields), TO_REDACT), vin)
+
+    # ── Il veicolo, e cosa ha prodotto su QUESTA vettura ────────────────────────────────
+    # Perche' sta qui e non in una tabella tenuta a mano. La #9 chiede una matrice dei
+    # modelli provati, e finora l'unico modo di compilarla era che qualcuno elencasse le
+    # proprie entita' voce per voce - cosa che una persona ha fatto davvero, con cura, e
+    # che nessuno rifara'. Tutto quello che serve lo sa gia' l'integrazione: marca e
+    # modello arrivano dal backend, non da un campo che l'utente digita, e l'insieme delle
+    # entita' e' l'impronta del modello (su una BEV confermata i sensori del termico non
+    # vengono proprio creati). Quindi il rapporto si scarica invece di scriverlo.
+    #
+    # Sono `entity_id`, non valori: non dicono dove sei ne' quanta batteria hai. E da oggi
+    # sono in inglese, quindi un elenco incollato da un polacco lo legge un danese.
+    registro = er.async_get(hass)
+    entita = sorted(
+        e.entity_id for e in er.async_entries_for_config_entry(registro, entry.entry_id)
+    )
+    diag["vehicle"] = {
+        "brand": coordinator.vehicle_brand,
+        "model": coordinator.vehicle_model,
+        "power_type": entry.data.get(DATA_POWER_TYPE),
+        "entity_count": len(entita),
+        "entities": entita,
+    }
 
     diag["coordinator"] = {
         "region": {

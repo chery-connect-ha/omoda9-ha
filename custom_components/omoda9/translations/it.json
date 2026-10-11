@@ -318,6 +318,9 @@
       "vent_windows": {
         "name": "Ventila finestrini"
       },
+      "vent_sunroof": {
+        "name": "Ventila tetto"
+      },
       "locate_car_gps": {
         "name": "Localizza auto (GPS)"
       },
@@ -488,6 +491,15 @@
       },
       "rear_center_seat_ventilation": {
         "name": "Ventilazione sedile post. centrale"
+      },
+      "charging_power": {
+        "name": "Potenza di ricarica"
+      },
+      "wltp_range": {
+        "name": "Autonomia WLTP"
+      },
+      "electric_efficiency_mi_kwh": {
+        "name": "Efficienza elettrica (mi/kWh)"
       }
     },
     "switch": {
