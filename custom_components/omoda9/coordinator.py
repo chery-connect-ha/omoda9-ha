@@ -46,7 +46,7 @@ from .const import (
     DATA_CLIMATE_LO, DATA_CLIMATE_HI, DATA_AIR_DURATIONS,
     DATA_CAPS_PROBED, DATA_CAPS_PROBED_V2, capabilities_from_item,
     CLIMA_MIN_DEFAULT, CLIMA_MAX_DEFAULT, CLIMA_STEP_DEFAULT,
-    DEFAULTS, DIAG_SWITCH_FILE, NOTE_COMANDO_S,
+    DEFAULTS, DIAG_SWITCH_FILE, NOTE_COMANDO_S, FIELDS_AS_RICH_ENTITY,
 )
 from .timers import (
     TimerRegistry, GRUPPO_POLL,
@@ -618,6 +618,12 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         breve quando l'auto è attaccata alla colonnina (`poll_charging_min`), altrimenti
         `poll_normal_min`. Ogni ciclo SVEGLIA l'auto (vehicleLocation = posizione) e
         forza una lettura realtime (telemetria)."""
+        # Startup seed: always, even with the automatic update switch off. Read-only,
+        # no command to the car: populates realtime plus the merged fields above
+        # (doors/lock) after a restart, when a parked car sends no MQTT.
+        if not self._timers.is_armed(STARTUP_PROBE):
+            self._timers.arm(STARTUP_PROBE,
+                             lambda: async_call_later(self.hass, 15, self._startup_probe_cb))
         if not self.poll_enabled:
             _LOGGER.debug("[poll] disattivato dall'interruttore")
             return
@@ -626,14 +632,6 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             return
         if not self._timers.is_armed(POLL):
             self._schedule_next_poll()
-        # SEED iniziale: una lettura realtime ~15s dopo l'avvio (dato il tempo alla MQTT di
-        # connettersi). Se l'auto è in carica/marcia (HV acceso) il follow-up ravvicinato a 2 min
-        # parte SUBITO, senza attendere il primo poll periodico (fino a 30 min) — l'auto a riposo
-        # NON manda MQTT, quindi senza questo seed dopo un riavvio in carica i sensori restavano
-        # fermi finché non scattava il poll. Sola lettura: nessun comando all'auto. One-shot.
-        if not self._timers.is_armed(STARTUP_PROBE):
-            self._timers.arm(STARTUP_PROBE,
-                             lambda: async_call_later(self.hass, 15, self._startup_probe_cb))
 
     async def _startup_probe_cb(self, _now) -> None:
         self._timers.cancel(STARTUP_PROBE)
@@ -1544,6 +1542,18 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             elif impronta != self._impronta_dati:
                 patch["car_data_ts"] = dt_util.utcnow()
             self._impronta_dati = impronta
+            # Merge the physical state carried by the realtime channel
+            # (doors/windows/lock/trunk/sunroof/climate/seats/engine/plug) into
+            # `fields`, using the same 0/1 encoding as the 5A02 pushes. Those
+            # entities read from `fields`, so without this a parked car — which
+            # sends no MQTT — leaves them `unknown`. Relates to #54.
+            state_keys = set(META) | FIELDS_AS_RICH_ENTITY
+            rt_fields = {k: str(v) for k, v in data.items()
+                         if k in state_keys and v is not None and str(v).strip() not in ("", "None")}
+            if rt_fields:
+                with self._state_lock:
+                    self._fields.update(rt_fields)
+                    patch["fields"] = dict(self._fields)
         if isinstance(data, dict) and "lat" in data and "lon" in data:
             geo = {k: data[k] for k in GEO_KEYS if k in data}
             with self._state_lock:
