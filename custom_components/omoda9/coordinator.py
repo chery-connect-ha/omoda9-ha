@@ -366,6 +366,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # sveglia più efficace — e il secondo si prende un A00082.
         self._sveglia_task: asyncio.Task | None = None
         self._fields: dict[str, str] = {}
+        # When the car last said each field (`time.time()`). `fields` keeps the value but not
+        # its age, and for a field that only ever arrives inside command confirmations the age
+        # is the whole story: see `REAR_DEFROST_MAX_S` in const.py.
+        self._fields_at: dict[str, float] = {}
         self._state_lock = threading.Lock()  # [H2] serializza _fields/position tra thread paho/executor/loop
         self._last_msg_ts: float = 0.0
         # contatore dei push di CONFERMA comando (non della telemetria): è l'ancora di
@@ -382,7 +386,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         self._note_cmd_at: float | None = None
         self.position: dict | None = None
         self.otp_code: str = ""   # impostato dall'entità text «Codice OTP», letto da confirm
-        self.data = {"fields": {}, "msg_fields": {}, "position": None,
+        self.data = {"fields": {}, "fields_at": {}, "msg_fields": {}, "position": None,
                      "awake": False, "car_connected": False,
                      "session_ok": None, "session_detail": "",
                      # — sensori diagnostici (parità col bridge) —
@@ -882,8 +886,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             for k, v in data.items():
                 if k != "time" and k not in CMD_CONFIRM_META:
                     self._fields[k] = str(v)
+                    self._fields_at[k] = now
                     msg_fields[k] = str(v)
             fields_copy = dict(self._fields)
+            fields_at_copy = dict(self._fields_at)
 
         # [diag] auto-discovery: chiavi 5A02 che l'auto manda ma che META non mappa. È il
         # canale per scoprire la telemetria ancora mancante (autonomia/TPMS). Fuori dal
@@ -901,7 +907,8 @@ class Omoda9Coordinator(DataUpdateCoordinator):
                         and k not in GEO_KEYS and not _is_unit_flag(k)):
                     self._diag.note_unknown_field(k, v, svc)
 
-        patch.update({"fields": fields_copy, "msg_fields": msg_fields, "awake": True})
+        patch.update({"fields": fields_copy, "fields_at": fields_at_copy,
+                      "msg_fields": msg_fields, "awake": True})
         if is_confirmation:
             patch["cmd_status"] = self._esito_con_note(self._format_cmd_result(data))
             # [H2] il contatore è l'ancora della pausa di coda → si tocca sotto lock, perché

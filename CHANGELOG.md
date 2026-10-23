@@ -101,6 +101,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Internal: the integration no longer asks to install `requests` and `pillow`.** Home Assistant already ships both, and its validator now rejects a custom integration that lists them, which would have blocked this release. Nothing changes on your installation: the integration uses the copies Home Assistant already has.
 
+- **"Rear window heating" no longer stays on for days.** The rear window heater is switched on with a 15-minute timer, but when the timer runs out the car does not say so: unlike the windscreen, the steering wheel and the seats, the rear window's state only comes back when you send the car a command. So after a "Heat everything" the switch could stay on for days, and on an Omoda 9 it did, for 48 hours. It now goes off by itself 16 minutes after the car last confirmed it on, even if Home Assistant restarts in between. The other heaters are unchanged, because the car does report them going off. *Measured on an Omoda 9 on 23 October 2026: windscreen, steering wheel and rear window switched on together; 15 minutes later the car reported the first two off and said nothing about the rear window.*
+
 ### 🇮🇹 Italiano
 
 - **Nuovo pulsante «Ventila tetto»: il tetto ora si può anche inclinare, non solo aprire o
@@ -184,6 +186,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Tre sensori che esistono solo su un'auto elettrica erano rimasti coi vecchi nomi italiani, e non avevano nessuna traduzione.** Potenza di ricarica, autonomia WLTP ed efficienza elettrica nascono solo dopo che l'auto ha confermato di essere solo elettrica, cosa che avviene a configurazione gia' fatta: non c'erano nella tabella dei nomi, e nei file di traduzione non c'erano mai stati. Adesso hanno identificativi inglesi come tutto il resto e un nome in ogni lingua. Se li hai, vengono rinominati da soli al prossimo avvio e lo storico li segue.
 
 - **Lavoro interno: l'integrazione non chiede piu' di installare `requests` e `pillow`.** Home Assistant li include gia' entrambi, e il suo validatore adesso rifiuta un'integrazione custom che li elenca, cosa che avrebbe bloccato questo rilascio. Sulla tua installazione non cambia niente: l'integrazione usa le copie che Home Assistant ha gia'.
+
+- **«Riscaldamento lunotto» non resta più acceso per giorni.** Il riscaldamento del lunotto si accende con un timer di 15 minuti, ma quando il timer scade l'auto non lo dice: a differenza di parabrezza, volante e sedili, lo stato del lunotto torna solo quando le mandi un comando. Così dopo un «Riscalda tutto» l'interruttore poteva restare acceso per giorni, e su una Omoda 9 è successo, per 48 ore. Adesso si spegne da solo 16 minuti dopo l'ultima volta che l'auto l'ha confermato acceso, anche se nel frattempo Home Assistant si riavvia. Gli altri riscaldatori restano come prima, perché lì è l'auto a dire quando si spengono. *Misurato su una Omoda 9 il 23 ottobre 2026: parabrezza, volante e lunotto accesi insieme; 15 minuti dopo l'auto ha segnalato spenti i primi due e del lunotto non ha detto niente.*
 
 ## v1.13.0 — 2026-08-10
 

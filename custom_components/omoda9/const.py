@@ -354,6 +354,25 @@ MACRO_PRESET_S = 15 * 60 + 60
 # manifesta (durata dichiarata 15 = costante). Sistemarlo vuol dire derivare il timer dalla
 # durata effettivamente spedita, che oggi `switch.py` non conosce — va fatto, ma non di corsa
 # in una release che tocca già il corpo dei comandi comfort.
+
+# How long the rear window heater can still be on after the car last reported it on.
+# `rWinHeatingState` is NOT telemetry: the car only states it inside the confirmation of a
+# command that touches the rear window (`1135` for the rear defrost, `110B` for the "Heat
+# everything" preset; the `110C` confirmation does not carry it). Measured on the Omoda 9
+# bridge capture of 17-21/06/2026: 1,463 spontaneous `5A02` messages, none of them carries the
+# field — not even the 36-field snapshot the car pushes when it is switched off, which does
+# carry the windscreen, steering wheel and seat heaters. So when the car's own timer switches
+# the heater off, nobody tells us, and the switch used to stay on until the next rear-window
+# command: measured in Home Assistant on 21-23/10/2026, 48.6 hours "on" after a "Heat
+# everything" whose other heaters the car had reported off within 15 minutes.
+# On the Omoda 9 every way we have of switching it on sends a 15-minute duration
+# (`times`/`duration` "15"; the presets' duration can be adapted per vehicle, see
+# `_adatta_durata` in core/commands.py). That the car stops the heater at the end of it is
+# inferred, not observed: the switch-off is exactly what is never reported. Past that, plus
+# the same 60 s margin as `MACRO_PRESET_S`, the switch shows off. A newer confirmation
+# restarts the count.
+REAR_DEFROST_MAX_S = 15 * 60 + 60
+
 # Quanto si aspetta, dopo aver spedito una macro, prima di credere alla TELEMETRIA SPONTANEA
 # che dice «preset spento». Serve perché fra il nostro invio e l'esecuzione l'auto continua a
 # pubblicare lo stato di PRIMA: un 5A02 già in volo arriva con il clima ancora a zero, e senza
