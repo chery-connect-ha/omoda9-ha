@@ -5,7 +5,9 @@
     "recorder"
   ],
   "codeowners": [
-    "@Caslinovich"
+    "@Caslinovich",
+    "@drake69",
+    "@JackRonan"
   ],
   "config_flow": true,
   "dependencies": [
