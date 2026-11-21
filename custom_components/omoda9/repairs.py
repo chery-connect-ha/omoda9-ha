@@ -43,8 +43,47 @@ async def async_create_fix_flow(
     issue_id: str,
     data: dict[str, Any] | None,
 ) -> RepairsFlow:
-    """Factory richiesta da HA per l'avviso `pin_wrong`."""
+    """Factory richiesta da HA per gli avvisi riparabili: `pin_wrong` e l'offerta di passaggio."""
+    from .handover import OFFER_ISSUE_PREFIX
+
+    if issue_id.startswith(OFFER_ISSUE_PREFIX):
+        return HandoverRepairFlow(data or {})
     return Omoda9PinRepairFlow(data or {})
+
+
+class HandoverRepairFlow(RepairsFlow):
+    """One confirmation, then the vehicle is handed over to `chery_connect`.
+
+    A repair flow rather than a config flow because the move starts from this integration, the
+    only code running on the instance, and the notice is where the owner finds it.
+
+    Attributes:
+        _entry_id: the config entry of this integration the notice was raised for.
+    """
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        """Remember which entry the notice was about.
+
+        Args:
+            data: the data stored with the repair issue; `entry_id` names the config entry.
+        """
+        self._entry_id: str | None = data.get("entry_id")
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> data_entry_flow.FlowResult:
+        """Show what will happen, then run the handover on confirmation.
+
+        Args:
+            user_input: None on the first display, an empty dict once the owner confirms.
+        """
+        from .handover import async_hand_over
+
+        entry = self.hass.config_entries.async_get_entry(self._entry_id) if self._entry_id else None
+        if entry is None:
+            return self.async_abort(reason="entry_not_found")
+        if user_input is None:
+            return self.async_show_form(step_id="init", data_schema=vol.Schema({}), description_placeholders={"title": entry.title})
+        await async_hand_over(self.hass, entry)
+        return self.async_create_entry(title="", data={})
 
 
 class Omoda9PinRepairFlow(RepairsFlow):

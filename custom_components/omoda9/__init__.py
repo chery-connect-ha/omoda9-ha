@@ -267,8 +267,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Last, and outside the cleanup above: the integration is fully up whatever the bridge does.
     # When `chery_connect` is installed this is the only code that can tell the owner to move.
+    # When it is not installed yet, the move has to start from here: see `handover.py`.
     from .successor import async_offer_successor
-    await async_offer_successor(hass, entry)
+    if not await async_offer_successor(hass, entry):
+        from .handover import async_offer_handover
+        async_offer_handover(hass, entry)
     return True
 
 

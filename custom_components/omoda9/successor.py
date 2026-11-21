@@ -1,11 +1,11 @@
 """Bridge to the successor integration, `chery_connect`.
 
-Why this exists. The integration is moving to the `chery_connect` domain. When the domain in
-the manifest changes, HACS writes the new folder and leaves this one on disk, still loaded and
-still bound to its config entry. Home Assistant never sets up an integration that has no config
-entry, so after the update nothing would happen: the owner would keep running this code without
-being told. The only code that is certain to run on that instance is this one, so this is where
-the migration has to be offered.
+Why this exists. The integration is moving to the `chery_connect` domain. If `chery_connect`
+ends up installed next to this one (put there by hand, or from another repository), Home Assistant
+never sets it up, because it has no config entry: the owner would keep running this code without
+being told. The only code certain to run on that instance is this one, so this is where the move
+is offered. When `chery_connect` is not installed, which is the normal case because the Marketplace
+refuses to change the domain of an installed integration, `handover.py` takes over instead.
 
 What it does, and nothing more: when `chery_connect` is installed, it opens a discovery card for
 it and raises a repair notice. It passes the entry id only. Credentials stay where they are: the
