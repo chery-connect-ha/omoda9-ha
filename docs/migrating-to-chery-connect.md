@@ -1,5 +1,8 @@
 # Moving to Chery Connect (2.0)
 
+> [!WARNING]
+> **On hold: do not follow this guide yet.** Step 1 does not work: HACS refuses to update an integration whose domain changes, and offers to delete the configured `omoda9` entry instead, which deletes its entities and device. The path is being reworked; see [#10](https://github.com/chery-connect-ha/omoda9-ha/issues/10).
+
 From 2.0 this integration installs under its final name, **Chery Connect**, with the Home
 Assistant domain `chery_connect`. Every vehicle moves to it, whether it runs today on the
 `omoda9` integration (this repository, up to 1.14) or on the older `omoda_jaecoo` line.
