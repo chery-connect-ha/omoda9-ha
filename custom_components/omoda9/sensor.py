@@ -102,6 +102,28 @@ class _RtSpec:
     # a "sconosciuto", NON si tiene l'ultimo noto. Senza questo flag «Tempo di ricarica
     # residuo» restava a 120 min per ore ad auto scollegata (fuorviante).
     volatile: bool = False
+    # Unit that depends on the model, for a field that means different things on different cars.
+    # Pairs (lower-case prefix of the vehicle model, unit), first match wins; no match keeps
+    # `unit`. Fails open: a model nobody has measured keeps the behaviour it always had.
+    unit_by_model: tuple[tuple[str, str], ...] = ()
+
+
+def _unit_for_model(spec: _RtSpec, vehicle_model: str | None) -> str | None:
+    """Unit a sensor declares on this vehicle: the per-model override if one matches, else `spec.unit`.
+
+    Why it exists: `oilSurplus` is litres on the Omoda 9 it was first read on and a percentage on
+    the Jaecoo 7 PHEV (#3), under the same field name. One constant unit is wrong on one of them.
+
+    Args:
+        spec: the realtime sensor spec, with its default `unit` and its `unit_by_model` pairs.
+        vehicle_model: the model as the backend names it (for example "Jaecoo 7"); None when the
+            vehicle identity has not been read yet, which keeps the default unit.
+    """
+    model = (vehicle_model or "").strip().lower()
+    for prefix, unit in spec.unit_by_model:
+        if model.startswith(prefix):
+            return unit
+    return spec.unit
 
 
 # ── Mappe codice→testo per i campi enum di ricarica ──
@@ -307,6 +329,13 @@ _RT_SENSORS: list[_RtSpec] = [
             DIST, KM, TOTAL, "mdi:counter"),
     _RtSpec("km_ibrido", "Chilometraggio ibrido", "hybridMileage",
             DIST, KM, TOTAL, "mdi:counter", diag=True),
+    # electricRange is NOT the remaining electric range (that is pureElectricRange): on the
+    # Jaecoo 7 PHEV it is the distance driven on electricity, cumulative. Two cars agree (#64):
+    # 4632 -> 4641 km of odometer moved it by the 9 km driven on battery, and 9488 km against
+    # a 23464 km odometer on another. Combustion distance is then odometer minus this, which
+    # hybridMileage cannot give: that car reports it as 0.
+    _RtSpec("km_elettrici", "Chilometraggio elettrico", "electricRange",
+            DIST, KM, TOTAL, "mdi:counter", diag=True),
     # ── P1 · TPMS pressione (campo auto in kPa → mostrata in BAR come nell'app: ÷100) ──
     _RtSpec("gomma_ant_sx_press", "Pressione gomma ant. SX", "lFrontTyreKpa",
             PRESS, BAR, MEAS, "mdi:car-tire-alert", scale=0.01, precision=2),
@@ -335,8 +364,11 @@ _RT_SENSORS: list[_RtSpec] = [
             ("avgHkPowerKwh50km", "avgHkPower"),
             None, "kWh/100 km", MEAS, "mdi:lightning-bolt", invalid=(-100.0,)),
     # oilSurplus=23 dal vivo → LITRI (confermato dal calcolo autonomia benzina).
+    # On the Jaecoo 7 PHEV it is a PERCENTAGE (#3): 100 on a full 66 L tank, and 81 matched
+    # 919 km at 5.8 L/100 km within 0.3 %. Two owners confirm it. Other models keep litres
+    # until somebody measures them.
     _RtSpec("carburante_residuo", "Carburante residuo", "oilSurplus",
-            None, "L", MEAS, "mdi:fuel"),
+            None, "L", MEAS, "mdi:fuel", unit_by_model=(("jaecoo 7", PERCENTAGE),)),
     # ── P2 · batteria alta tensione (valide SOLO ad auto in marcia/ricarica) ──
     # Da ferma l'auto manda 0 V / -1000 A = segnaposto "HV spenta", non letture reali:
     # marcati invalidi → il sensore tiene l'ultimo valore noto invece di azzerarsi.
@@ -380,7 +412,7 @@ _RT_SENSORS: list[_RtSpec] = [
 # in miglia — cioè benzina anche lui.
 _SENSORI_SOLO_TERMICO = frozenset({
     "range_benzina", "range_combinato", "consumo_carburante", "carburante_residuo",
-    "km_ibrido",
+    "km_ibrido", "km_elettrici",
 })
 
 # Campi che ESISTONO solo sulle BEV: la cattura live dei 91 campi del 2026-06-25 ha
@@ -700,8 +732,9 @@ class Omoda9RealtimeSensor(_Omoda9RestoreSensor):
         self._spec = spec
         if spec.device_class:
             self._attr_device_class = spec.device_class
-        if spec.unit:
-            self._attr_native_unit_of_measurement = spec.unit
+        unit = _unit_for_model(spec, getattr(coord, "vehicle_model", None))
+        if unit:
+            self._attr_native_unit_of_measurement = unit
         if spec.state_class:
             self._attr_state_class = spec.state_class
         if spec.icon:

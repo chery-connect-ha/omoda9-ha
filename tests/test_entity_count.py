@@ -35,7 +35,7 @@ from custom_components.omoda9.const import (
 # Nessuna chiamata nuova verso il cloud: solo un campo che smettevamo di ignorare.
 ATTESO = {
     "binary_sensor": 27,
-    "sensor": 41,
+    "sensor": 42,
     "button": 15,
     "switch": 18,
     "cover": 3,
@@ -71,7 +71,11 @@ ATTESO = {
 # 110 -> 111 on 2026-10-02: `button.chery_connect_vent_sunroof` ("Vent sunroof", command
 # `tetto_ventila`, skylightControl controlType 2). A deliberate extra button, the sunroof
 # counterpart of `button.chery_connect_vent_windows`; the sunroof cover is unchanged.
-TOTALE_ATTESO = 111
+#
+# 111 -> 112 on 2026-11-21: `sensor.chery_connect_electric_mileage` (field `electricRange`, #64),
+# the distance driven on electricity, cumulative. A deliberate extra diagnostic sensor, created
+# only when the car is not a confirmed battery-electric one, like `hybrid_mileage` next to it.
+TOTALE_ATTESO = 112
 
 
 def test_totale_dichiarato_coerente():
