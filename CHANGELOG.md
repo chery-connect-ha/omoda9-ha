@@ -16,6 +16,14 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 ## [Non rilasciato]
 
+### 🇮🇹 Italiano
+
+- **Porte, finestrini, serratura e motore tornano a mostrare lo stato reale ad auto parcheggiata.** Questi stati arrivano via MQTT solo quando l'auto pubblica; da ferma restavano `unknown`. Ora la lettura realtime (che li trasporta con la stessa codifica) li riversa nei campi letti dalle entità, e la lettura iniziale parte sempre dopo l'avvio anche con l'aggiornamento automatico spento (sola lettura, nessun comando). Non risolve un MQTT che resta muto (vedi #54), ma gli stati tornano visibili. *Relates to #54.*
+
+### 🇬🇧 English
+
+- **Doors, windows, lock and engine show their real state again on a parked car.** These states arrive via MQTT only while the car publishes; when parked they stayed `unknown`. The realtime read (which carries them with the same encoding) now merges them into the fields the entities read, and the startup read always runs after boot even with automatic update off (read-only, no command). It does not fix an MQTT channel that stays silent (see #54), but the states become visible again. *Relates to #54.*
+
 ## v1.14.0 — 2026-08-24
 
 ### 🇬🇧 English
@@ -101,7 +109,12 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Internal: the integration no longer asks to install `requests` and `pillow`.** Home Assistant already ships both, and its validator now rejects a custom integration that lists them, which would have blocked this release. Nothing changes on your installation: the integration uses the copies Home Assistant already has.
 
+- **A command sent while the car is still busy with the previous one is no longer lost.** The car carries out one command at a time. When a second one reached it too early, the car refused it as "busy" and that was the end of it, with a "command failed" notice on your phone. Now the integration tries again by itself as soon as the car has finished the previous command, up to two more times, and tells you only if the last attempt is refused too. The rear window heater, which takes more than half a minute to answer, also gets more time before the next command goes out. *Measured on an Omoda 9 on 23 October 2026: the rear window answered in 35 to 37 seconds, the windscreen and the steering wheel in 2 to 11 seconds. The new retry has not yet been seen at work on a car.*
+
+- **"Rear window heating" no longer stays on for days.** The rear window heater is switched on with a 15-minute timer, but when the timer runs out the car does not say so: unlike the windscreen, the steering wheel and the seats, the rear window's state only comes back when you send the car a command. So after a "Heat everything" the switch could stay on for days, and on an Omoda 9 it did, for 48 hours. It now goes off by itself 16 minutes after the car last confirmed it on, even if Home Assistant restarts in between. The other heaters are unchanged, because the car does report them going off. *Measured on an Omoda 9 on 23 October 2026: windscreen, steering wheel and rear window switched on together; 15 minutes later the car reported the first two off and said nothing about the rear window.*
+
 - **Jaecoo 7 PHEV: "Fuel remaining" now shows a percentage, which is what the car sends.** On that model the value reaches 100 on a full tank, so showing it in litres was wrong. Other models keep litres until somebody measures them. Home Assistant may ask once what to do with the old statistics of this sensor, because its unit changed. *Reported and checked against the car's own display by two Jaecoo 7 PHEV owners.*
+
 - **New "Electric mileage" sensor: the distance driven on electricity, as a counter.** It reads a field that looked like a range but grows with every kilometre driven on battery. With the odometer it also gives the distance driven on petrol. It is a diagnostic sensor, created only on cars that are not battery-electric. This adds one entity, `sensor.chery_connect_electric_mileage`. *Seen on two Jaecoo 7 PHEVs; not yet checked on other plug-in hybrids.*
 
 ### 🇮🇹 Italiano
@@ -188,7 +201,12 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Lavoro interno: l'integrazione non chiede piu' di installare `requests` e `pillow`.** Home Assistant li include gia' entrambi, e il suo validatore adesso rifiuta un'integrazione custom che li elenca, cosa che avrebbe bloccato questo rilascio. Sulla tua installazione non cambia niente: l'integrazione usa le copie che Home Assistant ha gia'.
 
+- **Un comando mandato mentre l'auto è ancora occupata col precedente non si perde più.** L'auto esegue un comando alla volta. Quando un secondo comando le arrivava troppo presto, lo rifiutava come «occupata» e finiva lì, con un avviso «comando non riuscito» sul telefono. Adesso l'integrazione riprova da sola appena l'auto ha finito il comando precedente, fino a due volte, e ti avvisa solo se viene rifiutato anche l'ultimo tentativo. Il riscaldamento del lunotto, che ci mette più di mezzo minuto a rispondere, ha anche più tempo prima che parta il comando successivo. *Misurato su una Omoda 9 il 23 ottobre 2026: il lunotto ha risposto in 35-37 secondi, il parabrezza e il volante in 2-11 secondi. Il nuovo tentativo automatico non è ancora stato visto all'opera su un'auto.*
+
+- **«Riscaldamento lunotto» non resta più acceso per giorni.** Il riscaldamento del lunotto si accende con un timer di 15 minuti, ma quando il timer scade l'auto non lo dice: a differenza di parabrezza, volante e sedili, lo stato del lunotto torna solo quando le mandi un comando. Così dopo un «Riscalda tutto» l'interruttore poteva restare acceso per giorni, e su una Omoda 9 è successo, per 48 ore. Adesso si spegne da solo 16 minuti dopo l'ultima volta che l'auto l'ha confermato acceso, anche se nel frattempo Home Assistant si riavvia. Gli altri riscaldatori restano come prima, perché lì è l'auto a dire quando si spengono. *Misurato su una Omoda 9 il 23 ottobre 2026: parabrezza, volante e lunotto accesi insieme; 15 minuti dopo l'auto ha segnalato spenti i primi due e del lunotto non ha detto niente.*
+
 - **Jaecoo 7 PHEV: «Carburante residuo» ora mostra una percentuale, cioè quello che l'auto manda.** Su quel modello il valore arriva a 100 col pieno, quindi mostrarlo in litri era sbagliato. Gli altri modelli restano in litri finché qualcuno non li misura. Home Assistant potrebbe chiedere una volta cosa fare delle vecchie statistiche di questo sensore, perché l'unità è cambiata. *Segnalato e verificato sul display dell'auto da due proprietari di Jaecoo 7 PHEV.*
+
 - **Nuovo sensore «Chilometraggio elettrico»: i chilometri percorsi in elettrico, come contatore.** Legge un campo che sembrava un'autonomia ma cresce a ogni chilometro fatto a batteria. Con l'odometro dà anche i chilometri fatti a benzina. È un sensore diagnostico, creato solo sulle auto che non sono elettriche pure. Aggiunge un'entità, `sensor.chery_connect_electric_mileage`. *Visto su due Jaecoo 7 PHEV; non ancora verificato su altre ibride plug-in.*
 
 ## v1.13.0 — 2026-08-10

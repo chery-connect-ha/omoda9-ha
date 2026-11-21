@@ -398,7 +398,7 @@ async def test_la_coda_si_libera_anche_se_il_task_viene_annullato(hass,
     ri-attivi mentre l'invio è in volo."""
     coord = _coordinator(hass, integrazione_avviata)
 
-    def _lento(key, params=None):
+    def _lento(key, params=None, busy_will_retry=False):
         time.sleep(2)
         return "inviato (test)"
 
