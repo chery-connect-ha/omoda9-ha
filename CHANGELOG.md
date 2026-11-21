@@ -24,7 +24,7 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Doors, windows, lock and engine show their real state again on a parked car.** These states arrive via MQTT only while the car publishes; when parked they stayed `unknown`. The realtime read (which carries them with the same encoding) now merges them into the fields the entities read, and the startup read always runs after boot even with automatic update off (read-only, no command). It does not fix an MQTT channel that stays silent (see #54), but the states become visible again. *Relates to #54.*
 
-## v1.14.0 — 2026-08-24
+## v1.14.0 - 2026-11-21
 
 ### 🇬🇧 English
 
