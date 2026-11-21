@@ -71,15 +71,15 @@ jobs:
           sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha)
           {
             echo "sha=$sha"
-            echo "titolo=tutto quello che è entrato finora"
+            echo "titolo=everything merged so far"
           } >> "$GITHUB_OUTPUT"
-          echo "Build d'insieme da master: $sha"
+          echo "Combined build from master: $sha"
 
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.pr.outputs.sha }}
 
-      - name: Calcola la versione della beta
+      - name: Work out the beta version
         id: ver
         env:
           GH_TOKEN: ${{ github.token }}
@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
           base=$(jq -r .version custom_components/chery_connect/manifest.json)
           if [ -z "$base" ] || [ "$base" = "null" ]; then
-            echo "::error::manifest.json senza campo version."
+            echo "::error::manifest.json has no version field."
             exit 1
           fi
 
@@ -104,7 +104,7 @@ jobs:
           if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
             piu_alta=$(printf '%s\n%s\n' "$base" "$stabile" | sort -V | tail -1)
             if [ "$base" = "$stabile" ] || [ "$piu_alta" = "$stabile" ]; then
-              echo "::error::Il manifest dichiara $base e l'ultima stabile è $stabile, quindi il tag sarebbe v$base-beta.N: che in semver ordina PRIMA di v$stabile e HACS mostrerebbe come più vecchio di quello che l'utente ha già installato. Alza \`version\` in custom_components/chery_connect/manifest.json al numero con cui questa modifica uscirà (es. $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), mergia, e rilancia questo workflow."
+              echo "::error::The manifest says $base and the latest stable is $stabile, so the tag would be v$base-beta.N, which semver orders BEFORE v$stabile: HACS would show it as older than what the owner already has. Raise \`version\` in custom_components/chery_connect/manifest.json to the number this change will ship as (for example $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), merge, and run this workflow again."
               exit 1
             fi
           fi
@@ -122,7 +122,7 @@ jobs:
           echo "versione=${base}-beta.${n}" >> "$GITHUB_OUTPUT"
           echo "tag=v${base}-beta.${n}"     >> "$GITHUB_OUTPUT"
 
-      - name: Costruisci chery_connect.zip
+      - name: Build chery_connect.zip
         env:
           VERSIONE: ${{ steps.ver.outputs.versione }}
         run: |
@@ -143,10 +143,10 @@ jobs:
           git ls-files -z | xargs -0 zip -q -X "$GITHUB_WORKSPACE/chery_connect.zip"
           cd "$GITHUB_WORKSPACE"
 
-          echo "File nell'archivio: $(unzip -Z1 chery_connect.zip | wc -l)"
-          unzip -p chery_connect.zip manifest.json | jq -r '"Versione nel manifest: " + .version'
+          echo "Files in the archive: $(unzip -Z1 chery_connect.zip | wc -l)"
+          unzip -p chery_connect.zip manifest.json | jq -r '"Version in the manifest: " + .version'
 
-      - name: Pubblica la pre-release
+      - name: Publish the pre-release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.ver.outputs.tag }}
@@ -159,7 +159,7 @@ jobs:
           stabile=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
           confronto=""
           if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
-            confronto="Cosa c'è dentro, rispetto all'ultima stabile:
+            confronto="What is in it, compared with the latest stable:
           https://github.com/${GITHUB_REPOSITORY}/compare/${stabile}...master"
           fi
 
@@ -168,26 +168,26 @@ jobs:
           # rompe in silenzio quando il testo cambia: `--notes-file` prende lo stesso
           # contenuto senza passare dal parser due volte.
           cat > note-beta.md <<EOF
-          Build d'insieme da \`master\` — **${TITOLO}**
+          Combined build from \`master\`: **${TITOLO}**
 
-          Non è una release, e non è una singola modifica: è tutto quello che è entrato
-          finora, provato **insieme**. Si guardano le cose che nascono dalla combinazione:
-          il numero di entità, i nomi che spariscono in una lingua sola, due sensori che si
-          contendono lo stesso campo.
+          Not a release, and not a single change: everything merged so far, tried
+          **together**. What to look at is what only shows up in combination: the number
+          of entities, names that go missing in one language, two sensors fighting over
+          the same field.
 
           ${confronto}
 
-          **Come si installa.** In HACS, sulla scheda di questa integrazione: menù ⋮ →
-          *Redownload* → attiva **Show beta versions** → scegli \`${VERSIONE}\` → riavvia
-          Home Assistant. Per tornare indietro, stessa strada scegliendo l'ultima stabile.
+          **How to install it.** In HACS, on this integration: menu ⋮, *Redownload*, turn
+          on **Show beta versions**, pick \`${VERSIONE}\`, then restart Home Assistant. To
+          go back, same path, picking the latest stable.
 
-          **Se puoi, non provarla sull'istanza da cui dipendi ogni giorno.** È una
-          pre-release e l'auto è vera.
+          **If you can, do not try it on the instance you rely on every day.** It is a
+          pre-release and the car is real.
 
-          **Cosa serve sapere dopo.** Non "funziona", ma cosa ha fatto l'auto: il campo di
-          stato che è cambiato, e l'ora. \`HTTP 200\` e \`operation.successful\` dicono che
-          il backend ha accettato — non che la vettura abbia eseguito. Apri una issue col
-          modello, la regione e cosa NON hai potuto provare: anche quello è un risultato.
+          **What we need to know afterwards.** Not "it works", but what the car did: the
+          state field that changed, and when. \`HTTP 200\` and \`operation.successful\` say
+          the backend accepted the command, not that the car carried it out. Open an issue
+          with the model, the region and what you could NOT try: that is a result too.
 
           Commit: \`${SHA}\`
           EOF
@@ -196,10 +196,10 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$SHA" \
             --prerelease \
-            --title "${VERSIONE} — insieme, da master" \
+            --title "${VERSIONE}, combined build from master" \
             --notes-file note-beta.md
 
-      - name: Una sola pre-release visibile alla volta
+      - name: Only one visible pre-release at a time
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.ver.outputs.tag }}
@@ -230,7 +230,7 @@ jobs:
           vecchie=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
                     --jq ".[] | select(.draft == false and .prerelease == true) | select(.tag_name != \"$TAG\") | .tag_name")
           if [ -z "$vecchie" ]; then
-            echo "nessuna pre-release precedente da nascondere."
+            echo "no earlier pre-release to hide."
             exit 0
           fi
           for t in $vecchie; do
@@ -243,8 +243,8 @@ jobs:
                      --jq "[.[] | select(.draft == false and .prerelease == true)] | length")
           prima=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
                   --jq "[.[] | select(.draft == false and .prerelease == true)][0].tag_name")
-          echo "pre-release visibili: $visibili, la prima e': $prima"
+          echo "visible pre-releases: $visibili, the first one is: $prima"
           if [ "$visibili" != "1" ] || [ "$prima" != "$TAG" ]; then
-            echo "::error::HACS servirebbe $prima invece di $TAG. Il taglio e' andato, ma la beta non e' raggiungibile."
+            echo "::error::HACS would serve $prima instead of $TAG. The build was published, but the beta cannot be reached."
             exit 1
           fi
