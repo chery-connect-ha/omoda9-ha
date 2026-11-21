@@ -117,6 +117,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **New "Electric mileage" sensor: the distance driven on electricity, as a counter.** It reads a field that looked like a range but grows with every kilometre driven on battery. With the odometer it also gives the distance driven on petrol. It is a diagnostic sensor, created only on cars that are not battery-electric. This adds one entity, `sensor.chery_connect_electric_mileage`. *Seen on two Jaecoo 7 PHEVs; not yet checked on other plug-in hybrids.*
 
+- **Getting ready for the move to Chery Connect.** The next major version installs under its final name, Chery Connect (`chery_connect`), next to this one. When that happens, this version notices it, shows Chery Connect as discovered in Settings, Devices and services, and adds a notice explaining what to do. Until then it does nothing at all. Nothing moves on its own: you start the move, and it brings your entities and their history with it.
+
 ### 🇮🇹 Italiano
 
 - **Nuovo pulsante «Ventila tetto»: il tetto ora si può anche inclinare, non solo aprire o
@@ -208,6 +210,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Jaecoo 7 PHEV: «Carburante residuo» ora mostra una percentuale, cioè quello che l'auto manda.** Su quel modello il valore arriva a 100 col pieno, quindi mostrarlo in litri era sbagliato. Gli altri modelli restano in litri finché qualcuno non li misura. Home Assistant potrebbe chiedere una volta cosa fare delle vecchie statistiche di questo sensore, perché l'unità è cambiata. *Segnalato e verificato sul display dell'auto da due proprietari di Jaecoo 7 PHEV.*
 
 - **Nuovo sensore «Chilometraggio elettrico»: i chilometri percorsi in elettrico, come contatore.** Legge un campo che sembrava un'autonomia ma cresce a ogni chilometro fatto a batteria. Con l'odometro dà anche i chilometri fatti a benzina. È un sensore diagnostico, creato solo sulle auto che non sono elettriche pure. Aggiunge un'entità, `sensor.chery_connect_electric_mileage`. *Visto su due Jaecoo 7 PHEV; non ancora verificato su altre ibride plug-in.*
+
+- **Preparazione al passaggio a Chery Connect.** La prossima versione maggiore si installa col suo nome definitivo, Chery Connect (`chery_connect`), accanto a questa. Quando succede, questa versione se ne accorge, mostra Chery Connect fra le integrazioni rilevate in Impostazioni, Dispositivi e servizi, e aggiunge un avviso che spiega cosa fare. Fino ad allora non fa niente. Niente si sposta da solo: il passaggio lo avvii tu, e porta con sé le entità e il loro storico.
 
 ## v1.13.0 — 2026-08-10
 
