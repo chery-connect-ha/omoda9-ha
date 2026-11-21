@@ -262,3 +262,25 @@ async def test_a_vehicle_already_here_is_not_moved_again(hass, config_entry, no_
 
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert source.disabled_by is None, "an aborted move must leave the old integration running"
+
+
+async def test_a_vehicle_handed_over_by_the_old_code_is_left_as_it_is(hass, migration, registries):
+    """1.14 already moved everything and said so: nothing moves again, and its notice is answered."""
+    from homeassistant.helpers import issue_registry as ir
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.chery_connect.const import DOMAIN
+
+    entities, _devices = registries
+    entry = MockConfigEntry(domain=DOMAIN, title="Omoda 9", unique_id=FX.VIN, data={
+        "vin": FX.VIN, "email": FX.EMAIL, "pin": FX.PIN, migration.MIGRATED_FROM_KEY: "gone",
+        migration.SOURCE_DOMAIN_KEY: OLD, migration.MIGRATION_DONE_KEY: True})
+    entry.add_to_hass(hass)
+    battery = entities.async_get_or_create("sensor", DOMAIN, f"{FX.VIN}_battery", suggested_object_id="chery_connect_battery", config_entry=entry)
+    notice = f"{migration.HANDOVER_DONE_ISSUE_PREFIX}{entry.entry_id}"
+    ir.async_create_issue(hass, OLD, notice, is_fixable=False, is_persistent=True, severity=ir.IssueSeverity.WARNING, translation_key="handover_done")
+
+    assert await migration.async_complete_migration(hass, entry) is False
+
+    assert ir.async_get(hass).async_get_issue(OLD, notice) is None, "the notice would stay forever: its integration is gone"
+    assert entities.async_get(battery.entity_id).config_entry_id == entry.entry_id
