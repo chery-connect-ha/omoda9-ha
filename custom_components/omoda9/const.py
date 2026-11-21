@@ -418,19 +418,35 @@ OPT_MAX_S = 15 * 60
 # canale di push) e appiccicarle i nostri avvisi direbbe una cosa falsa su un'azione altrui.
 NOTE_COMANDO_S = 120
 
-# Coda comandi: l'auto esegue UN comando alla volta (A00082 = "veicolo occupato"), quindi i
-# comandi si serializzano. Un secondo comando (o un doppio-tap) ASPETTA il suo turno invece di
-# essere rifiutato. Dopo un invio si lascia respirare l'auto fino alla sua conferma MQTT o al
-# più COMMAND_SETTLE_S, così il prossimo della coda non parte mentre è ancora occupata.
-# COMMAND_QUEUE_WAIT limita l'attesa in coda: oltre, il comando fallisce con un messaggio chiaro.
+# Command queue: the car runs ONE command at a time (A00082 = "vehicle busy"), so commands are
+# serialised. A second command (or a double tap) WAITS for its turn instead of being refused.
+# After a send the car is given room until its MQTT confirmation, or at most COMMAND_SETTLE_S,
+# so the next command in the queue does not go out while it is still busy.
+# COMMAND_QUEUE_WAIT caps the wait in the queue: past it, the command fails with a clear message.
 #
-# ⚠️ Il valore va tenuto SOPRA il tempo di conferma reale, altrimenti la pausa scade prima che
-# l'auto abbia risposto e il comando successivo parte comunque a vettura occupata. Misurato sui
-# push di conferma di luglio 2026: 11-14s quando la macro comfort riesce, 8-10s quando riesce a
-# metà — 5s (il vecchio valore) scadeva SEMPRE prima. Serve anche il taglio dall'altro lato:
-# `_settle_after_command` ora aspetta la conferma VERA e non un messaggio qualsiasi (vedi lì).
+# ⚠️ The pause has to stay ABOVE the real confirmation time, or it runs out before the car has
+# answered and the next command goes out to a busy car anyway. Measured on the July 2026
+# confirmation pushes: 11-14 s when the comfort preset succeeds, 8-10 s when it half succeeds —
+# 5 s (the old value) ALWAYS ran out first. The other half of the fix: `_settle_after_command`
+# waits for a REAL confirmation, not for any message (see there).
 COMMAND_SETTLE_S = 15
-COMMAND_QUEUE_WAIT = 30
+# Commands whose confirmation is much slower than the rest, by command key. The rear window
+# heater: on 23/10/2026 three confirmations took 35, 36 and 37 s (the windscreen and the
+# steering wheel, sent in the same minute, 5-6 s and 2 s). With the common 15 s the next command
+# went out while the car was still busy: that morning "rear window off" then "on" ended in
+# A00082 for the second one. 45 s covers the measured spread with a margin.
+COMMAND_SETTLE_SLOW_S = {"defrost_lunotto": 45, "defrost_lunotto_off": 45}
+# Long enough for a command queued behind the slowest holder of the slot: a rear window command
+# (send + 45 s) plus its busy retries below. 30 s, the old value, was shorter than the rear
+# window pause alone, so the command behind it would have failed with "still busy" instead.
+COMMAND_QUEUE_WAIT = 150
+# A command the car refused as busy (A00082) is read as NOT executed (core/routing.py already
+# lists A00082 as retryable), so retrying it should not run it twice. It is retried up to
+# COMMAND_BUSY_RETRIES more times, each one as soon as the car confirms whatever it was busy
+# with, or after COMMAND_BUSY_WAIT_S at most. Only the last refusal reaches the user as a
+# failure.
+COMMAND_BUSY_RETRIES = 2
+COMMAND_BUSY_WAIT_S = 20
 
 # Monitor diagnostico per lo SVILUPPATORE (vedi diag.py). Non è una funzione utente: non
 # ha interruttore nell'interfaccia. Si attiva creando il file bandierina qui sotto nella

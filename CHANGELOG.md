@@ -101,6 +101,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Internal: the integration no longer asks to install `requests` and `pillow`.** Home Assistant already ships both, and its validator now rejects a custom integration that lists them, which would have blocked this release. Nothing changes on your installation: the integration uses the copies Home Assistant already has.
 
+- **A command sent while the car is still busy with the previous one is no longer lost.** The car carries out one command at a time. When a second one reached it too early, the car refused it as "busy" and that was the end of it, with a "command failed" notice on your phone. Now the integration tries again by itself as soon as the car has finished the previous command, up to two more times, and tells you only if the last attempt is refused too. The rear window heater, which takes more than half a minute to answer, also gets more time before the next command goes out. *Measured on an Omoda 9 on 23 October 2026: the rear window answered in 35 to 37 seconds, the windscreen and the steering wheel in 2 to 11 seconds. The new retry has not yet been seen at work on a car.*
+
 ### 🇮🇹 Italiano
 
 - **Nuovo pulsante «Ventila tetto»: il tetto ora si può anche inclinare, non solo aprire o
@@ -184,6 +186,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Tre sensori che esistono solo su un'auto elettrica erano rimasti coi vecchi nomi italiani, e non avevano nessuna traduzione.** Potenza di ricarica, autonomia WLTP ed efficienza elettrica nascono solo dopo che l'auto ha confermato di essere solo elettrica, cosa che avviene a configurazione gia' fatta: non c'erano nella tabella dei nomi, e nei file di traduzione non c'erano mai stati. Adesso hanno identificativi inglesi come tutto il resto e un nome in ogni lingua. Se li hai, vengono rinominati da soli al prossimo avvio e lo storico li segue.
 
 - **Lavoro interno: l'integrazione non chiede piu' di installare `requests` e `pillow`.** Home Assistant li include gia' entrambi, e il suo validatore adesso rifiuta un'integrazione custom che li elenca, cosa che avrebbe bloccato questo rilascio. Sulla tua installazione non cambia niente: l'integrazione usa le copie che Home Assistant ha gia'.
+
+- **Un comando mandato mentre l'auto è ancora occupata col precedente non si perde più.** L'auto esegue un comando alla volta. Quando un secondo comando le arrivava troppo presto, lo rifiutava come «occupata» e finiva lì, con un avviso «comando non riuscito» sul telefono. Adesso l'integrazione riprova da sola appena l'auto ha finito il comando precedente, fino a due volte, e ti avvisa solo se viene rifiutato anche l'ultimo tentativo. Il riscaldamento del lunotto, che ci mette più di mezzo minuto a rispondere, ha anche più tempo prima che parta il comando successivo. *Misurato su una Omoda 9 il 23 ottobre 2026: il lunotto ha risposto in 35-37 secondi, il parabrezza e il volante in 2-11 secondi. Il nuovo tentativo automatico non è ancora stato visto all'opera su un'auto.*
 
 ## v1.13.0 — 2026-08-10
 

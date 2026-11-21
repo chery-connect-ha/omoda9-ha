@@ -39,6 +39,7 @@ from .const import (
     CONF_TENANT_CODE, CONF_COUNTRY_ID,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING, DEFAULT_POLL_NORMAL_MIN,
     DEFAULT_POLL_CHARGING_MIN, POLL_WAKE_WAIT, COMMAND_SETTLE_S, COMMAND_QUEUE_WAIT,
+    COMMAND_SETTLE_SLOW_S, COMMAND_BUSY_RETRIES, COMMAND_BUSY_WAIT_S,
     HV_ON_POLL_EVERY, HV_ON_POLL_MAX,
     CHARGING_POLL_EVERY, CHARGING_POLL_MAX, DRIVE_WATCH_EVERY,
     CONF_VEHICLE_NAME, DATA_VEHICLE_MODEL, DATA_VEHICLE_BRAND,
@@ -1126,20 +1127,19 @@ class Omoda9Coordinator(DataUpdateCoordinator):
     # in `repairs.py`/`config_flow.py`), perché quello vive in memoria e sopravviverebbe.
 
     # ───────────────── coda comandi (l'auto ne esegue uno alla volta) ─────────────────
-    async def _settle_after_command(self) -> None:
-        """Pausa dopo un comando, prima che parta il prossimo in coda: aspetta il push di
-        CONFERMA dell'auto oppure COMMAND_SETTLE_S, quale che arrivi prima. Serve a non
-        ricolpire l'auto mentre è ancora occupata (A00082).
+    async def _settle_after_command(self, max_s: float | None = None) -> None:
+        """Pause after a command, before the next one in the queue goes out: waits for the
+        car's CONFIRMATION push or `max_s` (default COMMAND_SETTLE_S), whichever comes first.
+        It keeps us from hitting the car again while it is still busy (A00082).
 
-        ⚠️ L'ancora è `_confirm_n`, NON `last_seen`. `last_seen` avanza a OGNI messaggio, e
-        un'auto sveglia manda telemetria 5A02 ogni pochi secondi: la pausa usciva quindi al
-        primo mezzo secondo — proprio nel caso in cui serviva, cioè con la vettura desta e un
-        comando appena partito. Risultato misurato in campo (luglio 2026): la coda non
-        proteggeva da due pressioni ravvicinate e il secondo comando tornava A00082 «auto
-        occupata». Contando solo le conferme la pausa dura finché l'auto ha davvero
-        risposto."""
+        ⚠️ The anchor is `_confirm_n`, NOT `last_seen`. `last_seen` moves on EVERY message,
+        and an awake car sends 5A02 telemetry every few seconds: the pause used to end within
+        half a second — exactly when it was needed, with the car awake and a command just
+        sent. Measured in the field (July 2026): the queue did not protect two close taps and
+        the second command came back A00082 "car busy". Counting confirmations only, the
+        pause lasts until the car has really answered."""
         anchor = self._confirm_n
-        deadline = time.monotonic() + COMMAND_SETTLE_S
+        deadline = time.monotonic() + (COMMAND_SETTLE_S if max_s is None else max_s)
         while time.monotonic() < deadline:
             await asyncio.sleep(0.5)
             if self._confirm_n != anchor:
@@ -1218,7 +1218,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # l'auto, mentre Home Assistant lo considera annullato.
         consegnato = False
         try:
-            res = await self.hass.async_add_executor_job(self._send_command, key, params)
+            res = await self._send_retrying_busy(key, params)
             consegnato = True
         except Exception as err:  # noqa: BLE001 — instrada il rimedio, poi RILANCIA
             if self._diag is not None:
@@ -1247,22 +1247,51 @@ class Omoda9Coordinator(DataUpdateCoordinator):
 
         async def _hold_then_release() -> None:
             try:
-                await self._settle_after_command()
+                await self._settle_after_command(COMMAND_SETTLE_SLOW_S.get(key))
             finally:
                 self._cmd_gate.release()
 
         self.hass.async_create_background_task(_hold_then_release(), f"{DOMAIN}_cmd_settle")
         return res
 
-    def _send_command(self, key: str, params: dict | None = None) -> str:
+    async def _send_retrying_busy(self, key: str, params: dict | None) -> str:
+        """Send `key`, and send it again if the car refused it as busy (A00082).
+
+        Runs while holding the queue slot, so a retry keeps its place: nothing queued behind
+        it overtakes it. Each retry waits for the confirmation of whatever kept the car busy
+        (that is when the car is free again), or COMMAND_BUSY_WAIT_S at most. Any other
+        refusal, and the last busy one, propagate unchanged."""
+        retries = 0
+        while True:
+            last_try = retries >= COMMAND_BUSY_RETRIES
+            try:
+                return await self.hass.async_add_executor_job(
+                    self._send_command, key, params, not last_try)
+            except Exception as err:  # noqa: BLE001 — anything but "busy" goes straight up
+                if last_try or not getattr(err, "retryable", False):
+                    raise
+                retries += 1
+                _LOGGER.info("[cmd] %s: car busy, retry %d of %d once it is free",
+                             key, retries, COMMAND_BUSY_RETRIES)
+                await self._settle_after_command(COMMAND_BUSY_WAIT_S)
+
+    def _send_command(self, key: str, params: dict | None = None,
+                      busy_will_retry: bool = False) -> str:
         from .core import commands as CMD
         msgs: list[str] = []
         note: list[str] = []
 
         def emit(m):
-            msgs.append(str(m))
+            m = str(m)
+            # A busy refusal that is going to be retried is not the outcome yet. Published as
+            # it is, it reads as a failure ("HTTP 200 A00082 …") and the "command failed"
+            # blueprint pushes it to the phone, seconds before the retry succeeds.
+            if busy_will_retry and any(code in m for code in CMD.RETRYABLE_CODES):
+                m = ("Auto occupata con un altro comando: riprovo appena si libera ⏳ · "
+                     "Car busy with another command: retrying as soon as it is free")
+            msgs.append(m)
             _LOGGER.info("[cmd] %s", m)
-            self._update({"cmd_status": str(m)[:STATO_MAX]})
+            self._update({"cmd_status": m[:STATO_MAX]})
 
         def avvisa(m):
             """Avviso che l'utente deve poter LEGGERE, non solo un passaggio.
