@@ -26,9 +26,9 @@ veicolo, posizione e comandi, come nell'app ufficiale ma integrati in HA.
 > Omoda / Jaecoo / Chery. Fornito "as is", usalo a tuo rischio e solo sul tuo
 > veicolo. Vedi [`LICENSE`](LICENSE).
 
-## Cosa sta succedendo: il passaggio a Chery Connect è sospeso
+## Cosa sta succedendo: il passaggio a Chery Connect
 
-Il piano resta un'integrazione sola con un nome solo, **Chery Connect** (dominio `chery_connect`), per chi usa `omoda9` e per chi usa la vecchia linea `omoda_jaecoo`. La prima build, `2.0.0-beta.1`, è stata ritirata: HACS rifiuta di aggiornare un'integrazione che cambia dominio e propone di eliminare quella configurata, cosa che ne cancellerebbe entità e dispositivo. **Se HACS ti mostra quella finestra, chiudila.** Non c'è niente da fare da parte tua: continua a usare questa integrazione così com'è. A che punto siamo: [#10](https://github.com/chery-connect-ha/omoda9-ha/issues/10).
+L'integrazione passa al suo nome definitivo, **Chery Connect** (dominio `chery_connect`), per chi usa `omoda9` e per chi usa la vecchia linea `omoda_jaecoo`. Il Marketplace non cambia il nome di un'integrazione installata, quindi il passaggio avviene in due metà: una versione 1.14 consegna il veicolo da Impostazioni, Riparazioni, poi nel Marketplace rimuovi Omoda 9 / Jaecoo e scarichi Chery Connect 2.0 dalla stessa scheda. Entità, storico e dispositivo passano di qua, e l'accesso viene riusato. **Se il Marketplace propone di eliminare la configurazione al posto tuo, chiudi la finestra**: cancellerebbe le entità. Passo per passo (in inglese): [`docs/migrating-to-chery-connect.md`](docs/migrating-to-chery-connect.md). A che punto siamo: [#10](https://github.com/chery-connect-ha/omoda9-ha/issues/10).
 
 ## Cosa puoi fare
 
