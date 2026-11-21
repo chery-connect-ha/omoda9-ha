@@ -28,8 +28,8 @@ import time
 import pytest
 
 import fixtures as FX
-from custom_components.omoda9.const import DOMAIN, NOTE_COMANDO_S
-from custom_components.omoda9.coordinator import _SEP_NOTE, STATO_MAX, unisci_esito_e_note
+from custom_components.chery_connect.const import DOMAIN, NOTE_COMANDO_S
+from custom_components.chery_connect.coordinator import _SEP_NOTE, STATO_MAX, unisci_esito_e_note
 
 AVVISO_DURATA = "durata 30′ non ammessa"
 
@@ -250,7 +250,7 @@ async def test_una_conferma_arrivata_mentre_il_comando_e_in_volo(hass, integrazi
     ancora la riga di PRIMA e mostrerebbe verde qualunque cosa. Due stesure precedenti di
     questo test sono cadute in quella trappola — restavano verdi col difetto reintrodotto —
     ed è la ragione per cui è scritto così."""
-    from custom_components.omoda9.core import commands as CMD
+    from custom_components.chery_connect.core import commands as CMD
 
     coord = _coordinator(hass, integrazione_avviata)
     _prepara(coord, cloud)
@@ -332,8 +332,8 @@ async def test_un_guasto_nel_comporre_lesito_non_si_sostituisce_allerrore_vero(
     formattazione sarebbe arrivato all'utente come una richiesta di riconfigurare il PIN.
 
     Il rimedio si decide sulla causa, e la causa è dell'auto: qui si verifica che resti tale."""
-    from custom_components.omoda9 import coordinator as COORD
-    from custom_components.omoda9.core.commands import CommandError
+    from custom_components.chery_connect import coordinator as COORD
+    from custom_components.chery_connect.core.commands import CommandError
 
     coord = _coordinator(hass, integrazione_avviata)
     coord.ctx.caps = {"durate_aria": [5, 10, 15]}

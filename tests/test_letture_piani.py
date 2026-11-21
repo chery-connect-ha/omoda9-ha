@@ -37,7 +37,7 @@ PIANO_REALE = {
 @pytest.fixture
 def sensore(core):
     """Il sensore del piano di partenza, con un coordinator finto minimale."""
-    from custom_components.omoda9.sensor import Omoda9DeparturePlan
+    from custom_components.chery_connect.sensor import Omoda9DeparturePlan
 
     class CoordFinto:
         data: dict = {}
@@ -110,7 +110,7 @@ def test_orari_impossibili_non_vengono_mostrati(sensore, minuti):
 
 @pytest.fixture
 def switch_ricarica(core):
-    from custom_components.omoda9.switch import Omoda9ScheduledChargeSwitch
+    from custom_components.chery_connect.switch import Omoda9ScheduledChargeSwitch
 
     class CoordFinto:
         data: dict = {"fields": {}}

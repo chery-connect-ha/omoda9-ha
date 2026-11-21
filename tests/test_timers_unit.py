@@ -8,7 +8,7 @@ Ora la garanzia è del registro.
 """
 from __future__ import annotations
 
-from custom_components.omoda9.timers import GRUPPO_POLL, KEEPALIVE, POLL, TimerRegistry
+from custom_components.chery_connect.timers import GRUPPO_POLL, KEEPALIVE, POLL, TimerRegistry
 
 
 def _finto_timer(tracker: list, nome: str):
@@ -88,7 +88,7 @@ def test_gruppo_poll_non_tocca_il_keepalive():
 def test_il_gruppo_poll_copre_ogni_timer_che_contatta_il_cloud():
     """Guard-rail: un timer nuovo che parla col cloud e NON entra in `GRUPPO_POLL`
     sopravviverebbe allo switch OFF — è esattamente il bug P0-5."""
-    from custom_components.omoda9 import timers
+    from custom_components.chery_connect import timers
 
     # Le uniche due eccezioni ammesse, entrambe perché NON contattano nessuno:
     #   KEEPALIVE → parla col cloud ma NON con l'auto, e deve restare acceso a poll spento

@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from custom_components.omoda9.core.pin_lockout import PinLockedError, PinLockout
+from custom_components.chery_connect.core.pin_lockout import PinLockedError, PinLockout
 
 
 def test_parte_sbloccato():

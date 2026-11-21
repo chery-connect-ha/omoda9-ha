@@ -16,7 +16,7 @@ import os
 import pytest
 
 import fixtures as FX
-from custom_components.omoda9.core.context import CoreCtx
+from custom_components.chery_connect.core.context import CoreCtx
 
 
 # ───────────────────────── indipendenza fra veicoli ─────────────────────────
@@ -50,10 +50,10 @@ def test_due_coordinator_due_contesti(hass, cloud, monkeypatch):
     """Verifica end-to-end della stessa proprietà, sui coordinator veri."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-    from custom_components.omoda9.const import (
+    from custom_components.chery_connect.const import (
         CONF_EMAIL, CONF_PIN, CONF_TUSERID, CONF_VIN, DOMAIN,
     )
-    from custom_components.omoda9.coordinator import Omoda9Coordinator
+    from custom_components.chery_connect.coordinator import Omoda9Coordinator
 
     def _coord(vin, pin):
         entry = MockConfigEntry(

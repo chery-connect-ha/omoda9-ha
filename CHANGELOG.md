@@ -24,6 +24,16 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Doors, windows, lock and engine show their real state again on a parked car.** These states arrive via MQTT only while the car publishes; when parked they stayed `unknown`. The realtime read (which carries them with the same encoding) now merges them into the fields the entities read, and the startup read always runs after boot even with automatic update off (read-only, no command). It does not fix an MQTT channel that stays silent (see #54), but the states become visible again. *Relates to #54.*
 
+## v2.0.0
+
+### 🇬🇧 English
+
+- **The integration is now Chery Connect, domain `chery_connect`, and every vehicle moves to it.** For Home Assistant a new domain is a new integration, so updating installs it next to the old one: confirm the move once from Settings (it is listed as discovered, or under "Add integration"). Your login is reused, no new code is sent, and entities, history and the device come along with their ids. From `omoda9` entity ids do not change; from `omoda_jaecoo` they move to the English names, as the adoption of 1.14 already did. **To fix by hand:** automations that call services (`omoda9.*` becomes `chery_connect.*`) and the bundled blueprints, which need re-importing from `blueprints/automation/chery_connect/`. When everything works, delete the old entry and the folder `custom_components/omoda9`; a notice in Settings says so. Guide: `docs/migrating-to-chery-connect.md`. *The move from `omoda_jaecoo` was tried on a real instance on 27 September 2026, through the adoption service it reuses; the move from `omoda9` has not yet run on a car.*
+
+### 🇮🇹 Italiano
+
+- **L'integrazione ora è Chery Connect, dominio `chery_connect`, e ogni veicolo passa lì.** Per Home Assistant un dominio nuovo è un'integrazione nuova, quindi l'aggiornamento la installa accanto alla vecchia: conferma il passaggio una volta da Impostazioni (compare fra le integrazioni rilevate, oppure in «Aggiungi integrazione»). L'accesso viene riusato, nessun nuovo codice, ed entità, storico e dispositivo passano coi loro identificativi. Da `omoda9` gli entity_id non cambiano; da `omoda_jaecoo` prendono i nomi inglesi, come già faceva l'adozione della 1.14. **Da sistemare a mano:** le automazioni che chiamano servizi (`omoda9.*` diventa `chery_connect.*`) e i blueprint inclusi, da reimportare da `blueprints/automation/chery_connect/`. Quando tutto funziona, elimina la voce vecchia e la cartella `custom_components/omoda9`; te lo dice un avviso in Impostazioni. Guida (in inglese): `docs/migrating-to-chery-connect.md`. *Il passaggio da `omoda_jaecoo` è stato provato su un'istanza vera il 27 settembre 2026, tramite il servizio di adozione che riusa; quello da `omoda9` non è ancora stato eseguito su un'auto.*
+
 ## v1.14.0 — 2026-08-24
 
 ### 🇬🇧 English

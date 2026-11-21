@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.timers import DRIVE_WATCH, HV_POLL, POLL
+from custom_components.chery_connect.timers import DRIVE_WATCH, HV_POLL, POLL
 
 
 def _coordinator(hass, entry):
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
     return hass.data[DOMAIN][entry.entry_id]
 
 
@@ -106,7 +106,7 @@ async def test_il_follow_up_si_ferma_da_solo_quando_l_auto_si_spegne(hass, coord
 async def test_cap_di_sicurezza_sul_numero_di_letture(hass, coord, monkeypatch):
     """Anche restando la spina collegata il loop ha un tetto: una carica che non
     finisce mai non deve tradursi in letture cloud infinite."""
-    from custom_components.omoda9.const import CHARGING_POLL_MAX
+    from custom_components.chery_connect.const import CHARGING_POLL_MAX
 
     monkeypatch.setattr(coord, "_is_plugged", lambda: True)
     coord.poll_enabled = True
@@ -120,7 +120,7 @@ async def test_cap_di_sicurezza_sul_numero_di_letture(hass, coord, monkeypatch):
 async def test_unload_smonta_tutto(hass, integrazione_avviata):
     """Scaricando l'integrazione non devono restare né timer né il coordinator in
     `hass.data`: è la condizione perché un reload riparta pulito."""
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
 
     coord = _coordinator(hass, integrazione_avviata)
     await hass.config_entries.async_unload(integrazione_avviata.entry_id)
@@ -226,7 +226,7 @@ async def test_la_sveglia_interroga_lo_stato_reale(hass, coord, monkeypatch):
         visto["awake"] = is_awake() if is_awake else None
         return {"ok": True, "online": True}
 
-    from custom_components.omoda9.core import wake as WAKE
+    from custom_components.chery_connect.core import wake as WAKE
 
     monkeypatch.setattr(WAKE, "do_wake", finto_do_wake)
     coord.awake_window = 300

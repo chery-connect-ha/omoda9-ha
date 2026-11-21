@@ -513,7 +513,7 @@ class Omoda9ClimaMacroSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, 
         (a differenza di ogni altro comando, che scrive i suoi passaggi su «Esito comando»),
         e il silenzio faceva ripremere il tasto — cioè l'innesco della corsa fra due cicli.
         Testo corto e bilingue di proposito: finisce nello stato di
-        `sensor.omoda9_esito_comando`, che Home Assistant tronca a 255 caratteri."""
+        `sensor.chery_connect_command_result`, che Home Assistant tronca a 255 caratteri."""
         s = int(secondi)
         self.coordinator._update({
             "cmd_status": f"Sveglio l'auto: il comando parte fra ~{s} s · "

@@ -17,7 +17,7 @@ import re
 
 import pytest
 
-from custom_components.omoda9.core import mask
+from custom_components.chery_connect.core import mask
 
 
 # ───────────────────────────── numeri ─────────────────────────────
@@ -168,7 +168,7 @@ def test_la_diagnostica_toglie_anche_il_dominio(frase):
     canale pubblico. Prima l'indirizzo grezzo veniva sostituito per intero nel file «Scarica
     diagnostica»; con la sola mascheratura alla sorgente il dominio ricompariva, perché la rete
     di sicurezza non riconosceva più ciò che le arrivava davanti."""
-    from custom_components.omoda9.diagnostics import _scrub_email
+    from custom_components.chery_connect.diagnostics import _scrub_email
 
     uscita = _scrub_email({"session_detail": frase})["session_detail"]
     assert "example.com" not in uscita and "dominio.co.uk" not in uscita

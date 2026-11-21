@@ -46,7 +46,7 @@ import tempfile
 import time
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-PACKAGE = os.path.join(REPO, "custom_components", "omoda9")
+PACKAGE = os.path.join(REPO, "custom_components", "chery_connect")
 
 DEFAULT_HOST = "tspemqx-app-eu.cheryinternational.com"
 # 8083 is what the integration actually dials (const.py DEFAULTS); the others are

@@ -33,9 +33,9 @@ import fixtures as FX                      # noqa: E402
 # Assistant, avviando l'istanza di test, ne rimappa il percorso sulla config dir
 # temporanea. Importandolo qui — a tempo di collezione, prima che la fixture `hass`
 # esista — resta fissato in sys.modules e i test lo trovano anche dentro le fixture.
-# Senza questo, `from custom_components.omoda9...` funziona a livello di modulo ma
+# Senza questo, `from custom_components.chery_connect...` funziona a livello di modulo ma
 # fallisce con ModuleNotFoundError se eseguito a runtime.
-from custom_components.omoda9 import const as OMODA_CONST   # noqa: E402
+from custom_components.chery_connect import const as OMODA_CONST   # noqa: E402
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
@@ -78,7 +78,7 @@ def ctx(tmp_path):
     Il file del taskId punta di proposito a un percorso inesistente: nei test il taskId
     deve arrivare SOLO dal conio via checkPassword, altrimenti si verificherebbe una
     scorciatoia invece della catena vera."""
-    from custom_components.omoda9.core.context import CoreCtx
+    from custom_components.chery_connect.core.context import CoreCtx
 
     return CoreCtx(
         vin=FX.VIN, tuserid=FX.TUSERID, pin=FX.PIN, email=FX.EMAIL,
@@ -128,7 +128,7 @@ async def integrazione_avviata(hass, config_entry, cloud, monkeypatch):
     certificati (tocca il filesystem), connessione MQTT all'auto (apre un socket TLS
     verso Chery) e i timer periodici (sveglierebbero l'auto). Restano reali le
     piattaforme e la creazione delle entità, che è ciò che si vuole misurare."""
-    from custom_components.omoda9.coordinator import Omoda9Coordinator
+    from custom_components.chery_connect.coordinator import Omoda9Coordinator
 
     # NB (P2-2): qui serviva neutralizzare `_load_core_from_disk`, che a ogni setup
     # ricaricava i moduli core/ creandone una seconda copia e scavalcando i monkeypatch

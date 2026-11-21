@@ -46,8 +46,8 @@ async def test_un_suffisso_identico_viene_adottato(hass, registro, entry_nostro,
     """Il caso degli 83: il suffisso e' il nome del campo dell'API Chery, uguale sulle due
     linee. L'entita' cambia integrazione e nome, e resta la stessa entita' - che e' il punto,
     perche' e' l'identita' a cui lo storico e' attaccato."""
-    from custom_components.omoda9.legacy import adotta
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.legacy import adotta
+    from custom_components.chery_connect.const import DOMAIN
 
     _vecchia(registro, config_entry_legacy, "binary_sensor", "engineState", "engine")
 
@@ -63,7 +63,7 @@ async def test_un_suffisso_identico_viene_adottato(hass, registro, entry_nostro,
 async def test_un_suffisso_diverso_usa_la_tabella(hass, registro, entry_nostro, config_entry_legacy):
     """Il caso dei 13: stessa entita', suffisso scritto nella lingua di chi l'ha aggiunta.
     Senza la tabella queste resterebbero orfane, e sono quelle che l'utente nota."""
-    from custom_components.omoda9.legacy import adotta
+    from custom_components.chery_connect.legacy import adotta
 
     _vecchia(registro, config_entry_legacy, "binary_sensor", "rt_battery_low", "battery_low")
 
@@ -82,10 +82,10 @@ async def test_la_gemella_vuota_lascia_il_posto_a_quella_con_lo_storico(
 
     E' l'unico punto in cui questa funzione cancella qualcosa. Cancella solo roba nostra, e
     solo quando ha il rimpiazzo gia' in mano."""
-    from custom_components.omoda9.legacy import adotta
+    from custom_components.chery_connect.legacy import adotta
 
     registro.async_get_or_create(
-        "binary_sensor", "omoda9", f"{VIN}_engineState",
+        "binary_sensor", "chery_connect", f"{VIN}_engineState",
         suggested_object_id="chery_connect_engine", config_entry=entry_nostro)
     _vecchia(registro, config_entry_legacy, "binary_sensor", "engineState", "engine")
 
@@ -103,7 +103,7 @@ async def test_cio_che_non_si_puo_adottare_viene_dichiarato(hass, registro, entr
     """Cinque entita' non sono portabili: due perche' le due linee le hanno fatte di tipo
     diverso, tre perche' sul canonico non esistono. Devono comparire nel rapporto: un numero
     che non torna, scoperto dall'utente dopo, costa la fiducia in tutto il resto."""
-    from custom_components.omoda9.legacy import adotta
+    from custom_components.chery_connect.legacy import adotta
 
     _vecchia(registro, config_entry_legacy, "select", "windows_select", "windows")
 
@@ -118,7 +118,7 @@ async def test_cio_che_non_si_puo_adottare_viene_dichiarato(hass, registro, entr
 async def test_dry_run_non_scrive_niente(hass, registro, entry_nostro, config_entry_legacy):
     """Far vedere cosa succederebbe, prima che succeda. Su un'operazione senza precedenti
     in 1401 integrazioni, e' il minimo."""
-    from custom_components.omoda9.legacy import adotta
+    from custom_components.chery_connect.legacy import adotta
 
     v = _vecchia(registro, config_entry_legacy, "binary_sensor", "engineState", "engine")
 
@@ -133,7 +133,7 @@ async def test_dry_run_non_scrive_niente(hass, registro, entry_nostro, config_en
 async def test_le_entita_di_un_altro_veicolo_non_si_toccano(hass, registro, entry_nostro, config_entry_legacy):
     """Due auto sullo stesso Home Assistant: adottare quelle dell'altra sarebbe peggio che
     non adottare niente."""
-    from custom_components.omoda9.legacy import adotta
+    from custom_components.chery_connect.legacy import adotta
 
     registro.async_get_or_create(
         "binary_sensor", "omoda_jaecoo", "UNALTROVIN_engineState",
@@ -154,7 +154,7 @@ async def test_il_servizio_rifiuta_se_la_vecchia_e_ancora_accesa(
     from homeassistant.exceptions import HomeAssistantError
     import pytest as _pytest
 
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
 
     _vecchia(registro, config_entry_legacy, "binary_sensor", "engineState", "engine")
     config_entry_legacy.mock_state(hass, ConfigEntryState.LOADED)
@@ -178,7 +178,7 @@ async def test_il_servizio_rifiuta_se_la_vecchia_e_ancora_accesa(
 def _prese(monkeypatch, serie, cronologie_esistenti=None):
     """Sostituisce le tre prese sul recorder, che nell'ambiente di test non esiste.
     Ritorna le liste su cui si accumulano le chiamate."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     rinominate, cancellate, cronologie = [], [], []
 
@@ -222,7 +222,7 @@ async def test_recupera_le_statistiche_di_una_entita_cancellata(
         hass, registro, entry_nostro, config_entry_legacy, monkeypatch):
     """La vecchia non esiste piu' nel registro, solo in `deleted_entities`. I suoi dati
     esistono ancora, e vanno spostati addosso alla nostra, che il nome giusto ce l'ha."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     vecchio = _dimenticata(hass, registro, config_entry_legacy,
                            "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -240,7 +240,7 @@ async def test_la_serie_nuova_e_corta_lascia_il_posto_a_quella_lunga(
     """Chi ha configurato la nuova prima di accorgersi ha due serie: la sua, di ore, e
     quella vecchia, di anni. Si libera la corta. E' l'unico punto in cui questa funzione
     cancella dei dati, e cancella sempre il lato piu' corto."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     vecchio = _dimenticata(hass, registro, config_entry_legacy,
                            "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -259,7 +259,7 @@ async def test_il_recupero_e_ripetibile(
     giro non deve rifare niente, e soprattutto non deve CANCELLARE la serie appena
     recuperata scambiandola per la gemella corta di turno. Un recupero che si mangia il
     proprio risultato al secondo lancio e' peggio di nessun recupero."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     _dimenticata(hass, registro, config_entry_legacy,
                  "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -275,7 +275,7 @@ async def test_il_recupero_e_ripetibile(
 async def test_dry_run_del_recupero_non_scrive(
         hass, registro, entry_nostro, config_entry_legacy, monkeypatch):
     """Su una funzione che tocca lo storico della gente, far vedere prima e' il minimo."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     vecchio = _dimenticata(hass, registro, config_entry_legacy,
                            "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -296,7 +296,7 @@ async def test_la_cronologia_libera_il_posto_come_le_statistiche(
     prima di recuperare - il recorder scriveva "Cannot migrate history ... already in use" e
     lasciava tutto com'era. Trenta entita' con le statistiche da luglio e la cronologia da
     quella sera, senza eccezioni e senza un test rosso."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     vecchio = _dimenticata(hass, registro, config_entry_legacy,
                            "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -319,7 +319,7 @@ async def test_il_secondo_lancio_non_purga_la_cronologia_appena_recuperata(
     Senza la condizione sul vecchio, un secondo lancio vedrebbe il nuovo occupato, lo
     purgherebbe per fare posto, e poi rinominerebbe un'entita' che non ha piu' dati: il
     recupero si mangerebbe il proprio risultato, in silenzio."""
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     _dimenticata(hass, registro, config_entry_legacy,
                  "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -337,7 +337,7 @@ async def test_il_secondo_lancio_non_purga_la_cronologia_appena_recuperata(
 
 async def test_il_dry_run_non_purga_e_non_rinomina_la_cronologia(
         hass, registro, entry_nostro, config_entry_legacy, monkeypatch):
-    from custom_components.omoda9 import legacy
+    from custom_components.chery_connect import legacy
 
     vecchio = _dimenticata(hass, registro, config_entry_legacy,
                            "sensor", "rt_odometro", "omoda_jaecoo_odometer")
@@ -355,8 +355,8 @@ def test_il_nome_di_parcheggio_non_collide_con_niente(hass):
     """Lo spostamento di lato inventa un nome, e un nome inventato male e' il modo in cui
     questa funzione potrebbe mangiarsi dei dati al giro dopo. Deve stare fuori da cio' che
     l'integrazione produce, altrimenti un secondo giro lo scambierebbe per un candidato."""
-    from custom_components.omoda9 import legacy
-    from custom_components.omoda9.legacy import CANON_ENTITY_ID
+    from custom_components.chery_connect import legacy
+    from custom_components.chery_connect.legacy import CANON_ENTITY_ID
 
     visti = []
     legacy._rinomina_cronologia = lambda h, v, n: visti.append((v, n))

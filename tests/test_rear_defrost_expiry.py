@@ -26,9 +26,9 @@ from pytest_homeassistant_custom_component.common import (
     mock_restore_cache,
 )
 
-from custom_components.omoda9 import coordinator as coord_mod
-from custom_components.omoda9 import switch as switch_mod
-from custom_components.omoda9.const import DOMAIN, REAR_DEFROST_MAX_S
+from custom_components.chery_connect import coordinator as coord_mod
+from custom_components.chery_connect import switch as switch_mod
+from custom_components.chery_connect.const import DOMAIN, REAR_DEFROST_MAX_S
 
 REAR = "switch.chery_connect_rear_window_heating"
 WINDSHIELD = "switch.chery_connect_windshield_defrost"

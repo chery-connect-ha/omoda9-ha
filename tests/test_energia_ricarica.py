@@ -17,8 +17,8 @@ import datetime as dt
 
 import pytest
 
-from custom_components.omoda9 import sensor as S
-from custom_components.omoda9.const import CHARGE_ENERGY_MAX_GAP
+from custom_components.chery_connect import sensor as S
+from custom_components.chery_connect.const import CHARGE_ENERGY_MAX_GAP
 
 
 class _CoordFinto:

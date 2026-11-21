@@ -1,6 +1,6 @@
 """Test BLOCCANTE: il monitor diagnostico non deve far uscire segreti.
 
-Il file `omoda9_<VIN>_diag.jsonl` nasce redatto ed è pensato per essere allegato a una
+Il file `chery_connect_<VIN>_diag.jsonl` nasce redatto ed è pensato per essere allegato a una
 issue. Questi test sono la garanzia di quel claim: verificano che VIN, email, PIN, token,
 taskId e GPS non compaiano MAI né nel ring buffer né nel file su disco — nemmeno dentro
 campi dal nome sconosciuto, che la deny-list per chiave non coprirebbe.
@@ -22,7 +22,7 @@ import tempfile
 import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_DIAG_PY = os.path.join(_HERE, "..", "custom_components", "omoda9", "diag.py")
+_DIAG_PY = os.path.join(_HERE, "..", "custom_components", "chery_connect", "diag.py")
 
 _spec = importlib.util.spec_from_file_location("omoda9_diag", _DIAG_PY)
 diag = importlib.util.module_from_spec(_spec)

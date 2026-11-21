@@ -17,15 +17,15 @@ import collections
 
 
 def _coord(hass, entry):
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
     return hass.data[DOMAIN][entry.entry_id]
 
 
 def test_una_chiave_fuori_tabella_resta_com_e(hass, integrazione_avviata):
     """Il ripiego storico deve restare: un'entita' nuova, aggiunta domani da qualcuno che
     non sa che la tabella esiste, deve funzionare come ha sempre funzionato."""
-    from custom_components.omoda9.entity import Omoda9Entity
-    from custom_components.omoda9.naming import ENGLISH_KEYS
+    from custom_components.chery_connect.entity import Omoda9Entity
+    from custom_components.chery_connect.naming import ENGLISH_KEYS
 
     coord = _coord(hass, integrazione_avviata)
     assert "cosa_nuova" not in ENGLISH_KEYS
@@ -40,8 +40,8 @@ def test_una_chiave_fuori_tabella_resta_com_e(hass, integrazione_avviata):
 def test_una_chiave_in_tabella_porta_con_se_l_entity_id(hass, integrazione_avviata):
     """La conversione e' di due cose insieme, non di una. Se l'entity_id restasse indietro
     avremmo la chiave inglese e l'indirizzo italiano: il peggiore dei due mondi."""
-    from custom_components.omoda9.entity import Omoda9Entity
-    from custom_components.omoda9.naming import ENGLISH_KEYS, ID_PREFIX
+    from custom_components.chery_connect.entity import Omoda9Entity
+    from custom_components.chery_connect.naming import ENGLISH_KEYS, ID_PREFIX
 
     coord = _coord(hass, integrazione_avviata)
     assert ENGLISH_KEYS["batteria_scarica"] == "low_battery"
@@ -83,14 +83,13 @@ def test_nessun_entity_id_e_rimasto_in_italiano(hass, integrazione_avviata):
     meta' italiane, una issue aperta da due utenti parla di due cose con nomi diversi."""
     from homeassistant.helpers import entity_registry as er
 
-    from custom_components.omoda9.const import DOMAIN
-    from custom_components.omoda9.naming import ID_PREFIX
+    from custom_components.chery_connect.naming import ID_PREFIX, NAME_PREFIX
 
     reg = er.async_get(hass)
     rimasti = [
         e.entity_id
         for e in er.async_entries_for_config_entry(reg, integrazione_avviata.entry_id)
-        if e.entity_id.split(".", 1)[1].startswith(f"{DOMAIN}_")
+        if e.entity_id.split(".", 1)[1].startswith(f"{NAME_PREFIX}_")
     ]
     assert not rimasti, f"entity_id ancora col vecchio prefisso: {rimasti}"
 

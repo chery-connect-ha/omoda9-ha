@@ -13,8 +13,8 @@ from __future__ import annotations
 import pytest
 from homeassistant.components.cover import CoverEntityFeature
 
-from custom_components.omoda9 import coordinator as coord_mod
-from custom_components.omoda9.const import COMMANDS_AS_RICH_ENTITY
+from custom_components.chery_connect import coordinator as coord_mod
+from custom_components.chery_connect.const import COMMANDS_AS_RICH_ENTITY
 
 VENT_SUNROOF = "button.chery_connect_vent_sunroof"
 VENT_WINDOWS = "button.chery_connect_vent_windows"

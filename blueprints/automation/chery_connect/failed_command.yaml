@@ -29,11 +29,11 @@ blueprint:
       name: "\"Command result\" sensor"
       description: >
         The integration sensor that reports the result of the last command.
-        Usually `sensor.omoda9_esito_comando`.
-      default: sensor.omoda9_esito_comando
+        Usually `sensor.chery_connect_command_result`.
+      default: sensor.chery_connect_command_result
       selector:
         entity:
-          integration: omoda9
+          integration: chery_connect
           domain: sensor
     popup_ha:
       name: Popup in Home Assistant

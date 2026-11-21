@@ -5,6 +5,7 @@
         "title": "Chery Connect",
         "description": "Choose how to sign in to your Omoda/Jaecoo account. Use the phone option if your account is registered with a phone number instead of an email.",
         "menu_options": {
+          "migrate_existing": "Move a vehicle from the old integration",
           "login_email": "Sign in with email",
           "login_phone": "Sign in with phone number (SMS)",
           "login_password": "Sign in with password (no code)"
@@ -142,6 +143,17 @@
         "data": {
           "password": "Account password"
         }
+      },
+      "migrate_existing": {
+        "title": "Which vehicle?",
+        "description": "More than one vehicle is still on an old integration. Pick the one to move now; the others can follow the same way.",
+        "data": {
+          "source": "Vehicle"
+        }
+      },
+      "migrate_confirm": {
+        "title": "Move {title} to Chery Connect",
+        "description": "**{title}** is configured in the old integration `{domain}`. Chery Connect takes it over:\n\n- the old integration is **disabled** for this vehicle, so the two never talk to the car at the same time;\n- your login is reused: **no new code** by e-mail or text message;\n- entities, their **history** and the device move across. On the `omoda9` integration their names do not change; from `omoda_jaecoo` they are renamed to English (`sensor.battery` becomes `sensor.chery_connect_battery`).\n\nWhat needs your hand afterwards: automations that call `{domain}` services (they become `chery_connect` services) and the bundled blueprints. Nothing is deleted: the old integration stays on disk, disabled, until you remove it."
       }
     },
     "error": {
@@ -161,8 +173,10 @@
       "reconfigure_no_entry": "Integration not found — reload Home Assistant and try again.",
       "reconfigure_successful": "PIN updated. The integration was reloaded.",
       "reauth_no_entry": "Integration not found — reload Home Assistant and try again.",
-      "reauth_successful": "Re-authentication successful. The integration was reloaded."
-    }
+      "reauth_successful": "Re-authentication successful. The integration was reloaded.",
+      "migration_source_gone": "The vehicle to move is no longer configured in the old integration, or it has already been moved."
+    },
+    "flow_title": "{name}"
   },
   "issues": {
     "pin_wrong": {
@@ -189,9 +203,9 @@
       "title": "Omoda 9: {count} entities were renamed",
       "description": "The entity ids of this integration moved from Italian to English: `sensor.omoda9_batteria` is now `sensor.chery_connect_battery`, and {count} entities on this vehicle were renamed.\n\n**Your history came with them.** Graphs, long-term statistics and the energy dashboard followed the rename automatically. There is nothing to reinstall and nothing to log in to again.\n\n**What did not follow: names you typed yourself.** Automations, scripts, template sensors and dashboard cards that refer to an entity by name still point at the old one. Home Assistant shows those as unknown entities.\n\nWhere to look: Settings, Automations and scenes, then any automation flagged with an unknown entity. The full old-to-new list is here: {url}\n\nDismiss this notice once you have been through them."
     },
-    "successor_available": {
-      "title": "{title}: Chery Connect is installed, move this vehicle to it",
-      "description": "This integration is being replaced by **Chery Connect** (`chery_connect`), the same code under its final name. It is now installed on this Home Assistant, and this vehicle is still running on the old integration.\n\n**To move it**, open Settings, Devices and services: Chery Connect is listed as discovered. Press Add and follow the steps. It reuses the login of this integration, so no new code by text message, and it brings your entities and their history across.\n\n**Until you do, nothing changes**: this integration keeps working as before. Full guide: {url}"
+    "remove_old_integration": {
+      "title": "Chery Connect: remove the old integration `{domain}`",
+      "description": "This vehicle now runs on Chery Connect: {moved} entities moved with their history, {not_moved} could not be moved (the log names each one and why).\n\nThe old integration `{domain}` is disabled but still installed. To finish:\n\n1. Settings, Devices and services, `{domain}`: delete its entry.\n2. In HACS, remove the old repository if it is listed, then delete the folder `custom_components/{domain}` if it is still there.\n3. Restart Home Assistant.\n\nDismiss this notice when done."
     }
   },
   "options": {

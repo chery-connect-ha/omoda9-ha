@@ -19,12 +19,12 @@ LAT, LON = 40.904308, 14.349437
 
 
 async def _scarica(hass, entry) -> dict:
-    from custom_components.omoda9.diagnostics import async_get_config_entry_diagnostics
+    from custom_components.chery_connect.diagnostics import async_get_config_entry_diagnostics
     return await async_get_config_entry_diagnostics(hass, entry)
 
 
 def _coord(hass, entry):
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
     return hass.data[DOMAIN][entry.entry_id]
 
 

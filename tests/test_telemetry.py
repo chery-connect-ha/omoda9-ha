@@ -26,7 +26,7 @@ async def _consegna(hass, coordinator, envelope: dict) -> None:
 
 
 def _coordinator(hass, entry):
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
     return hass.data[DOMAIN][entry.entry_id]
 
 
@@ -251,7 +251,7 @@ async def test_serratura_zero_e_bloccata(hass, integrazione_avviata):
 
     Era invertita in origine. Un'inversione qui è particolarmente insidiosa: la
     dashboard mostrerebbe "aperta" un'auto chiusa, o peggio il contrario."""
-    from custom_components.omoda9.entity import field_on
+    from custom_components.chery_connect.entity import field_on
 
     coord = _coordinator(hass, integrazione_avviata)
     await _consegna(hass, coord, FX.telemetry_5a02(doorLock="0"))

@@ -12,7 +12,7 @@ import json
 
 
 def _coord(hass, entry):
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
     return hass.data[DOMAIN][entry.entry_id]
 
 
@@ -80,7 +80,7 @@ async def test_gli_altri_sensori_non_spariscono_a_fine_carica(hass, integrazione
 async def test_un_solo_sensore_e_volatile(hass, integrazione_avviata):
     """Guard-rail: rendere volatile un sensore che non lo è lo farebbe sparire a ogni
     lettura parziale. Oggi solo il tempo di ricarica lo è."""
-    from custom_components.omoda9.sensor import _RT_SENSORS
+    from custom_components.chery_connect.sensor import _RT_SENSORS
 
     vol = [s.field for s in _RT_SENSORS if s.volatile]
     assert vol == ["remainChargeTime"], f"sensori volatili inattesi: {vol}"
@@ -138,7 +138,7 @@ async def test_autonomia_in_miglia_dichiara_l_unita_giusta(hass, integrazione_av
     più in contraddizione con «Autonomia benzina» (182 km) sulla stessa dashboard."""
     from homeassistant.const import UnitOfLength
 
-    from custom_components.omoda9.sensor import _RT_SENSORS
+    from custom_components.chery_connect.sensor import _RT_SENSORS
 
     spec = next(s for s in _RT_SENSORS if s.field == "cruiseRange")
     assert spec.unit == UnitOfLength.MILES
@@ -202,7 +202,7 @@ async def test_il_criterio_non_scatta_se_manca_il_campo(hass, integrazione_avvia
     """Campo assente ≠ campo a zero. Una lettura parziale senza `pureElectricRange` non
     deve essere scambiata per degradata, altrimenti la batteria smetterebbe di aggiornarsi
     ogni volta che il cloud manda un frame ridotto."""
-    from custom_components.omoda9.sensor import _frame_batteria_degradato
+    from custom_components.chery_connect.sensor import _frame_batteria_degradato
 
     assert _frame_batteria_degradato({"dumpEnergy": "97"}) is False
     assert _frame_batteria_degradato({"pureElectricRange": "0"}) is True
@@ -244,7 +244,7 @@ async def test_ogni_entita_ha_un_nome_tradotto(hass, integrazione_avviata):
 
     from homeassistant.helpers import entity_registry as er
 
-    base = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "omoda9"
+    base = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "chery_connect"
     strings = json.loads((base / "strings.json").read_text(encoding="utf-8"))
     voci = strings.get("entity", {})
     reg = er.async_get(hass)
@@ -264,7 +264,7 @@ def test_le_traduzioni_coprono_le_stesse_entita():
     import json
     import pathlib
 
-    base = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "omoda9"
+    base = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "chery_connect"
     rif = json.loads((base / "strings.json").read_text(encoding="utf-8")).get("entity", {})
     for lingua in ("it", "en"):
         tr = json.loads((base / "translations" / f"{lingua}.json").read_text(encoding="utf-8"))

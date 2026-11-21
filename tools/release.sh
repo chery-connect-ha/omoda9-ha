@@ -22,10 +22,10 @@ cd "$R_ROOT"
 rules_cmdline "$@"
 
 R_REPO="${OMODA9_REPO:-chery-connect-ha/omoda9-ha}"
-SRC_DIR="custom_components/omoda9"
+SRC_DIR="custom_components/chery_connect"
 MANIFEST="$SRC_DIR/manifest.json"
 CHANGELOG="CHANGELOG.md"
-ZIP_NAME="omoda9.zip"        # must match "filename" in hacs.json
+ZIP_NAME="chery_connect.zip"        # must match "filename" in hacs.json
 BASE="master"
 UNRELEASED="## [Non rilasciato]"
 

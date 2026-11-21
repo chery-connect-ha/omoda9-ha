@@ -7,7 +7,7 @@ name: Beta
 # review of someone who does not program is the field test on their own car. For that rule
 # to be exigible, the person with the car has to be able to install the code — and until
 # this workflow existed they could not: `hacs.json` declares `zip_release`, so HACS installs
-# only from a release carrying an `omoda9.zip` asset, and that asset was built and uploaded
+# only from a release carrying an `chery_connect.zip` asset, and that asset was built and uploaded
 # by hand once per release. The only other route was cloning a branch and copying files into
 # `custom_components/` — exactly the barrier that filters out the people whose review is
 # worth most.
@@ -85,7 +85,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          base=$(jq -r .version custom_components/omoda9/manifest.json)
+          base=$(jq -r .version custom_components/chery_connect/manifest.json)
           if [ -z "$base" ] || [ "$base" = "null" ]; then
             echo "::error::manifest.json senza campo version."
             exit 1
@@ -104,7 +104,7 @@ jobs:
           if [ -n "$stabile" ] && [ "$stabile" != "null" ]; then
             piu_alta=$(printf '%s\n%s\n' "$base" "$stabile" | sort -V | tail -1)
             if [ "$base" = "$stabile" ] || [ "$piu_alta" = "$stabile" ]; then
-              echo "::error::Il manifest dichiara $base e l'ultima stabile è $stabile, quindi il tag sarebbe v$base-beta.N — che in semver ordina PRIMA di v$stabile e HACS mostrerebbe come più vecchio di quello che l'utente ha già installato. Alza \`version\` in custom_components/omoda9/manifest.json al numero con cui questa modifica uscirà (es. $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), mergia, e rilancia questo workflow."
+              echo "::error::Il manifest dichiara $base e l'ultima stabile è $stabile, quindi il tag sarebbe v$base-beta.N: che in semver ordina PRIMA di v$stabile e HACS mostrerebbe come più vecchio di quello che l'utente ha già installato. Alza \`version\` in custom_components/chery_connect/manifest.json al numero con cui questa modifica uscirà (es. $(echo "$stabile" | awk -F. '{print $1"."$2+1".0"}')), mergia, e rilancia questo workflow."
               exit 1
             fi
           fi
@@ -122,7 +122,7 @@ jobs:
           echo "versione=${base}-beta.${n}" >> "$GITHUB_OUTPUT"
           echo "tag=v${base}-beta.${n}"     >> "$GITHUB_OUTPUT"
 
-      - name: Costruisci omoda9.zip
+      - name: Costruisci chery_connect.zip
         env:
           VERSIONE: ${{ steps.ver.outputs.versione }}
         run: |
@@ -131,20 +131,20 @@ jobs:
           # Assistant mostra, ed è come il tester capisce quale build sta girando
           # senza doverci credere sulla parola.
           tmp=$(mktemp)
-          jq --arg v "$VERSIONE" '.version = $v' custom_components/omoda9/manifest.json > "$tmp"
-          mv "$tmp" custom_components/omoda9/manifest.json
+          jq --arg v "$VERSIONE" '.version = $v' custom_components/chery_connect/manifest.json > "$tmp"
+          mv "$tmp" custom_components/chery_connect/manifest.json
 
-          # L'asset delle stabili contiene il CONTENUTO di custom_components/omoda9/
+          # L'asset delle stabili contiene il CONTENUTO di custom_components/chery_connect/
           # appiattito alla radice dell'archivio (HACS lo scompatta dentro
           # custom_components/<dominio>/). Verificato voce per voce contro
-          # l'omoda9.zip di v1.13.0: stessa lista, 53 file, nessuna esclusione.
+          # l'chery_connect.zip di v1.13.0: stessa lista, 53 file, nessuna esclusione.
           # Si zippano solo i file TRACCIATI, così nulla di generato può entrarci.
-          cd custom_components/omoda9
-          git ls-files -z | xargs -0 zip -q -X "$GITHUB_WORKSPACE/omoda9.zip"
+          cd custom_components/chery_connect
+          git ls-files -z | xargs -0 zip -q -X "$GITHUB_WORKSPACE/chery_connect.zip"
           cd "$GITHUB_WORKSPACE"
 
-          echo "File nell'archivio: $(unzip -Z1 omoda9.zip | wc -l)"
-          unzip -p omoda9.zip manifest.json | jq -r '"Versione nel manifest: " + .version'
+          echo "File nell'archivio: $(unzip -Z1 chery_connect.zip | wc -l)"
+          unzip -p chery_connect.zip manifest.json | jq -r '"Versione nel manifest: " + .version'
 
       - name: Pubblica la pre-release
         env:
@@ -192,7 +192,7 @@ jobs:
           Commit: \`${SHA}\`
           EOF
 
-          gh release create "$TAG" omoda9.zip \
+          gh release create "$TAG" chery_connect.zip \
             --repo "$GITHUB_REPOSITORY" \
             --target "$SHA" \
             --prerelease \

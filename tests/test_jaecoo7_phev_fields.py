@@ -12,7 +12,7 @@ import pytest
 @pytest.fixture
 def sensor_module():
     """The sensor platform module, imported late so the package path is already pinned by conftest."""
-    from custom_components.omoda9 import sensor
+    from custom_components.chery_connect import sensor
     return sensor
 
 

@@ -547,7 +547,7 @@ def nomi_saltati(saltati) -> str:
 def _coda_saltati(saltati, lunghezza: int, tetto: int = 255) -> str:
     """Coda bilingue da accodare all'esito, **solo se ci sta**.
 
-    Lo stato di `sensor.omoda9_esito_comando` è troncato a 255 (`coordinator.py`): una coda che
+    Lo stato di `sensor.chery_connect_command_result` è troncato a 255 (`coordinator.py`): una coda che
     non entra verrebbe tagliata a metà parola, che è peggio del non dirla. Quindi o entra
     intera o non si mette (il dettaglio è comunque già passato dalla riga di avanzamento)."""
     coda = (f" · saltate {len(saltati)} funzioni non autorizzate su questa auto · "
@@ -922,7 +922,7 @@ def send(ctx, cmd_key, emit=lambda m: None, params=None, avvisa=None):
     out = f"{c['name']}: HTTP {status} {code or ''} — {meaning}"
     # Una macro che silenziosamente fa sei cose su sette è peggio di un errore: l'utente
     # crede che il lunotto si stia sbrinando. Se abbiamo potato, si dice cosa manca.
-    # ⚠️ Il testo finisce nello stato di `sensor.omoda9_esito_comando`, e uno stato HA non può
+    # ⚠️ Il testo finisce nello stato di `sensor.chery_connect_command_result`, e uno stato HA non può
     # superare i 255 caratteri: oltre il limite l'entità si rompe. Si accodano al massimo due
     # nomi di campo e poi si conta, e comunque si tronca (vedi `_coda_saltati`).
     if saltati:

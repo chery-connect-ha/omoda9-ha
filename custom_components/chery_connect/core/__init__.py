@@ -1,4 +1,4 @@
-"""Cuore di protocollo Omoda/Chery — sotto-pacchetto di `custom_components.omoda9`.
+"""Cuore di protocollo Omoda/Chery: sotto-pacchetto di `custom_components.chery_connect`.
 
 Contiene la logica verificata sul campo: autenticazione BFF, firma delle richieste,
 catalogo e invio comandi, sonda realtime, sveglia. Le entità di Home Assistant non

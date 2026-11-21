@@ -24,8 +24,8 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.config_flow import _normalizza_telefono
-from custom_components.omoda9.const import DEFAULT_AREA_CODE
+from custom_components.chery_connect.config_flow import _normalizza_telefono
+from custom_components.chery_connect.const import DEFAULT_AREA_CODE
 
 
 # (numero digitato, prefisso digitato, numero atteso, prefisso atteso, perché)

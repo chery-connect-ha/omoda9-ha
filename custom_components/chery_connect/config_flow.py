@@ -32,6 +32,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .migration import entries_to_migrate, imported_data
 from .const import (
     DOMAIN, CONF_EMAIL, CONF_PIN, CONF_VIN, CONF_TUSERID,
     CONF_PHONE, CONF_AREA_CODE, DEFAULT_AREA_CODE,
@@ -373,6 +374,9 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._tuserid: str = ""
         self._vins: list[str] = []
         self._reauth_reason: str = ""       # reauth: motivo dell'ultimo tentativo, mostrato nel menu
+        # The entry of an older integration (omoda9, omoda_jaecoo) this flow is taking over, or
+        # None for an ordinary setup.
+        self._migration_source: config_entries.ConfigEntry | None = None
 
     @staticmethod
     @callback
@@ -442,10 +446,64 @@ class Omoda9ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Alcuni account sono registrati col NUMERO e non hanno e-mail: per loro il login e-mail
         fallisce e serve il ramo SMS. Il ramo PASSWORD (username+password, senza codici) è il più
         comodo per chi ha impostato una password sull'account."""
-        return self.async_show_menu(
-            step_id="user",
-            menu_options=["login_email", "login_phone", "login_password"],
-        )
+        options = ["login_email", "login_phone", "login_password"]
+        # An owner who missed the card opened by the old integration lands here. Offering the
+        # move first is what keeps them from configuring a second, empty copy of the same car.
+        if entries_to_migrate(self.hass):
+            options = ["migrate_existing", *options]
+        return self.async_show_menu(step_id="user", menu_options=options)
+
+    # ───────────────── Move from an older integration (omoda9, omoda_jaecoo) ─────────────────
+    async def async_step_integration_discovery(self, discovery_info: dict[str, Any]):
+        """Opened by the bridge in the old integration, with the id of its config entry only."""
+        source = self.hass.config_entries.async_get_entry(discovery_info.get("source_entry_id", ""))
+        if source is None or source not in entries_to_migrate(self.hass):
+            return self.async_abort(reason="migration_source_gone")
+        return await self._async_start_migration(source)
+
+    async def async_step_migrate_existing(self, user_input: dict[str, Any] | None = None):
+        """The same move, started from "Add integration": pick the vehicle when there is more than one."""
+        sources = entries_to_migrate(self.hass)
+        if not sources:
+            return self.async_abort(reason="migration_source_gone")
+        if user_input is not None:
+            chosen = next((entry for entry in sources if entry.entry_id == user_input["source"]), None)
+            if chosen is None:
+                return self.async_abort(reason="migration_source_gone")
+            return await self._async_start_migration(chosen)
+        if len(sources) == 1:
+            return await self._async_start_migration(sources[0])
+        schema = vol.Schema({vol.Required("source"): vol.In({entry.entry_id: f"{entry.title} ({entry.domain})" for entry in sources})})
+        return self.async_show_form(step_id="migrate_existing", data_schema=schema)
+
+    async def _async_start_migration(self, source: config_entries.ConfigEntry):
+        """Bind this flow to one old entry; the VIN makes it unique, as for an ordinary setup.
+
+        Args:
+            source: the config entry of the older integration to take over.
+        """
+        vin = source.data.get(CONF_VIN)
+        if vin:
+            await self.async_set_unique_id(vin)
+            self._abort_if_unique_id_configured()
+        self._migration_source = source
+        self.context["title_placeholders"] = {"name": source.title}
+        return await self.async_step_migrate_confirm()
+
+    async def async_step_migrate_confirm(self, user_input: dict[str, Any] | None = None):
+        """Say what is about to happen, then do the part that belongs to the flow.
+
+        The old entry is disabled HERE, before ours exists, so that the two integrations never
+        run side by side against the same car. Entities, device and files move at the first
+        setup of the new entry (`migration.py`), when none of its entities is loaded yet.
+        """
+        source = self._migration_source
+        if source is None:
+            return self.async_abort(reason="migration_source_gone")
+        if user_input is None:
+            return self.async_show_form(step_id="migrate_confirm", description_placeholders={"title": source.title, "domain": source.domain})
+        await self.hass.config_entries.async_set_disabled_by(source.entry_id, config_entries.ConfigEntryDisabler.USER)
+        return self.async_create_entry(title=source.title, data=imported_data(source), options=dict(source.options))
 
     async def _submit_login(self, user_input: dict[str, Any], step_id: str, schema):
         """Logica comune ai due login: salva i dati, prova a inviare l'OTP, va allo step OTP."""

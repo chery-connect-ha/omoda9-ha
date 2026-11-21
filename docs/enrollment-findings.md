@@ -8,7 +8,7 @@ of guessing.
 
 ## Why this was asked
 
-`custom_components/omoda9/certs/store.json` carries mutual-TLS material — `ca.pem`,
+`custom_components/chery_connect/certs/store.json` carries mutual-TLS material: `ca.pem`,
 `client.pem`, `client.key` — for 40 regional brokers. It comes from the public
 assets of the official APK, and it is the same for every user of a region. That
 means this repository redistributes a **vendor private key**. The goal is to stop

@@ -3,9 +3,9 @@ name: Card sanity
 on:
   push:
     branches: [master]
-    paths: ["custom_components/omoda9/lovelace/**"]
+    paths: ["custom_components/chery_connect/lovelace/**"]
   pull_request:
-    paths: ["custom_components/omoda9/lovelace/**"]
+    paths: ["custom_components/chery_connect/lovelace/**"]
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "20"
       - name: Syntax check
-        run: node --check custom_components/omoda9/lovelace/chery-card.js
+        run: node --check custom_components/chery_connect/lovelace/chery-card.js
       - name: No optional chaining / nullish coalescing (older Android WebView)
         # `?.` and `??` fail to PARSE on older Android System WebView, which aborts
         # customElements.define() and makes the card show "Configuration error" on the
@@ -31,7 +31,7 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
-            const f = "custom_components/omoda9/lovelace/chery-card.js";
+            const f = "custom_components/chery_connect/lovelace/chery-card.js";
             const code = fs.readFileSync(f, "utf8")
               .replace(/\/\*[\s\S]*?\*\//g, "")
               .replace(/^\s*\/\/.*$/gm, "");

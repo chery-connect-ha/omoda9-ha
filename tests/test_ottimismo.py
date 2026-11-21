@@ -23,9 +23,9 @@ import time
 import fixtures as FX
 import pytest
 
-from custom_components.omoda9 import coordinator as coord_mod
-from custom_components.omoda9 import entity as entity_mod
-from custom_components.omoda9.const import DOMAIN
+from custom_components.chery_connect import coordinator as coord_mod
+from custom_components.chery_connect import entity as entity_mod
+from custom_components.chery_connect.const import DOMAIN
 
 SEDILE = "switch.chery_connect_driver_seat_ventilation"
 SERRATURA = "lock.chery_connect_lock"

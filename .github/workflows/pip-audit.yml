@@ -22,7 +22,7 @@ jobs:
           python-version: "3.12"
       - name: Extract requirements from manifest.json
         run: |
-          python -c "import json;print('\n'.join(json.load(open('custom_components/omoda9/manifest.json')).get('requirements',[])))" > requirements-manifest.txt
+          python -c "import json;print('\n'.join(json.load(open('custom_components/chery_connect/manifest.json')).get('requirements',[])))" > requirements-manifest.txt
           cat requirements-manifest.txt
       - name: Audit
         # Advisory only: reports known CVEs in the runtime deps (e.g. Pillow) but does

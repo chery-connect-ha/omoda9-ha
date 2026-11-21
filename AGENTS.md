@@ -121,10 +121,12 @@ translating them would destroy exactly what makes them worth reading. So:
   the translation key being derived from the same string as the `entity_id`, which no longer
   happens.
 
-  So: the domain stays `omoda9`, the slugs move on their own, in a release that carries
-  nothing else and an old → new table in its notes so people fix their automations in one
-  pass. The change is automatic for whoever is installed - the integration rewrites its own
-  entity registry at first start - and what breaks is references written by hand. See #10;
+  So the slugs moved on their own, in 1.14, with an old → new table in the notes; the
+  integration rewrote its own entity registry at first start. **The domain then moved too, in
+  2.0, to `chery_connect`**, decided on #10 on 21 November 2026 once the slug rename had
+  removed the reason against it: from `omoda9` the entity ids no longer change at all. The
+  move is a config flow step the owner confirms, opened by a bridge in the old integration;
+  see `docs/migrating-to-chery-connect.md` and `migration.py`;
 - **the user-facing Italian in `translations/it.json` and in command-result text**, which is
   a translation and is supposed to be in Italian.
 
@@ -467,19 +469,19 @@ reads as disagreement.
 A pre-release is `gh workflow run beta.yml`, from `master` — do not do it by hand.
 
 For a **stable**, the archive is not optional. `hacs.json` sets `zip_release`
-with `omoda9.zip`, so HACS installs *only* from a release carrying that asset:
+with `chery_connect.zip`, so HACS installs *only* from a release carrying that asset:
 publish without it and HACS lists the version and then fails to install it,
 which is worse than not publishing at all.
 
 ```bash
 # from a clean checkout of the commit you are releasing
-cd custom_components/omoda9
-git ls-files -z | xargs -0 zip -q -X ../../omoda9.zip
+cd custom_components/chery_connect
+git ls-files -z | xargs -0 zip -q -X ../../chery_connect.zip
 cd -
-gh release create v<X.Y.Z> omoda9.zip --latest --generate-notes
+gh release create v<X.Y.Z> chery_connect.zip --latest --generate-notes
 ```
 
-Only tracked files, and the contents of `custom_components/omoda9/` sit at the
+Only tracked files, and the contents of `custom_components/chery_connect/` sit at the
 root of the archive — that is where HACS expects them with
 `content_in_root: false`. The version in `manifest.json` must already match the
 tag. A stable also requires the field tests described in `CONTRIBUTING.md`.

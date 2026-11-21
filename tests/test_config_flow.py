@@ -11,7 +11,7 @@ import pytest
 from homeassistant import config_entries, data_entry_flow
 
 import fixtures as FX
-from custom_components.omoda9.const import (
+from custom_components.chery_connect.const import (
     CONF_EMAIL, CONF_PIN, CONF_VIN, CONF_PHONE, CONF_AREA_CODE, DOMAIN,
 )
 
@@ -19,7 +19,7 @@ from custom_components.omoda9.const import (
 @pytest.fixture
 def flusso_ok(monkeypatch):
     """Backend che coopera: OTP inviato, token coniato, un veicolo trovato."""
-    from custom_components.omoda9 import config_flow as cf
+    from custom_components.chery_connect import config_flow as cf
 
     monkeypatch.setattr(cf, "_send_otp", lambda hass, data: (True, "codice inviato"))
     monkeypatch.setattr(cf, "_mint_token", lambda hass, data, code: (True, "token ok"))
@@ -108,7 +108,7 @@ async def test_configurazione_via_telefono(hass, flusso_ok):
 async def test_invio_otp_fallito_resta_nel_primo_passo(hass, monkeypatch):
     """Se l'OTP non parte non si prosegue: chiedere un codice mai inviato manderebbe
     l'utente a cercare un'email che non arriverà."""
-    from custom_components.omoda9 import config_flow as cf
+    from custom_components.chery_connect import config_flow as cf
 
     monkeypatch.setattr(cf, "_send_otp", lambda hass, data: (False, "email.not.exists"))
     result = await _init_e_email(hass)
@@ -122,7 +122,7 @@ async def test_invio_otp_fallito_resta_nel_primo_passo(hass, monkeypatch):
 async def test_otp_errato_ripulisce_il_token_a_meta(hass, monkeypatch):
     """Un OTP rifiutato deve lasciare il disco pulito: un `pending_token` orfano
     verrebbe scambiato per una sessione valida al tentativo successivo."""
-    from custom_components.omoda9 import config_flow as cf
+    from custom_components.chery_connect import config_flow as cf
 
     pulizie = {"n": 0}
     monkeypatch.setattr(cf, "_send_otp", lambda hass, data: (True, ""))
@@ -251,7 +251,7 @@ async def test_pin_vuoto_rifiutato(hass, integrazione_avviata):
 async def test_repair_pin_sblocca_e_applica(hass, integrazione_avviata):
     """Il Repair è il rimedio che l'utente non tecnico incontra davvero: deve
     scrivere il nuovo PIN E azzerare il blocco, altrimenti "si aggiusta" solo in apparenza."""
-    from custom_components.omoda9 import repairs
+    from custom_components.chery_connect import repairs
 
     coord = hass.data[DOMAIN][integrazione_avviata.entry_id]
     _forza_blocco(coord)
@@ -275,7 +275,7 @@ async def test_repair_pin_sblocca_e_applica(hass, integrazione_avviata):
 
 async def test_repair_senza_entry_si_interrompe(hass):
     """Entry già rimosso mentre l'avviso era aperto: si abortisce senza esplodere."""
-    from custom_components.omoda9 import repairs
+    from custom_components.chery_connect import repairs
 
     flow = await repairs.async_create_fix_flow(hass, "pin_wrong_x",
                                                {"entry_id": "non_esiste"})

@@ -95,7 +95,7 @@ to argument like everything else.
 | **R05** | HIGH | At most one stable release every two weeks | **house rule**, from measured history (45 releases in 30 days) | blocks |
 | **R06** | NORMAL | Shared code asks for a read by somebody who is not the author | `CONTRIBUTING.md` *It lands* | **warns** — the source says merging is never blocked |
 | **R07** | HIGH | Never claim a hardware check you do not have; the unverified gets **named** | `CONTRIBUTING.md`; `AGENTS.md`; `docs/field-test.md` | asks, and labels `unverified-hardware` |
-| **R08** | HIGH | No stable release without the `omoda9.zip` asset | `AGENTS.md` *Cutting a release*; `hacs.json` | blocks — archive built and validated **before** the tag |
+| **R08** | HIGH | No stable release without the `chery_connect.zip` asset | `AGENTS.md` *Cutting a release*; `hacs.json` | blocks: archive built and validated **before** the tag |
 | **R09** | HIGH | No force-push, no rewriting published history | `AGENTS.md` *Never*; branch protection | blocks |
 | **R10** | NORMAL | No AI co-authorship trailers in commits | `AGENTS.md` *Save the work* | blocks |
 | **R11** | NORMAL | No Home Assistant imports inside `core/` | `AGENTS.md` *Invariants* | blocks |

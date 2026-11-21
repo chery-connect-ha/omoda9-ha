@@ -25,7 +25,7 @@ import pytest
 from homeassistant import config_entries
 
 import fixtures as FX
-from custom_components.omoda9.const import (
+from custom_components.chery_connect.const import (
     CONF_AREA_CODE, CONF_EMAIL, CONF_PHONE, CONF_PIN, DOMAIN,
 )
 

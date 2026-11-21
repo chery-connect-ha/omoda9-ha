@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.const import (
+from custom_components.chery_connect.const import (
     CLIMA_MAX_DEFAULT,
     CLIMA_MIN_DEFAULT,
     CLIMA_STEP_DEFAULT,
@@ -80,21 +80,21 @@ def test_item_non_dizionario_non_solleva():
 def test_totale_phev_none_se_manca_la_benzina():
     """Il difetto corretto in v1.7.1: un `mileageSurplus` assente per un frame NON deve
     valere zero, altrimenti il totale crolla di ~150 km e ci resta per ore."""
-    from custom_components.omoda9.sensor import _range_totale
+    from custom_components.chery_connect.sensor import _range_totale
     assert _range_totale({"pureElectricRange": "60"}) is None
     assert _range_totale({"pureElectricRange": "60", "mileageSurplus": "215"}) == 275.0
 
 
 def test_totale_bev_e_la_sola_parte_elettrica():
     """Su BEV confermata non c'è serbatoio: il calcolo a due addendi resterebbe None."""
-    from custom_components.omoda9.sensor import _range_totale_bev
+    from custom_components.chery_connect.sensor import _range_totale_bev
     assert _range_totale_bev({"pureElectricRange": "310"}) == 310.0
     assert _range_totale_bev({"dynamicPureElectricRange": "287"}) == 287.0
 
 
 def test_frame_degradato_riconosciuto_con_entrambi_i_nomi():
     """La sentinella «0 km = segnaposto» deve valere anche col nome di campo delle BEV."""
-    from custom_components.omoda9.sensor import _frame_batteria_degradato
+    from custom_components.chery_connect.sensor import _frame_batteria_degradato
     assert _frame_batteria_degradato({"pureElectricRange": "0"}) is True
     assert _frame_batteria_degradato({"dynamicPureElectricRange": "0"}) is True
     assert _frame_batteria_degradato({"dynamicPureElectricRange": "287"}) is False
@@ -108,7 +108,7 @@ class _CoordFinto:
 
 
 def test_fallback_nomi_vince_il_primo_presente():
-    from custom_components.omoda9.sensor import _rt
+    from custom_components.chery_connect.sensor import _rt
     assert _rt(_CoordFinto({"pureElectricRange": "60"}), ("pureElectricRange", "alt")) == "60"
     assert _rt(_CoordFinto({"alt": "42"}), ("pureElectricRange", "alt")) == "42"
     assert _rt(_CoordFinto({}), ("pureElectricRange", "alt")) is None
@@ -116,14 +116,14 @@ def test_fallback_nomi_vince_il_primo_presente():
 
 def test_fallback_salta_i_valori_vuoti():
     """Un campo presente ma vuoto non deve "coprire" l'alternativa valorizzata."""
-    from custom_components.omoda9.sensor import _rt
+    from custom_components.chery_connect.sensor import _rt
     coord = _CoordFinto({"pureElectricRange": "", "alt": "42"})
     assert _rt(coord, ("pureElectricRange", "alt")) == "42"
 
 
 def test_campo_singolo_resta_una_stringa():
     """La forma storica (un solo nome) non deve cambiare comportamento."""
-    from custom_components.omoda9.sensor import _rt
+    from custom_components.chery_connect.sensor import _rt
     assert _rt(_CoordFinto({"odometer": "4062"}), "odometer") == "4062"
 
 
@@ -138,7 +138,7 @@ class _CoordCaps:
 
 
 def _coord_con(data: dict):
-    from custom_components.omoda9.coordinator import Omoda9Coordinator
+    from custom_components.chery_connect.coordinator import Omoda9Coordinator
     c = _CoordCaps(data)
     c.is_pure_electric = lambda: Omoda9Coordinator.is_pure_electric(c)
     c.climate_limits = lambda: Omoda9Coordinator.climate_limits(c)
@@ -169,7 +169,7 @@ def test_limiti_clima_dalla_vettura_quando_dichiarati():
 
 def test_sensori_benzina_spariscono_solo_su_bev_confermata():
     """L'elenco dei sensori realtime non deve cambiare per una capability sconosciuta."""
-    from custom_components.omoda9.sensor import _RT_SENSORS, _SENSORI_SOLO_TERMICO
+    from custom_components.chery_connect.sensor import _RT_SENSORS, _SENSORI_SOLO_TERMICO
 
     presenti = {s.suffix for s in _RT_SENSORS}
     # tutti i suffissi dichiarati "solo termico" devono esistere davvero: un refuso li
@@ -186,7 +186,7 @@ def test_sensori_benzina_spariscono_solo_su_bev_confermata():
 
 def test_sensori_bev_non_esistono_gia_fra_quelli_normali():
     """I campi solo-BEV non devono duplicare un sensore già creato per tutti."""
-    from custom_components.omoda9.sensor import _RT_SENSORI_BEV, _RT_SENSORS
+    from custom_components.chery_connect.sensor import _RT_SENSORI_BEV, _RT_SENSORS
 
     normali = {s.suffix for s in _RT_SENSORS}
     assert not ({s.suffix for s in _RT_SENSORI_BEV} & normali)

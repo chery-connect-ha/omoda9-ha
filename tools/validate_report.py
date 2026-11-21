@@ -38,12 +38,12 @@ SUFFISSI_SOLO_TERMICO = (
 
 def _id_noti() -> set[str]:
     """Gli entity_id che questa integrazione sa produrre, dalla sua stessa tabella."""
-    from custom_components.omoda9.legacy import CANON_ENTITY_ID
+    from custom_components.chery_connect.legacy import CANON_ENTITY_ID
     return set(CANON_ENTITY_ID.values())
 
 
 def _id_solo_termico() -> set[str]:
-    from custom_components.omoda9.legacy import CANON_ENTITY_ID
+    from custom_components.chery_connect.legacy import CANON_ENTITY_ID
     return {CANON_ENTITY_ID[("sensor", s)] for s in SUFFISSI_SOLO_TERMICO
             if ("sensor", s) in CANON_ENTITY_ID}
 
