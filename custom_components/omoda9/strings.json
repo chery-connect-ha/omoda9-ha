@@ -192,6 +192,24 @@
     "successor_available": {
       "title": "{title}: Chery Connect is installed, move this vehicle to it",
       "description": "This integration is being replaced by **Chery Connect** (`chery_connect`), the same code under its final name. It is now installed on this Home Assistant, and this vehicle is still running on the old integration.\n\n**To move it**, open Settings, Devices and services: Chery Connect is listed as discovered. Press Add and follow the steps. It reuses the login of this integration, so no new code by text message, and it brings your entities and their history across.\n\n**Until you do, nothing changes**: this integration keeps working as before. Full guide: {url}"
+    },
+    "handover_offer": {
+      "title": "{title}: move this vehicle to Chery Connect",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Move {title} to Chery Connect",
+            "description": "This integration is being replaced by **Chery Connect**, the same code under its final name (`chery_connect`). The Marketplace cannot switch an installed integration to a new name by itself, so the move starts here.\n\n**When you press Submit:**\n- a Chery Connect entry is created with the same login, PIN and options, so no new code by text message;\n- your entities, with their history, and the device move to it;\n- this entry is removed: it is empty by then.\n\n**From that moment the car is not updated** until you finish in the Marketplace: open Omoda 9 / Jaecoo, **Remove** it, download **Chery Connect 2.0** from the same card (while 2.0 is a beta, turn on *Show beta versions*), then restart Home Assistant. A notice will repeat these steps.\n\nIf you are not ready, close this window: nothing changes until you confirm. Guide: {url}"
+          }
+        },
+        "abort": {
+          "entry_not_found": "Integration not found. Restart Home Assistant and try again."
+        }
+      }
+    },
+    "handover_done": {
+      "title": "Chery Connect: finish the move in the Marketplace",
+      "description": "{moved} entities moved to Chery Connect, {not_moved} did not (the log lines that start with `omoda9: not moved` name them). The car is not updated until Chery Connect is installed.\n\n**Now:**\n1. Marketplace, Omoda 9 / Jaecoo: **Remove**. It is allowed now, because the old entry no longer exists.\n2. Same card: download **Chery Connect 2.0** (while 2.0 is a beta, turn on *Show beta versions*).\n3. Restart Home Assistant. Chery Connect starts with your entities, history and device.\n\nGuide: {url}"
     }
   },
   "options": {

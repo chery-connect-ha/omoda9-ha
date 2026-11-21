@@ -158,7 +158,8 @@ async def integrazione_avviata(hass, config_entry, cloud, monkeypatch):
     await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
     yield config_entry
-    if config_entry.state is not None:
+    # A test may have removed the entry on purpose (the handover to chery_connect does).
+    if config_entry.state is not None and hass.config_entries.async_get_entry(config_entry.entry_id) is not None:
         await hass.config_entries.async_unload(config_entry.entry_id)
         await hass.async_block_till_done()
 
