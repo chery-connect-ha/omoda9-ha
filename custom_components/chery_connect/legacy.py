@@ -177,8 +177,12 @@ CANON_ENTITY_ID: dict[tuple[str, str], str] = {
 }
 
 
-def adotta(hass, entry, *, dry_run: bool = False) -> dict:
+def adotta(hass, entry, *, dry_run: bool = False, device_id: str | None = None) -> dict:
     """Adotta le entita' di `omoda_jaecoo` portandosi dietro il loro storico.
+
+    `device_id` is the device the adopted entities are attached to. None (the adoption service)
+    detaches them and lets the platforms attach them to our device at the next setup; the 2.0
+    migration passes the old device, moved to us with its id, so device automations survive.
 
     Ritorna un rapporto: quante adottate, quante saltate e perche'. Non solleva mai su una
     singola entita': un'adozione che si ferma a meta' lascia l'utente in uno stato che non
@@ -239,7 +243,7 @@ def adotta(hass, entry, *, dry_run: bool = False) -> dict:
             reg.async_update_entity_platform(
                 vecchio_id, DOMAIN,
                 new_config_entry_id=entry.entry_id,
-                new_device_id=None,
+                new_device_id=device_id,
                 **extra,
             )
         except Exception as err:  # noqa: BLE001 - una sola entita' non deve fermare il resto

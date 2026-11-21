@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.sensor import _cruise_range_miglia
+from custom_components.chery_connect.sensor import _cruise_range_miglia
 
 MIGLIO_KM = 1.609344
 # Frame vero, 2026-08-24. Serve come base a cui togliere un pezzo per volta.

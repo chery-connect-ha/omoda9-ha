@@ -2,7 +2,7 @@
 """Step 1 — offline X.509 inspection of the bundled mutual-TLS material.
 
 The question this step answers: is the client certificate shipped in
-`custom_components/omoda9/certs/store.json` a *per-device* identity, or a
+`custom_components/chery_connect/certs/store.json` a *per-device* identity, or a
 constant shared by every user of a region?
 
 Reading key (from the investigation brief):
@@ -33,7 +33,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-PACKAGE = os.path.join(REPO, "custom_components", "omoda9")
+PACKAGE = os.path.join(REPO, "custom_components", "chery_connect")
 
 # Extensions we consider "standard furniture" for a TLS client certificate.
 # Anything outside this set is reported verbatim: a vendor-specific OID carrying

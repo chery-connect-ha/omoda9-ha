@@ -187,8 +187,8 @@ def test_i_log_del_conio_non_contengono_il_codice_ne_il_numero(core, monkeypatch
 async def test_la_diagnostica_non_espone_il_telefono(hass, integrazione_avviata):
     """Due vie diverse, entrambe reali: la chiave in `entry.data` e il numero scritto dentro
     una frase discorsiva. Chiudere solo la prima lascia aperta la seconda."""
-    from custom_components.omoda9.const import DOMAIN
-    from custom_components.omoda9.diagnostics import async_get_config_entry_diagnostics
+    from custom_components.chery_connect.const import DOMAIN
+    from custom_components.chery_connect.diagnostics import async_get_config_entry_diagnostics
 
     coord = hass.data[DOMAIN][integrazione_avviata.entry_id]
     coord.phone, coord.area_code = FX.PHONE, FX.AREA_CODE

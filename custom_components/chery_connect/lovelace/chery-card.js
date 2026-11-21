@@ -10,15 +10,18 @@
  *   image: "/local/car.png"  # header photo (overrides the one set in the integration options)
  *   show_all: true           # also list every remaining entity, grouped
  *   entities: [...]          # append your own rows (entity ids)
- *   integration: "omoda9"    # platform to collect (default)
+ *   integration: "chery_connect"  # platform to collect (default)
  *   prefix: "chery_connect_" # object_id fallback prefix
  */
 class CheryCard extends HTMLElement {
   setConfig(config) {
     this.config = Object.assign(
-      { integration: "omoda9", prefix: "chery_connect_", show_all: false },
+      { integration: "chery_connect", prefix: "chery_connect_", show_all: false },
       config || {}
     );
+    // From 2.0 every vehicle runs on chery_connect. A dashboard saved with the old platform
+    // name would find nothing and show an empty card, so the old name means the new one.
+    if (this.config.integration === "omoda9") this.config.integration = "chery_connect";
   }
   getCardSize() { return 4; }
 

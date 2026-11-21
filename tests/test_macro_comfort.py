@@ -25,9 +25,9 @@ import pytest
 from homeassistant.core import State
 from homeassistant.util import dt as dt_util
 
-from custom_components.omoda9 import coordinator as coord_mod
-from custom_components.omoda9 import switch as switch_mod
-from custom_components.omoda9.const import DOMAIN, MACRO_PRESET_S
+from custom_components.chery_connect import coordinator as coord_mod
+from custom_components.chery_connect import switch as switch_mod
+from custom_components.chery_connect.const import DOMAIN, MACRO_PRESET_S
 
 MACRO = "switch.chery_connect_cool_everything"
 
@@ -61,7 +61,7 @@ async def _avvia(hass, config_entry, monkeypatch) -> None:
 
     Serve a parte perché il ripristino di stato va preparato PRIMA dell'avvio, e una
     fixture gira sempre prima del corpo del test."""
-    from custom_components.omoda9.coordinator import Omoda9Coordinator
+    from custom_components.chery_connect.coordinator import Omoda9Coordinator
 
     monkeypatch.setattr(Omoda9Coordinator, "_provision_certs",
                         lambda self: (True, "cert finti (test)"))

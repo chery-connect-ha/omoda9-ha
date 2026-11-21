@@ -1,6 +1,6 @@
 # Dipendenze della suite di test (CI GitHub Actions + sviluppo locale).
 # NON è un requirement del componente: gli utenti non lo scaricano mai — lo zip
-# pubblicato su HACS contiene solo custom_components/omoda9/ (vedi release.sh).
+# pubblicato su HACS contiene solo custom_components/chery_connect/ (vedi release.sh).
 #
 # `pytest-homeassistant-custom-component` tira dentro Home Assistant e l'intero
 # stack pytest già configurato per le integrazioni custom. Volutamente NON pinnato:

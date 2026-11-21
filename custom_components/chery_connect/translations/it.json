@@ -5,6 +5,7 @@
         "title": "Chery Connect",
         "description": "Scegli come accedere al tuo account Omoda/Jaecoo. Usa l'opzione telefono se il tuo account è registrato con un numero di telefono invece che con un'email.",
         "menu_options": {
+          "migrate_existing": "Sposta un veicolo dall'integrazione vecchia",
           "login_email": "Accedi con email",
           "login_phone": "Accedi con numero di telefono (SMS)",
           "login_password": "Accedi con password (senza codice)"
@@ -142,6 +143,17 @@
         "data": {
           "password": "Password account"
         }
+      },
+      "migrate_existing": {
+        "title": "Quale veicolo?",
+        "description": "Più di un veicolo è ancora su un'integrazione vecchia. Scegli quello da spostare adesso; gli altri seguono nello stesso modo.",
+        "data": {
+          "source": "Veicolo"
+        }
+      },
+      "migrate_confirm": {
+        "title": "Sposta {title} su Chery Connect",
+        "description": "**{title}** è configurato nell'integrazione vecchia `{domain}`. Chery Connect lo prende in carico:\n\n- l'integrazione vecchia viene **disattivata** per questo veicolo, così le due non parlano mai con l'auto nello stesso momento;\n- l'accesso viene riusato: **nessun nuovo codice** via e-mail o SMS;\n- entità, **storico** e dispositivo passano di qua. Dall'integrazione `omoda9` i nomi non cambiano; da `omoda_jaecoo` passano all'inglese (`sensor.battery` diventa `sensor.chery_connect_battery`).\n\nCosa va sistemato a mano dopo: le automazioni che chiamano servizi `{domain}` (diventano servizi `chery_connect`) e i blueprint inclusi. Non si cancella niente: l'integrazione vecchia resta installata, disattivata, finché non la togli tu."
       }
     },
     "error": {
@@ -161,8 +173,10 @@
       "reconfigure_no_entry": "Integrazione non trovata — ricarica Home Assistant e riprova.",
       "reconfigure_successful": "PIN aggiornato. L'integrazione è stata ricaricata.",
       "reauth_no_entry": "Integrazione non trovata — ricarica Home Assistant e riprova.",
-      "reauth_successful": "Ri-autenticazione riuscita. L'integrazione è stata ricaricata."
-    }
+      "reauth_successful": "Ri-autenticazione riuscita. L'integrazione è stata ricaricata.",
+      "migration_source_gone": "Il veicolo da spostare non è più configurato nell'integrazione vecchia, oppure è già stato spostato."
+    },
+    "flow_title": "{name}"
   },
   "issues": {
     "pin_wrong": {
@@ -189,9 +203,9 @@
       "title": "Omoda 9: {count} entita' rinominate",
       "description": "Gli identificativi delle entita' di questa integrazione sono passati dall'italiano all'inglese: `sensor.omoda9_batteria` adesso e' `sensor.chery_connect_battery`, e su questo veicolo sono state rinominate {count} entita'.\n\n**Il tuo storico e' venuto dietro.** Grafici, statistiche a lungo termine e dashboard Energia hanno seguito il cambio da soli. Non c'e' niente da reinstallare e nessun accesso da rifare.\n\n**Quello che non ha seguito: i nomi che hai scritto tu.** Automazioni, script, sensori template e schede della dashboard che nominano un'entita' puntano ancora al vecchio nome. Home Assistant te li segnala come entita' sconosciute.\n\nDove guardare: Impostazioni, Automazioni e scene, e poi ogni automazione segnalata con un'entita' sconosciuta. L'elenco completo vecchio-nuovo e' qui: {url}\n\nChiudi questo avviso quando le hai sistemate."
     },
-    "successor_available": {
-      "title": "{title}: Chery Connect e' installata, sposta qui il veicolo",
-      "description": "Questa integrazione viene sostituita da **Chery Connect** (`chery_connect`), lo stesso codice con il suo nome definitivo. Adesso e' installata su questo Home Assistant, e questo veicolo gira ancora sull'integrazione vecchia.\n\n**Per spostarlo** apri Impostazioni, Dispositivi e servizi: Chery Connect compare fra le integrazioni rilevate. Premi Aggiungi e segui i passi. Riusa l'accesso di questa integrazione, quindi niente nuovo codice via SMS, e porta con se' entita' e storico.\n\n**Finche' non lo fai non cambia niente**: questa integrazione continua a funzionare come prima. Guida completa: {url}"
+    "remove_old_integration": {
+      "title": "Chery Connect: togli l'integrazione vecchia `{domain}`",
+      "description": "Questo veicolo ora gira su Chery Connect: {moved} entità spostate col loro storico, {not_moved} non spostabili (il log le elenca una per una, col motivo).\n\nL'integrazione vecchia `{domain}` è disattivata ma ancora installata. Per finire:\n\n1. Impostazioni, Dispositivi e servizi, `{domain}`: elimina la sua voce.\n2. In HACS togli il repository vecchio se compare, poi cancella la cartella `custom_components/{domain}` se c'è ancora.\n3. Riavvia Home Assistant.\n\nChiudi questo avviso quando hai finito."
     }
   },
   "options": {

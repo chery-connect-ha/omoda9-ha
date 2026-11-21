@@ -16,10 +16,16 @@ keys per type as well. It looks like a bug in review, so it is said here.
 """
 from __future__ import annotations
 
-# Prefix of the object_id, kept out of the domain on purpose: the domain is `omoda9`
-# and stays there (see docs/design/naming-and-migration.md), while what the user reads
-# in an entity id is this.
+# Prefix of the object_id. It matches the domain since 2.0, but it is kept as its own constant
+# because the two have different jobs: the domain names the integration, this names what the
+# user reads in an entity id, and the entity ids must not move if the domain ever does again.
 ID_PREFIX = "chery_connect"
+
+# Slug of the hand-written entity names ("Omoda9 Batteria" -> "omoda9_batteria"), and the prefix
+# of the Italian entity ids of 1.13 and earlier. Until 2.0 it was the same string as the domain,
+# and the code read it from DOMAIN: after the domain change that lookup would silently miss every
+# key. It is a literal of the old names, not the domain, so it stays.
+NAME_PREFIX = "omoda9"
 
 # old translation key (Italian, derived from the entity name) -> new key (English).
 # The `entity_id` follows: f"{ID_PREFIX}_{new key}".

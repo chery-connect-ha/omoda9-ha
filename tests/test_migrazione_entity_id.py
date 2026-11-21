@@ -15,7 +15,7 @@ import pytest
 
 
 async def _migra(hass, entry):
-    from custom_components.omoda9 import _async_migrate_entity_ids
+    from custom_components.chery_connect import _async_migrate_entity_ids
     await _async_migrate_entity_ids(hass, entry)
 
 
@@ -30,7 +30,7 @@ async def test_una_entita_vecchia_viene_rinominata(hass, config_entry, registro)
     `sensor.chery_connect_battery`, e l'unique_id NON si tocca - e' l'identita', e
     cambiarla trasformerebbe un rename in una entita' nuova e vuota."""
     voce = registro.async_get_or_create(
-        "sensor", "omoda9", "VINFINTO_batteria",
+        "sensor", "chery_connect", "VINFINTO_batteria",
         suggested_object_id="omoda9_batteria", config_entry=config_entry)
     assert voce.entity_id == "sensor.omoda9_batteria"
 
@@ -50,7 +50,7 @@ async def test_non_sovrascrive_un_nome_gia_occupato(hass, config_entry, registro
     rosso: se ne accorgerebbe fra mesi chi apre un grafico. Quindi la vecchia resta dov'e'
     e il fatto viene dichiarato, invece di rinominare e perdere lo storico in silenzio."""
     registro.async_get_or_create(
-        "sensor", "omoda9", "VINFINTO_batteria",
+        "sensor", "chery_connect", "VINFINTO_batteria",
         suggested_object_id="omoda9_batteria", config_entry=config_entry)
     # qualcun altro occupa gia' il posto di arrivo
     registro.async_get_or_create(
@@ -68,7 +68,7 @@ async def test_una_entita_gia_inglese_non_viene_toccata(hass, config_entry, regi
     """La migrazione deve poter girare a ogni avvio senza fare niente: e' quello che
     succede dal secondo riavvio in poi, per sempre."""
     voce = registro.async_get_or_create(
-        "sensor", "omoda9", "VINFINTO_batteria",
+        "sensor", "chery_connect", "VINFINTO_batteria",
         suggested_object_id="chery_connect_battery", config_entry=config_entry)
     prima = voce.entity_id
 
@@ -83,7 +83,7 @@ async def test_una_entita_fuori_tabella_resta_com_e(hass, config_entry, registro
     """Chi non e' in ENGLISH_KEYS non si muove. Vale per un'entita' aggiunta dopo la
     tabella da qualcuno che non sa che la tabella esiste."""
     registro.async_get_or_create(
-        "sensor", "omoda9", "VINFINTO_sconosciuta",
+        "sensor", "chery_connect", "VINFINTO_sconosciuta",
         suggested_object_id="omoda9_cosa_sconosciuta", config_entry=config_entry)
 
     await _migra(hass, config_entry)
@@ -99,7 +99,7 @@ async def test_avvisa_l_utente_solo_se_ha_rinominato_qualcosa(hass, config_entry
     avviso che compare quando non c'e' nulla da fare insegna a ignorare anche quelli veri."""
     from homeassistant.helpers import issue_registry as ir
 
-    from custom_components.omoda9.const import DOMAIN
+    from custom_components.chery_connect.const import DOMAIN
 
     reg_issue = ir.async_get(hass)
     issue_id = f"entity_ids_rinominati_{config_entry.entry_id}"
@@ -110,7 +110,7 @@ async def test_avvisa_l_utente_solo_se_ha_rinominato_qualcosa(hass, config_entry
 
     # installazione che viene da prima -> avviso, col numero giusto
     registro.async_get_or_create(
-        "sensor", "omoda9", "VINFINTO_batteria",
+        "sensor", "chery_connect", "VINFINTO_batteria",
         suggested_object_id="omoda9_batteria", config_entry=config_entry)
     await _migra(hass, config_entry)
 

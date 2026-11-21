@@ -1,8 +1,8 @@
 <!-- logo:inizio -->
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/omoda9/brand/dark_logo.png">
-    <img src="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/omoda9/brand/logo.png" alt="OMODA | JAECOO" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/chery_connect/brand/dark_logo.png">
+    <img src="https://raw.githubusercontent.com/chery-connect-ha/omoda9-ha/master/custom_components/chery_connect/brand/logo.png" alt="OMODA | JAECOO" height="96">
   </picture>
 </p>
 <!-- logo:fine -->
@@ -25,6 +25,15 @@ veicolo, posizione e comandi, come nell'app ufficiale ma integrati in HA.
 > ⚠️ **Software NON ufficiale**, reverse-engineered. Nessuna affiliazione con
 > Omoda / Jaecoo / Chery. Fornito "as is", usalo a tuo rischio e solo sul tuo
 > veicolo. Vedi [`LICENSE`](LICENSE).
+
+## Cosa sta succedendo: un'integrazione, un nome, per tutti
+
+Dalla **2.0** questa integrazione si installa col suo nome definitivo, **Chery Connect**
+(dominio `chery_connect`), e ogni veicolo passa lì: sia da `omoda9` (questa integrazione fino
+alla 1.14) sia dalla vecchia linea `omoda_jaecoo`. Aggiorni da HACS, riavvii e confermi una
+volta da Impostazioni: l'accesso viene riusato, ed entità, storico e dispositivo passano di
+qua. Passo per passo (in inglese): [`docs/migrating-to-chery-connect.md`](docs/migrating-to-chery-connect.md).
+Piano e tempi: [#10](https://github.com/chery-connect-ha/omoda9-ha/issues/10).
 
 ## Cosa puoi fare
 
@@ -141,7 +150,7 @@ Opzioni (tutte facoltative):
 **La card mostra "Errore di configurazione" nell'app (ma funziona su desktop)?** L'integrazione
 carica la card da sola, ma l'app companion non sempre la recepisce. **Aggiungi la risorsa a mano
 una volta** e funziona: **Impostazioni → Dashboard → ⋮ (in alto a destra) → Risorse → + Aggiungi
-risorsa**, URL `/omoda9_card/chery-card.js`, tipo **Modulo JavaScript**. Poi chiudi e riapri del
+risorsa**, URL `/chery_connect_card/chery-card.js`, tipo **Modulo JavaScript**. Poi chiudi e riapri del
 tutto l'app (se resta lo stato vecchio, prima **Configurazione app → Debug → Reimposta cache del
 frontend**). La risorsa si aggiunge una volta sola; vale per tutte le dashboard.
 
@@ -180,7 +189,7 @@ falsi allarmi — e il popup si chiude da solo appena un comando riesce. Richied
 **HA 2024.10+**.
 
 (La stessa automazione in inglese è
-[`failed_command.yaml`](blueprints/automation/omoda9/failed_command.yaml): Home
+[`failed_command.yaml`](blueprints/automation/chery_connect/failed_command.yaml): Home
 Assistant non sa tradurre un blueprint, quindi c'è un file per lingua.)
 
 ## Se qualcosa non funziona
@@ -218,7 +227,7 @@ un'installazione normale **non va eseguito nulla a mano**.
 
 Il primo accesso conia un **token di sessione** per-account dall'identità (email
 o telefono) + OTP. Catena orchestrata dal config flow (codice in
-`custom_components/omoda9/core/`):
+`custom_components/chery_connect/core/`):
 
 | Passo | Modulo | Cosa fa |
 |---|---|---|
@@ -230,7 +239,7 @@ o telefono) + OTP. Catena orchestrata dal config flow (codice in
 Il **PIN non c'entra con l'accesso**: è l'OTP a coniare il token, il PIN firma
 soltanto i comandi (§4).
 
-Il token finisce in **`<config>/omoda9_<VIN>_token.json`** (mai nel repo). Finché
+Il token finisce in **`<config>/chery_connect_<VIN>_token.json`** (mai nel repo). Finché
 il **refresh_token** è valido, `session.refresh()` rinnova la sessione **senza**
 nuovo OTP. Un nuovo OTP serve solo se token e refresh muoiono entrambi — tipico
 caso: **apertura dell'app ufficiale** (sessione singola lato cloud).
@@ -252,8 +261,8 @@ universali per-regione** — **identiche per tutti gli utenti**, prese dagli ass
 da username/password MQTT e dalle ACL sui topic, come fa l'app ufficiale.
 
 Al primo avvio `coordinator.async_provision_certs()` deobfusca i cert dal bundle
-(`custom_components/omoda9/certs/store.json`) e li scrive in
-**`<config>/omoda9_<VIN>_certs/`**. Override manuale: il campo **`certs_src`** del
+(`custom_components/chery_connect/certs/store.json`) e li scrive in
+**`<config>/chery_connect_<VIN>_certs/`**. Override manuale: il campo **`certs_src`** del
 config flow. Per una regione **non** presente nel bundle l'avvio fallisce con un
 messaggio che indica dove mettere i cert.
 
@@ -282,21 +291,21 @@ e `authorizeType` **senza toccare l'auto**.
 
 ### File generati (nel tuo HA, mai nel repo)
 
-- `<config>/omoda9_<VIN>_token.json` — token di sessione per-account.
-- `<config>/omoda9_<VIN>_certs/` — certificati mutual-TLS del broker MQTT.
+- `<config>/chery_connect_<VIN>_token.json`: token di sessione per-account.
+- `<config>/chery_connect_<VIN>_certs/`: certificati mutual-TLS del broker MQTT.
 
 Coperti da `.gitignore`, non lasciano mai la tua installazione.
 
 ### Provisioning / login manuale (avanzato, fuori da HA)
 
-Per debug si possono usare gli script CLI in `custom_components/omoda9/core/` con
+Per debug si possono usare gli script CLI in `custom_components/chery_connect/core/` con
 un Python che abbia i `requirements` del manifest. La configurazione arriva da
 variabili d'ambiente — l'elenco completo è `ctx_da_environ()` in
-[`core/context.py`](custom_components/omoda9/core/context.py) (`OMODA_BFF`,
+[`core/context.py`](custom_components/chery_connect/core/context.py) (`OMODA_BFF`,
 `TSP_HOST`, `OMODA_TOKEN_PATH`, `OMODA_PHONE`/`OMODA_AREA`, `VIN`, `OMODA_PIN`…).
 
 Vanno lanciati dalla cartella dell'integrazione
-(`<config>/custom_components/omoda9/`):
+(`<config>/custom_components/chery_connect/`):
 
 ```bash
 # 1) invia il codice OTP via email (risolve il captcha)
@@ -318,7 +327,7 @@ sopra, e l'argomento `diagnose` è obbligatorio — senza argomenti esegue un
 **auto-test offline con dati finti**, non contatta nulla.
 
 Il token così coniato è lo **stesso** file che legge l'integrazione: puntando
-`OMODA_TOKEN_PATH` a `<config>/omoda9_<VIN>_token.json` si può sbloccare un setup
+`OMODA_TOKEN_PATH` a `<config>/chery_connect_<VIN>_token.json` si può sbloccare un setup
 anche senza rifare l'OTP dal config flow.
 
 ## Licenza

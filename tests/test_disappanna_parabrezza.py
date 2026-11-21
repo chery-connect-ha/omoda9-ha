@@ -61,7 +61,7 @@ def test_le_due_funzioni_restano_distinte(core):
 def test_nessun_pulsante_doppione(core):
     """I comandi di uno switch non devono generare anche due pulsanti: è il modo tipico in cui
     il conteggio delle entità cresce senza che nessuno se ne accorga."""
-    from custom_components.omoda9.const import COMMANDS_AS_RICH_ENTITY
+    from custom_components.chery_connect.const import COMMANDS_AS_RICH_ENTITY
 
     assert "disappanna_parabrezza" in COMMANDS_AS_RICH_ENTITY
     assert "disappanna_parabrezza_off" in COMMANDS_AS_RICH_ENTITY
@@ -74,7 +74,7 @@ def test_il_campo_di_stato_non_e_promosso_a_entita_ricca(core):
     dal giugno 2026: l'entità cambierebbe dominio, lo storico si spezzerebbe e nel registro
     resterebbe un orfano `unavailable` — cioè si romperebbe proprio l'invariante di salute
     («0 unavailable») per far quadrare quello del conteggio. Meglio un'entità in più."""
-    from custom_components.omoda9.const import FIELDS_AS_RICH_ENTITY
+    from custom_components.chery_connect.const import FIELDS_AS_RICH_ENTITY
 
     assert "fWinHeatingState" not in FIELDS_AS_RICH_ENTITY
 

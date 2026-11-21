@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.const import (
+from custom_components.chery_connect.const import (
     COMMANDS_AS_RICH_ENTITY,
     FIELDS_AS_RICH_ENTITY,
     PLATFORMS,
@@ -93,7 +93,7 @@ def test_ogni_piattaforma_e_coperta():
 # ───────────────────────── livello 1: aritmetica sulle liste sorgenti ─────────────────────────
 def test_sensori_da_campi_auto(core):
     """`SENSORS` filtrata per componente, meno i campi promossi a entità "ricche"."""
-    from custom_components.omoda9.coordinator import SENSORS
+    from custom_components.chery_connect.coordinator import SENSORS
 
     sensor = [s for s in SENSORS
               if s["comp"] == "sensor" and s["key"] not in FIELDS_AS_RICH_ENTITY]
@@ -108,7 +108,7 @@ def test_nessun_campo_ricco_orfano():
 
     Un refuso qui non darebbe errore: il filtro semplicemente non escluderebbe nulla e
     comparirebbe un sensore doppione accanto all'entità ricca."""
-    from custom_components.omoda9.coordinator import SENSORS
+    from custom_components.chery_connect.coordinator import SENSORS
 
     chiavi = {s["key"] for s in SENSORS}
     orfane = FIELDS_AS_RICH_ENTITY - chiavi
@@ -138,7 +138,7 @@ def test_campi_unita_non_diventano_sensori():
     """`rangeUnit`/`averageFuelUnit`/`tirePressureUnit` valgono SEMPRE "1": sono flag di
     unità di misura, non valori. Mapparli mostrerebbe un sensore fisso a 1 — errore già
     fatto una volta, quindi vale la pena bloccarlo."""
-    from custom_components.omoda9.coordinator import META
+    from custom_components.chery_connect.coordinator import META
 
     for flag in ("rangeUnit", "averageFuelUnit", "tirePressureUnit"):
         assert flag not in META, f"{flag} è un flag di unità, non deve diventare un sensore"

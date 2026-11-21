@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Custom Lovelace card: static-served from this package and auto-loaded on the frontend so it
 # appears in the card picker without the user adding a dashboard resource by hand. Il percorso
-# URL è legato al DOMINIO (`/omoda9_card`), non al marchio: così non collide con la card di
+# URL è legato al DOMINIO (`/chery_connect_card`), non al marchio: così non collide con la card di
 # un'altra integrazione della piattaforma (es. `omoda_jaecoo`) installata sulla stessa macchina.
 # L'elemento invece è `chery-card` (marchio), distinto da `omoda-card`.
 _CARD_PATH = f"/{DOMAIN}_card"
@@ -158,16 +158,16 @@ async def _async_migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> 
     """
     from homeassistant.helpers import entity_registry as er
 
-    from .naming import ENGLISH_KEYS, ID_PREFIX
+    from .naming import ENGLISH_KEYS, ID_PREFIX, NAME_PREFIX
 
     reg = er.async_get(hass)
     esistenti = {e.entity_id for e in reg.entities.values()}
     fatti = 0
     for voce in er.async_entries_for_config_entry(reg, entry.entry_id):
         piattaforma, _, object_id = voce.entity_id.partition(".")
-        if not object_id.startswith(f"{DOMAIN}_"):
+        if not object_id.startswith(f"{NAME_PREFIX}_"):
             continue
-        inglese = ENGLISH_KEYS.get(object_id[len(DOMAIN) + 1:])
+        inglese = ENGLISH_KEYS.get(object_id[len(NAME_PREFIX) + 1:])
         if inglese is None:
             continue
         nuovo = f"{piattaforma}.{ID_PREFIX}_{inglese}"
@@ -211,6 +211,11 @@ async def _async_migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Inizializza l'integrazione da un config entry."""
     from .coordinator import Omoda9Coordinator
+
+    # A vehicle taken over from an older integration moves here, once, before anything else:
+    # its entities must change integration while none of them is loaded.
+    from .migration import async_complete_migration
+    await async_complete_migration(hass, entry)
 
     # PRIMA di costruire qualunque entita': il rename tocca il registro, e il registro va
     # sistemato mentre nessuna entita' e' ancora montata.
@@ -265,10 +270,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.async_add_executor_job(coordinator.async_stop)
         raise
 
-    # Last, and outside the cleanup above: the integration is fully up whatever the bridge does.
-    # When `chery_connect` is installed this is the only code that can tell the owner to move.
-    from .successor import async_offer_successor
-    await async_offer_successor(hass, entry)
     return True
 
 

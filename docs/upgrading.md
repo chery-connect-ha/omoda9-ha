@@ -1,5 +1,9 @@
 # What you have to do, depending on where you are coming from
 
+> **From 2.0 the integration is Chery Connect (`chery_connect`), and every vehicle moves to it.**
+> The guide for that move is [`migrating-to-chery-connect.md`](migrating-to-chery-connect.md).
+> What follows describes the 1.14 update, which a vehicle on 1.13 still goes through on the way.
+
 Two different situations, and they are not the same amount of work. Find yours.
 
 ## You already have this integration (domain `omoda9`)

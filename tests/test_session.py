@@ -338,7 +338,7 @@ async def test_il_monitor_e_armato_prima_del_controllo_sessione(
     rileggere quando si indaga su un riavvio. Con il monitor armato DOPO (com'era), quel
     controllo non veniva mai registrato: verificato sul campo su 5 riavvii consecutivi,
     zero controlli d'avvio nel file. Qui si fissa l'ordine, non l'implementazione."""
-    from custom_components.omoda9.coordinator import Omoda9Coordinator
+    from custom_components.chery_connect.coordinator import Omoda9Coordinator
 
     ordine: list[str] = []
     vero_diag = Omoda9Coordinator.async_setup_diag
@@ -382,7 +382,7 @@ async def test_il_monitor_e_armato_prima_del_controllo_sessione(
 async def test_armare_il_monitor_due_volte_e_innocuo(hass, config_entry, cloud, monkeypatch):
     """`async_setup_entry` lo arma presto e `async_start` lo richiama: la seconda
     chiamata non deve creare un secondo scrittore sullo stesso file."""
-    from custom_components.omoda9.coordinator import Omoda9Coordinator
+    from custom_components.chery_connect.coordinator import Omoda9Coordinator
 
     monkeypatch.setattr(Omoda9Coordinator, "_provision_certs",
                         lambda self: (True, "cert finti (test)"))

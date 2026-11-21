@@ -93,7 +93,7 @@ R_RULES=(
 "R05|HIGH|At most one stable release every 2 weeks: each tag costs every user a HACS notification and a Home Assistant restart. Work accumulates in '[Non rilasciato]'. Exceptions: data loss, account lockout, security.|house rule, from measured history (45 releases in 30 days, 62% of them less than an hour apart). Not in CONTRIBUTING.md or AGENTS.md"
 "R06|NORMAL|Shared code (core/, coordinator.py, authentication, signing, the entity model) asks for a read by somebody who is not the author. The merge is NEVER blocked and required approvals on GitHub are deliberately zero: the block sits on the stable release. Nobody approves because they own the organisation.|CONTRIBUTING.md \"It lands\" (\"Merging is never blocked. Only the last step is.\")"
 "R07|HIGH|Never claim a hardware check you do not have. 'The backend answered OK' is layer 1 and speaks about us; only a state field on the car changing, at a time you can point to, is layer 2 and speaks about the car. Code written for a car nobody owns still merges, labelled unverified-hardware, and a stable release must NAME it rather than folding it in quietly.|CONTRIBUTING.md \"Never\" and \"It becomes stable\" · AGENTS.md \"don't overstate evidence\" · docs/field-test.md"
-"R08|HIGH|A stable release without the omoda9.zip asset is worse than no release: hacs.json sets zip_release, so HACS lists the version and then fails to install it.|AGENTS.md \"Cutting a release\" · hacs.json"
+"R08|HIGH|A stable release without the chery_connect.zip asset is worse than no release: hacs.json sets zip_release, so HACS lists the version and then fails to install it.|AGENTS.md \"Cutting a release\" · hacs.json"
 "R09|HIGH|Never force-push and never rewrite published history. To bring an already-pushed branch up to date use merge, not rebase. On master the protection forbids deletions too.|AGENTS.md \"Never\" and \"When master has moved on\" · branch protection"
 "R10|NORMAL|Never AI co-authorship trailers in commit messages. How this project credits its tools is a decision for the group, not an assistant's default.|AGENTS.md \"Save the work\""
 "R11|NORMAL|No Home Assistant imports inside core/: the protocol logic must stay runnable without HA installed, which is what lets the sandbox exercise a change without an instance.|AGENTS.md \"Invariants\""
@@ -440,7 +440,7 @@ gate_cadence() { # $1 = (optional) the version being published, NOT to be counte
 }
 
 # ── R06 — a read by somebody else: reported, not blocked (the source says so) ────────
-R_SHARED_RE='^custom_components/omoda9/(core/|coordinator\.py|config_flow\.py|__init__\.py|const\.py|entity\.py)'
+R_SHARED_RE='^custom_components/chery_connect/(core/|coordinator\.py|config_flow\.py|__init__\.py|const\.py|entity\.py)'
 gate_shared_code() { # $1 = base
   local base="${1:-origin/master}" touched
   touched="$(git -C "$R_ROOT" diff --name-only "$base"...HEAD | grep -E "$R_SHARED_RE" || true)"
@@ -531,16 +531,16 @@ gate_no_trailer_in_commits() { # $1 = base
 
 # ── R11 / R21 — architecture invariants ─────────────────────────────────────────────
 gate_core_without_ha() {
-  local core="$R_ROOT/custom_components/omoda9/core" h
+  local core="$R_ROOT/custom_components/chery_connect/core" h
   # ⚠️ Without this line the gate went green when core/ no longer existed: grep failed,
   # `|| true` zeroed it, and absence looked like compliance.
-  [ -d "$core" ] || { require R11 "custom_components/omoda9/core/ does not exist: the gate does not know what to look at."; return 0; }
+  [ -d "$core" ] || { require R11 "custom_components/chery_connect/core/ does not exist: the gate does not know what to look at."; return 0; }
   h="$(grep -rnE '^[[:space:]]*(from|import)[[:space:]]+homeassistant|import_module\(["'"'"']homeassistant|__import__\(["'"'"']homeassistant' "$core" 2>/dev/null || true)"
   [ -n "$h" ] && require R11 "Home Assistant imported inside core/:$(printf '\n%s' "$h")" \
               || ok "R11 · core/ does not import Home Assistant"
 }
 gate_no_model_names() {
-  local cc="$R_ROOT/custom_components/omoda9" h
+  local cc="$R_ROOT/custom_components/chery_connect" h
   [ -d "$cc" ] || return 0
   h="$(grep -rnEi 'if[^:]*\b(model|modello|marca|brand)\b[^:]*==[[:space:]]*["'"'"'](omoda|jaecoo|j7|e5|c5)' "$cc" 2>/dev/null || true)"
   [ -n "$h" ] && require R21 "a model name used as a code path:$(printf '\n%s' "$h")" \
@@ -650,7 +650,7 @@ gate_stage_clean() {
 # `grep -oP` is GNU-only (and a JSON file deserves a JSON parser).
 manifest_version() {
   python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' \
-    "$R_ROOT/custom_components/omoda9/manifest.json"
+    "$R_ROOT/custom_components/chery_connect/manifest.json"
 }
 gate_manifest_matches_tag() { # $1 = X.Y.Z
   local v; v="$(manifest_version)"

@@ -83,6 +83,16 @@ logged. A collision check is therefore not tidiness, it is the difference
 between keeping and losing somebody's year of data. Measured on the proposed
 mapping: 110 entities, **0 collisions**.
 
+## Superseded in 2.0: the domain moved after all
+
+*Added on 21 November 2026; the decision below is kept as it was written, because the reasoning
+in it is still what made the move cheap.* The domain is `chery_connect` from 2.0 (#10). What
+changed is the cost: once 1.14 had moved the entity ids to English inside the integration,
+moving the domain no longer changes a single entity id for an `omoda9` owner, so the "second
+break" this document was avoiding is gone. The other objection, an API nobody in core uses,
+was answered on a real instance on 27 September 2026 by the adoption of #78, which uses that
+same API. How the move works: `docs/migrating-to-chery-connect.md`.
+
 ## The decision
 
 - **The HA domain stays `omoda9`.** With it the folder

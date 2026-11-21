@@ -2,7 +2,7 @@
 
 Four standalone probes that answer one question: **can each user of this
 integration obtain their own MQTT credentials, instead of sharing the vendor
-certificate bundled in `custom_components/omoda9/certs/store.json`?**
+certificate bundled in `custom_components/chery_connect/certs/store.json`?**
 
 They exist to be re-run and disagreed with. Every claim in
 [`docs/enrollment-findings.md`](../../docs/enrollment-findings.md) comes from one
@@ -50,7 +50,7 @@ python3 tools/enrollment_probe/step4_keygen_scan.py --extra ../.coding_agent
 
 ```bash
 export VIN=...                 # your vehicle
-export OMODA_TOKEN_PATH=...    # <config>/omoda9_<VIN>_token.json
+export OMODA_TOKEN_PATH=...    # <config>/chery_connect_<VIN>_token.json
 python3 tools/enrollment_probe/step3_response_scan.py
 ```
 

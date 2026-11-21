@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.entity import car_zone, in_zona_casa
+from custom_components.chery_connect.entity import car_zone, in_zona_casa
 
 CASA = {"lat": 45.0, "lon": 9.0}
 

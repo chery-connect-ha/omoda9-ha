@@ -21,7 +21,7 @@ name: Version guard
 on:
   pull_request:
     paths:
-      - "custom_components/omoda9/manifest.json"
+      - "custom_components/chery_connect/manifest.json"
 
 permissions:
   contents: read
@@ -40,10 +40,12 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          MANIFEST=custom_components/omoda9/manifest.json
+          MANIFEST=custom_components/chery_connect/manifest.json
 
           new=$(jq -r .version "$MANIFEST")
-          base=$(git show "$BASE:$MANIFEST" | jq -r .version)
+          # Before 2.0 the package lived under the omoda9 domain: a base from then has the manifest there.
+          base=$(git show "$BASE:$MANIFEST" 2>/dev/null || git show "$BASE:custom_components/omoda9/manifest.json")
+          base=$(printf '%s' "$base" | jq -r .version)
 
           if [ "$new" = "$base" ]; then
             echo "Version unchanged ($base): nothing to check."
@@ -64,6 +66,14 @@ jobs:
           if [ "$base" = "$stable" ]; then
             echo "The manifest was still on the last stable ($stable) and this pull request opens $new."
             echo "It is the first one after the release, so raising it is its job."
+            exit 0
+          fi
+          # A new MAJOR version is a release decision taken out loud, not a collision: 2.0.0 is
+          # the domain change to chery_connect (#10), and the number already open (1.14.0) keeps
+          # shipping from its own maintenance branch. Two pull requests cannot both open a
+          # major by accident, because each one also has to change everything a major breaks.
+          if [ "${new%%.*}" -gt "${base%%.*}" ] 2>/dev/null; then
+            echo "This pull request opens a new major version ($base -> $new): a release decision, allowed."
             exit 0
           fi
 

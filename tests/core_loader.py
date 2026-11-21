@@ -3,7 +3,7 @@
 Dopo P2-2 `core/` è un sotto-pacchetto vero: basta un import normale. Prima serviva
 caricare ogni modulo dal file e fissarlo in `sys.modules` per nome nudo, perché i
 moduli si importavano fra loro con nomi generici (`import wake`) e non erano
-raggiungibili come `custom_components.omoda9.core.wake`.
+raggiungibili come `custom_components.chery_connect.core.wake`.
 
 L'indirezione resta perché è ciò che ha reso possibile il refactor: i test asseriscono
 sul COMPORTAMENTO e hanno attraversato il cambio di meccanismo di import senza che una
@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-CORE_DIR = os.path.join(_HERE, "..", "custom_components", "omoda9", "core")
+CORE_DIR = os.path.join(_HERE, "..", "custom_components", "chery_connect", "core")
 
 _NOMI = (
     "codes", "omoda", "omoda_auth", "tsp_sign", "captcha_solver", "prova_token",
@@ -33,7 +33,7 @@ def load_core() -> dict:
     out: dict = {}
     for nome in _NOMI:
         try:
-            out[nome] = importlib.import_module(f"custom_components.omoda9.core.{nome}")
+            out[nome] = importlib.import_module(f"custom_components.chery_connect.core.{nome}")
         except ImportError:
             continue
     return out

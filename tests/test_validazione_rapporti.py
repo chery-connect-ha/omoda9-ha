@@ -26,7 +26,7 @@ def _valida(tmp_path, dati, testo=None):
 
 
 def _buono():
-    from custom_components.omoda9.legacy import CANON_ENTITY_ID
+    from custom_components.chery_connect.legacy import CANON_ENTITY_ID
     ent = sorted(CANON_ENTITY_ID.values())[:12]
     return {"vehicle": {"brand": "Omoda", "model": "Omoda 5Ev", "power_type": 0,
                         "entity_count": len(ent), "entities": ent}}
@@ -55,7 +55,7 @@ def test_una_bev_con_i_sensori_del_termico_non_passa(tmp_path):
     """La regola del domain model. Se il file dichiara entrambe le cose una delle due e'
     falsa, e quale delle due e' esattamente cio' che questa raccolta serve a scoprire:
     quindi si apre una issue, non si corregge il file."""
-    from custom_components.omoda9.legacy import CANON_ENTITY_ID
+    from custom_components.chery_connect.legacy import CANON_ENTITY_ID
     benzina = CANON_ENTITY_ID[("sensor", "rt_range_benzina")]
     d = _buono()
     d["vehicle"]["entities"] = sorted(set(d["vehicle"]["entities"]) | {benzina})

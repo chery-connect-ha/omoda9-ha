@@ -1,5 +1,5 @@
 {
-  "domain": "omoda9",
+  "domain": "chery_connect",
   "name": "Chery Connect",
   "after_dependencies": [
     "recorder"
@@ -22,5 +22,5 @@
     "pycryptodome>=3.17",
     "numpy>=1.21"
   ],
-  "version": "1.14.0"
+  "version": "2.0.0"
 }

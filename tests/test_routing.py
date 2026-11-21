@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 import fixtures as FX
-from custom_components.omoda9.core import routing as R
+from custom_components.chery_connect.core import routing as R
 
 
 # ───────────────────────── la tabella ─────────────────────────
@@ -94,7 +94,7 @@ def test_reason_sconosciuto_degrada_ad_avviso():
 def test_gli_insiemi_derivano_dalla_tabella():
     """Erano elenchi scritti a mano accanto alla tabella: potevano divergere in silenzio
     da come i codici venivano davvero instradati."""
-    from custom_components.omoda9.core import commands
+    from custom_components.chery_connect.core import commands
 
     assert commands.SUCCESS_CODES is R.SUCCESS_CODES
     assert commands.FAILURE_CODES is R.FAILURE_CODES
@@ -106,7 +106,7 @@ def test_gli_insiemi_derivano_dalla_tabella():
 def test_ogni_codice_instradato_ha_un_testo_leggibile():
     """Le decisioni stanno in `routing`, i testi in `codes`: separati per la regola H7.
     Ma un codice che il componente instrada e non sa spiegare arriva all'utente muto."""
-    from custom_components.omoda9.core import codes
+    from custom_components.chery_connect.core import codes
 
     senza_testo = sorted(
         c for c in (R.SUCCESS_CODES | R.FAILURE_CODES) if c not in codes.CODE_MEANING
@@ -128,8 +128,8 @@ async def test_comando_ui_e_fallback_sveglia_instradano_uguale(
 
     Prima erano due catene di `if` indipendenti e il fallback classificava male: un PIN
     errato lì bruciava un tentativo in silenzio, senza Repair né riautenticazione."""
-    from custom_components.omoda9.const import DOMAIN
-    from custom_components.omoda9.core.commands import CommandError
+    from custom_components.chery_connect.const import DOMAIN
+    from custom_components.chery_connect.core.commands import CommandError
 
     coord = hass.data[DOMAIN][integrazione_avviata.entry_id]
     errore = CommandError("rifiutato", code="A00000", reason=reason)

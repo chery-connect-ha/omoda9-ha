@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.omoda9.core import tls_client as T
+from custom_components.chery_connect.core import tls_client as T
 
 
 PAGINA_WAF = '<!doctypehtml><meta charset="UTF-8"><meta name="aliyun_waf_aa" content="…">'

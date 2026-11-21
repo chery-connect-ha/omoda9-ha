@@ -1,6 +1,6 @@
 """Costanti del custom component Omoda 9 / Jaecoo."""
 
-DOMAIN = "omoda9"
+DOMAIN = "chery_connect"
 PLATFORMS = ["sensor", "binary_sensor", "button", "lock", "switch", "climate",
              "number", "time", "cover", "device_tracker", "text"]
 

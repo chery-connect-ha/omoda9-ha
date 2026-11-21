@@ -76,6 +76,6 @@ def test_la_posizione_arriva_comunque_al_device_tracker(core, cloud):
 
 
 def _ctx():
-    from custom_components.omoda9.core.context import CoreCtx
+    from custom_components.chery_connect.core.context import CoreCtx
     return CoreCtx(vin=FX.VIN, tuserid=FX.TUSERID, pin=FX.PIN, email=FX.EMAIL,
                    tsp_host=FX.TSP_HOST, bff=FX.BFF)

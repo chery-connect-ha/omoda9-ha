@@ -28,7 +28,7 @@ CODE_MEANING = {
     # come non attestata finché non la si rimisura.
     # Il testo dice esplicitamente «non è il PIN» perché è lì che l'utente va a cercare.
     # ⚠️ BILINGUE e CORTO di proposito: questo testo finisce nello stato di
-    # `sensor.omoda9_esito_comando`, e uno stato HA non può superare i 255 caratteri —
+    # `sensor.chery_connect_command_result`, e uno stato HA non può superare i 255 caratteri:
     # oltre quel limite l'entità si rompe. Budget reale: 203 char (il prefisso col nome
     # comando più lungo ne occupa 52). Le traduzioni di `translations/` non arrivano qui:
     # lo stato è una stringa libera composta a runtime, non una chiave tradotta.

@@ -15,9 +15,9 @@ import time
 
 import pytest
 
-from custom_components.omoda9 import coordinator as coord_mod
-from custom_components.omoda9.const import DOMAIN
-from custom_components.omoda9.core import commands as CMD
+from custom_components.chery_connect import coordinator as coord_mod
+from custom_components.chery_connect.const import DOMAIN
+from custom_components.chery_connect.core import commands as CMD
 
 BUSY = "Sbrina lunotto: HTTP 200 A00082 — auto occupata ⏳ (un altro comando è in corso)"
 OK = "Sbrina lunotto: HTTP 200 A00079 — comando accettato ✅"
