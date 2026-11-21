@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Omoda 9 / Jaecoo",
+        "title": "Chery Connect",
         "description": "Kies hoe u zich aanmeldt bij uw Omoda/Jaecoo-account. Gebruik de telefoonoptie als uw account is geregistreerd met een telefoonnummer in plaats van een e-mail.",
         "menu_options": {
           "login_email": "Aanmelden met e-mail",
@@ -64,7 +64,7 @@
         }
       },
       "reauth_confirm": {
-        "title": "Opnieuw verifiëren Omoda 9 / Jaecoo",
+        "title": "Opnieuw verifiëren Chery Connect",
         "description": "De sessie is verlopen: totdat u opnieuw geverifieerd bent, kan de integratie niet met de auto communiceren en blijven commando's en sensoren vaststaan.\n\n**Er is geen code automatisch verzonden.** Kies hoe u wilt doorgaan of voer een bestaande code in.",
         "menu_options": {
           "send_code": "Stuur me een nieuwe code",
@@ -140,6 +140,10 @@
           "entry_not_found": "Integratie niet gevonden — herlaad Home Assistant en probeer het opnieuw."
         }
       }
+    },
+    "entity_ids_renamed": {
+      "title": "Omoda 9: {count} entities were renamed",
+      "description": "The entity ids of this integration moved from Italian to English: `sensor.omoda9_batteria` is now `sensor.chery_connect_battery`, and {count} entities on this vehicle were renamed.\n\n**Your history came with them.** Graphs, long-term statistics and the energy dashboard followed the rename automatically. There is nothing to reinstall and nothing to log in to again.\n\n**What did not follow: names you typed yourself.** Automations, scripts, template sensors and dashboard cards that refer to an entity by name still point at the old one. Home Assistant shows those as unknown entities.\n\nWhere to look: Settings, Automations and scenes, then any automation flagged with an unknown entity. The full old-to-new list is here: {url}\n\nDismiss this notice once you have been through them."
     }
   },
   "options": {
@@ -157,354 +161,366 @@
   },
   "entity": {
     "binary_sensor": {
-      "a_casa": {
+      "at_home": {
         "name": "Thuis"
       },
-      "alta_tensione_attiva": {
+      "high_voltage_active": {
         "name": "Hoge spanning actief"
       },
-      "auto_sveglia": {
+      "car_awake": {
         "name": "Auto wakker"
       },
-      "avviso_carburante_basso": {
+      "low_fuel_warning": {
         "name": "Lage brandstofwaarschuwing"
       },
-      "avviso_gomma_ant_dx": {
+      "tire_warning_front_right": {
         "name": "Bandwaarschuwing voor rechtsvoor"
       },
-      "avviso_gomma_ant_sx": {
+      "tire_warning_front_left": {
         "name": "Bandwaarschuwing voor linksvoor"
       },
-      "avviso_gomma_post_dx": {
+      "tire_warning_rear_right": {
         "name": "Bandwaarschuwing voor rechtsachter"
       },
-      "avviso_gomma_post_sx": {
+      "tire_warning_rear_left": {
         "name": "Bandwaarschuwing voor linksachter"
       },
-      "avviso_ricarica_necessaria": {
+      "charge_needed_warning": {
         "name": "Opladen vereist waarschuwing"
       },
-      "batteria_scarica": {
+      "low_battery": {
         "name": "Laag batterijniveau"
       },
-      "cofano": {
+      "hood": {
         "name": "Motorkap"
       },
-      "connessa": {
+      "connection": {
         "name": "Verbonden"
       },
-      "finestrino_anteriore_dx": {
+      "front_right_window": {
         "name": "Voorraam rechts"
       },
-      "finestrino_anteriore_sx": {
+      "front_left_window": {
         "name": "Voorraam links"
       },
-      "finestrino_posteriore_dx": {
+      "rear_right_window": {
         "name": "Achterraam rechts"
       },
-      "finestrino_posteriore_sx": {
+      "rear_left_window": {
         "name": "Achterraam links"
       },
-      "motore": {
+      "engine": {
         "name": "Motor"
       },
-      "porta_anteriore_dx": {
+      "front_right_door": {
         "name": "Voordeur rechts"
       },
-      "porta_anteriore_sx": {
+      "front_left_door": {
         "name": "Voordeur links"
       },
-      "porta_posteriore_dx": {
+      "rear_right_door": {
         "name": "Achterdeur rechts"
       },
-      "porta_posteriore_sx": {
+      "rear_left_door": {
         "name": "Achterdeur links"
       },
-      "portellone_in_movimento": {
+      "tailgate_moving": {
         "name": "Kofferklep in beweging"
       },
-      "purificazione_aria": {
+      "air_purification": {
         "name": "Luchtzuivering"
       },
-      "riscaldamento_parabrezza": {
+      "windshield_heating": {
         "name": "Voorruitverwarming"
       },
-      "sessione": {
+      "session": {
         "name": "Sessie"
       },
-      "spina_ricarica": {
+      "charging_cable": {
         "name": "Laadkabel"
       },
-      "tendina_tetto": {
+      "sunroof_blind": {
         "name": "Zonnedakrolgordijn"
       }
     },
     "button": {
-      "aggiorna_posizione": {
+      "refresh_location": {
         "name": "Locatie verversen"
       },
-      "aggiorna_stato_completo": {
+      "refresh_full_status": {
         "name": "Status volledig verversen"
       },
-      "antifurto_off": {
+      "alarm_off": {
         "name": "Alarm uit"
       },
-      "antifurto_on": {
+      "alarm_on": {
         "name": "Alarm aan"
       },
-      "clima_raffredda_off": {
+      "cool_everything_off": {
         "name": "Koeling uit"
       },
-      "clima_raffredda_on": {
+      "cool_everything": {
         "name": "Koeling aan"
       },
-      "clima_riscalda_off": {
+      "heat_everything_off": {
         "name": "Verwarming uit"
       },
-      "clima_riscalda_on": {
+      "heat_everything": {
         "name": "Verwarming aan"
       },
-      "conferma_otp": {
+      "confirm_otp": {
         "name": "OTP bevestigen"
       },
-      "finestrini_ventila": {
+      "vent_windows": {
         "name": "Ramen ventileren"
       },
-      "localizza": {
+      "vent_sunroof": {
+        "name": "Zonnedak ventileren"
+      },
+      "locate_car_gps": {
         "name": "Auto lokaliseren (GPS)"
       },
-      "richiedi_codice_otp": {
+      "request_otp_code": {
         "name": "Vraag OTP-code aan"
       },
-      "sveglia_auto": {
+      "wake_car": {
         "name": "Auto wekken"
       },
-      "trova_auto": {
+      "find_car_flash_lights": {
         "name": "Auto vinden (knipperlichten)"
       }
     },
     "climate": {
-      "clima": {
+      "climate": {
         "name": "Klimaat"
       }
     },
     "cover": {
-      "baule": {
+      "trunk": {
         "name": "Kofferbak"
       },
-      "finestrini": {
+      "windows": {
         "name": "Ramen"
       },
-      "tetto": {
+      "sunroof": {
         "name": "Zonnedak"
       }
     },
     "device_tracker": {
-      "posizione": {
+      "location": {
         "name": "Locatie"
       }
     },
     "lock": {
-      "serratura": {
+      "lock": {
         "name": "Deurslot"
       }
     },
     "number": {
-      "durata_clima": {
+      "climate_duration": {
         "name": "Klimaatduur"
       },
-      "ricarica_durata": {
+      "charge_duration": {
         "name": "Laadduur"
       }
     },
     "sensor": {
-      "autonomia_benzina": {
+      "fuel_range": {
         "name": "Brandstofbereik"
       },
-      "autonomia_benzina_miglia": {
+      "petrol_range_miles": {
         "name": "Benzinebereik (mijlen)"
       },
-      "autonomia_elettrica": {
+      "electric_range": {
         "name": "Elektrisch bereik"
       },
-      "autonomia_totale": {
+      "total_range": {
         "name": "Totaal bereik"
       },
-      "batteria": {
+      "battery": {
         "name": "Batterij"
       },
-      "carburante_residuo": {
+      "fuel_remaining": {
         "name": "Overgebleven brandstof"
       },
-      "chilometraggio_ibrido": {
+      "hybrid_mileage": {
         "name": "Hybride kilometerstand"
       },
-      "consumo_medio_carburante": {
+      "average_fuel_consumption": {
         "name": "Gemiddeld brandstofverbruik"
       },
-      "consumo_medio_elettrico": {
+      "average_energy_consumption": {
         "name": "Gemiddeld energieverbruik"
       },
-      "corrente_batteria_hv": {
+      "hv_battery_current": {
         "name": "HV batterijstroom"
       },
-      "dati_auto_aggiornati": {
+      "car_data_updated": {
         "name": "Autogegevens bijgewerkt"
       },
-      "energia_ricarica_a_casa": {
+      "home_charging_energy": {
         "name": "Laadenergie thuis"
       },
-      "energia_ricarica_fuori_casa": {
+      "away_charging_energy": {
         "name": "Laadenergie buitenshuis"
       },
-      "esito_comando": {
+      "command_result": {
         "name": "Commando resultaat"
       },
-      "esito_sonda_posizione": {
+      "location_probe_result": {
         "name": "Locatie-proef resultaat"
       },
-      "esito_sveglia": {
+      "wake_up_result": {
         "name": "Wekresultaat"
       },
-      "odometro": {
+      "odometer": {
         "name": "Kilometerstand"
       },
-      "partenza_programmata": {
+      "scheduled_departure": {
         "name": "Geplande vertrek"
       },
-      "presa_ricarica_rapida": {
+      "fast_charging_port": {
         "name": "Snel laadpunt"
       },
-      "pressione_gomma_ant_dx": {
+      "tire_pressure_front_right": {
         "name": "Bandenspanning voor rechts"
       },
-      "pressione_gomma_ant_sx": {
+      "tire_pressure_front_left": {
         "name": "Bandenspanning voor links"
       },
-      "pressione_gomma_post_dx": {
+      "tire_pressure_rear_right": {
         "name": "Bandenspanning achter rechts"
       },
-      "pressione_gomma_post_sx": {
+      "tire_pressure_rear_left": {
         "name": "Bandenspanning achter links"
       },
-      "ricarica_programmata_stato": {
+      "scheduled_charging_status": {
         "name": "Status geplande lading"
       },
-      "riscaldamento_sedile_post_centrale": {
+      "rear_center_seat_heating": {
         "name": "Achterste middenzitplaats verwarming"
       },
-      "stato_ricarica": {
+      "charging_status": {
         "name": "Laadstatus"
       },
-      "stato_sessione": {
+      "session_status": {
         "name": "Sessie status"
       },
-      "temperatura_gomma_ant_dx": {
+      "tire_temperature_front_right": {
         "name": "Bandtemperatuur voor rechts"
       },
-      "temperatura_gomma_ant_sx": {
+      "tire_temperature_front_left": {
         "name": "Bandtemperatuur voor links"
       },
-      "temperatura_gomma_post_dx": {
+      "tire_temperature_rear_right": {
         "name": "Bandtemperatuur achter rechts"
       },
-      "temperatura_gomma_post_sx": {
+      "tire_temperature_rear_left": {
         "name": "Bandtemperatuur achter links"
       },
-      "temperatura_impostata_dx": {
+      "set_temperature_right": {
         "name": "Ingestelde temperatuur rechts"
       },
-      "temperatura_impostata_sx": {
+      "set_temperature_left": {
         "name": "Ingestelde temperatuur links"
       },
-      "tempo_di_ricarica_residuo": {
+      "remaining_charge_time": {
         "name": "Resterende laadtijd"
       },
-      "tensione_batteria_hv": {
+      "hv_battery_voltage": {
         "name": "HV batterijspanning"
       },
-      "tetto_stato_movimento": {
+      "sunroof_movement_state": {
         "name": "Stand zonnedak beweging"
       },
-      "ultima_posizione": {
+      "last_position": {
         "name": "Laatste locatie"
       },
-      "ultima_sveglia": {
+      "last_wake_up": {
         "name": "Laatste wekken"
       },
-      "ultimo_contatto": {
+      "last_seen": {
         "name": "Laatst gezien"
       },
-      "velocita": {
+      "speed": {
         "name": "Snelheid"
       },
-      "ventilazione_sedile_post_centrale": {
+      "rear_center_seat_ventilation": {
         "name": "Ventilatie achterste middenzitplaats"
+      },
+      "charging_power": {
+        "name": "Charging power"
+      },
+      "wltp_range": {
+        "name": "WLTP range"
+      },
+      "electric_efficiency_mi_kwh": {
+        "name": "Electric efficiency (mi/kWh)"
       }
     },
     "switch": {
-      "aggiornamento_automatico": {
+      "automatic_updates": {
         "name": "Automatische updates"
       },
-      "antifurto": {
+      "alarm": {
         "name": "Alarm"
       },
-      "disappannamento_parabrezza": {
+      "windshield_defog": {
         "name": "Voorruit ontwaseming"
       },
-      "raffredda_tutto": {
+      "cool_everything": {
         "name": "Koel alles"
       },
-      "ricarica": {
+      "charging": {
         "name": "Opladen"
       },
-      "ricarica_programmata": {
+      "scheduled_charging": {
         "name": "Geplande lading"
       },
-      "riscalda_tutto": {
+      "heat_everything": {
         "name": "Verwarm alles"
       },
-      "riscaldamento_lunotto": {
+      "rear_window_heating": {
         "name": "Achterruitverwarming"
       },
-      "riscaldamento_sedile_guida": {
+      "driver_seat_heating": {
         "name": "Bestuurdersstoel verwarming"
       },
-      "riscaldamento_sedile_passeggero": {
+      "passenger_seat_heating": {
         "name": "Passagiersstoel verwarming"
       },
-      "riscaldamento_sedile_post_dx": {
+      "rear_right_seat_heating": {
         "name": "Achterste rechter stoel verwarming"
       },
-      "riscaldamento_sedile_post_sx": {
+      "rear_left_seat_heating": {
         "name": "Achterste linker stoel verwarming"
       },
-      "riscaldamento_volante": {
+      "steering_wheel_heating": {
         "name": "Stuurwielverwarming"
       },
-      "sbrinamento_parabrezza": {
+      "windshield_defrost": {
         "name": "Voorruit ontdooiing"
       },
-      "ventilazione_sedile_guida": {
+      "driver_seat_ventilation": {
         "name": "Bestuurdersstoel ventilatie"
       },
-      "ventilazione_sedile_passeggero": {
+      "passenger_seat_ventilation": {
         "name": "Passagiersstoel ventilatie"
       },
-      "ventilazione_sedile_post_dx": {
+      "rear_right_seat_ventilation": {
         "name": "Achterste rechter stoel ventilatie"
       },
-      "ventilazione_sedile_post_sx": {
+      "rear_left_seat_ventilation": {
         "name": "Achterste linker stoel ventilatie"
       }
     },
     "text": {
-      "codice_otp": {
+      "otp_code": {
         "name": "OTP-code"
       }
     },
     "time": {
-      "ricarica_orario_di_inizio": {
+      "charge_start_time": {
         "name": "Starttijd laden"
       }
     }

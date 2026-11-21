@@ -11,12 +11,12 @@
  *   show_all: true           # also list every remaining entity, grouped
  *   entities: [...]          # append your own rows (entity ids)
  *   integration: "omoda9"    # platform to collect (default)
- *   prefix: "omoda9_"        # object_id fallback prefix
+ *   prefix: "chery_connect_" # object_id fallback prefix
  */
 class CheryCard extends HTMLElement {
   setConfig(config) {
     this.config = Object.assign(
-      { integration: "omoda9", prefix: "omoda9_", show_all: false },
+      { integration: "omoda9", prefix: "chery_connect_", show_all: false },
       config || {}
     );
   }
@@ -189,10 +189,10 @@ class CheryCard extends HTMLElement {
 
     const bat = this._find(items, "battery") || items.find((r) =>
       r.s.attributes.device_class === "battery" && r.s.attributes.unit_of_measurement === "%");
-    const range = this._find(items, "range_electric", "range_total", "range_combined_estimate");
-    const chargeState = this._find(items, "charge_state");
+    const range = this._find(items, "electric_range", "total_range", "petrol_range_miles");
+    const chargeState = this._find(items, "charging_status");
     const charging = this._find(items, "charging");
-    const plug = this._find(items, "charge_plug");
+    const plug = this._find(items, "charging_cable");
     const odo = this._find(items, "odometer");
     const isCharging = charging ? charging.s.state === "on"
       : (chargeState && /charg/i.test(chargeState.s.state) && !/not/i.test(chargeState.s.state));
@@ -245,7 +245,7 @@ class CheryCard extends HTMLElement {
     items.filter((r) => /tire.*warning|tyre.*warning/.test(r.key) && r.s.state === "on")
       .forEach((r) => warns.push({ id: r.id, icon: "mdi:car-tire-alert",
         text: (r.s.attributes.friendly_name || r.key).replace(new RegExp("^" + deviceRe + "\\s*", "i"), "").replace(/warning/i, "").trim() }));
-    const low = this._find(items, "battery_low");
+    const low = this._find(items, "low_battery");
     if (low && low.s.state === "on") warns.push({ id: low.id, icon: "mdi:battery-alert", text: "Battery low" });
     const conn = this._find(items, "connection");
     if (conn && conn.s.state === "off") warns.push({ id: conn.id, icon: "mdi:wifi-off", text: "Offline" });

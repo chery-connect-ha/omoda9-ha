@@ -85,6 +85,11 @@ CONF_VEHICLE_NAME = "vehicle_name"
 DATA_VEHICLE_MODEL = "vehicle_model"
 DATA_VEHICLE_BRAND = "vehicle_brand"
 # fallback quando il modello non è (ancora) noto
+# Ripiego del nome del DISPOSITIVO, cioe' dell'AUTO - non dell'integrazione. Di norma
+# arriva il nome vero dal backend (Omoda 9, Jaecoo 7...) e questo non si vede mai. Resta
+# il nome di un'auto di proposito: l'integrazione si chiama "Chery Connect" (manifest), il
+# dispositivo e' la macchina. Chiamare "Chery Connect" anche la vettura farebbe comparire
+# un'auto col nome del software.
 DEFAULT_VEHICLE_NAME = "Omoda 9 / Jaecoo"
 
 # ── Capability per-veicolo (dalla stessa risposta `queryList` dell'identità) ──────────────
@@ -349,6 +354,25 @@ MACRO_PRESET_S = 15 * 60 + 60
 # manifesta (durata dichiarata 15 = costante). Sistemarlo vuol dire derivare il timer dalla
 # durata effettivamente spedita, che oggi `switch.py` non conosce — va fatto, ma non di corsa
 # in una release che tocca già il corpo dei comandi comfort.
+
+# How long the rear window heater can still be on after the car last reported it on.
+# `rWinHeatingState` is NOT telemetry: the car only states it inside the confirmation of a
+# command that touches the rear window (`1135` for the rear defrost, `110B` for the "Heat
+# everything" preset; the `110C` confirmation does not carry it). Measured on the Omoda 9
+# bridge capture of 17-21/06/2026: 1,463 spontaneous `5A02` messages, none of them carries the
+# field — not even the 36-field snapshot the car pushes when it is switched off, which does
+# carry the windscreen, steering wheel and seat heaters. So when the car's own timer switches
+# the heater off, nobody tells us, and the switch used to stay on until the next rear-window
+# command: measured in Home Assistant on 21-23/10/2026, 48.6 hours "on" after a "Heat
+# everything" whose other heaters the car had reported off within 15 minutes.
+# On the Omoda 9 every way we have of switching it on sends a 15-minute duration
+# (`times`/`duration` "15"; the presets' duration can be adapted per vehicle, see
+# `_adatta_durata` in core/commands.py). That the car stops the heater at the end of it is
+# inferred, not observed: the switch-off is exactly what is never reported. Past that, plus
+# the same 60 s margin as `MACRO_PRESET_S`, the switch shows off. A newer confirmation
+# restarts the count.
+REAR_DEFROST_MAX_S = 15 * 60 + 60
+
 # Quanto si aspetta, dopo aver spedito una macro, prima di credere alla TELEMETRIA SPONTANEA
 # che dice «preset spento». Serve perché fra il nostro invio e l'esecuzione l'auto continua a
 # pubblicare lo stato di PRIMA: un 5A02 già in volo arriva con il clima ancora a zero, e senza
@@ -413,19 +437,35 @@ OPT_MAX_S = 15 * 60
 # canale di push) e appiccicarle i nostri avvisi direbbe una cosa falsa su un'azione altrui.
 NOTE_COMANDO_S = 120
 
-# Coda comandi: l'auto esegue UN comando alla volta (A00082 = "veicolo occupato"), quindi i
-# comandi si serializzano. Un secondo comando (o un doppio-tap) ASPETTA il suo turno invece di
-# essere rifiutato. Dopo un invio si lascia respirare l'auto fino alla sua conferma MQTT o al
-# più COMMAND_SETTLE_S, così il prossimo della coda non parte mentre è ancora occupata.
-# COMMAND_QUEUE_WAIT limita l'attesa in coda: oltre, il comando fallisce con un messaggio chiaro.
+# Command queue: the car runs ONE command at a time (A00082 = "vehicle busy"), so commands are
+# serialised. A second command (or a double tap) WAITS for its turn instead of being refused.
+# After a send the car is given room until its MQTT confirmation, or at most COMMAND_SETTLE_S,
+# so the next command in the queue does not go out while it is still busy.
+# COMMAND_QUEUE_WAIT caps the wait in the queue: past it, the command fails with a clear message.
 #
-# ⚠️ Il valore va tenuto SOPRA il tempo di conferma reale, altrimenti la pausa scade prima che
-# l'auto abbia risposto e il comando successivo parte comunque a vettura occupata. Misurato sui
-# push di conferma di luglio 2026: 11-14s quando la macro comfort riesce, 8-10s quando riesce a
-# metà — 5s (il vecchio valore) scadeva SEMPRE prima. Serve anche il taglio dall'altro lato:
-# `_settle_after_command` ora aspetta la conferma VERA e non un messaggio qualsiasi (vedi lì).
+# ⚠️ The pause has to stay ABOVE the real confirmation time, or it runs out before the car has
+# answered and the next command goes out to a busy car anyway. Measured on the July 2026
+# confirmation pushes: 11-14 s when the comfort preset succeeds, 8-10 s when it half succeeds —
+# 5 s (the old value) ALWAYS ran out first. The other half of the fix: `_settle_after_command`
+# waits for a REAL confirmation, not for any message (see there).
 COMMAND_SETTLE_S = 15
-COMMAND_QUEUE_WAIT = 30
+# Commands whose confirmation is much slower than the rest, by command key. The rear window
+# heater: on 23/10/2026 three confirmations took 35, 36 and 37 s (the windscreen and the
+# steering wheel, sent in the same minute, 5-6 s and 2 s). With the common 15 s the next command
+# went out while the car was still busy: that morning "rear window off" then "on" ended in
+# A00082 for the second one. 45 s covers the measured spread with a margin.
+COMMAND_SETTLE_SLOW_S = {"defrost_lunotto": 45, "defrost_lunotto_off": 45}
+# Long enough for a command queued behind the slowest holder of the slot: a rear window command
+# (send + 45 s) plus its busy retries below. 30 s, the old value, was shorter than the rear
+# window pause alone, so the command behind it would have failed with "still busy" instead.
+COMMAND_QUEUE_WAIT = 150
+# A command the car refused as busy (A00082) is read as NOT executed (core/routing.py already
+# lists A00082 as retryable), so retrying it should not run it twice. It is retried up to
+# COMMAND_BUSY_RETRIES more times, each one as soon as the car confirms whatever it was busy
+# with, or after COMMAND_BUSY_WAIT_S at most. Only the last refusal reaches the user as a
+# failure.
+COMMAND_BUSY_RETRIES = 2
+COMMAND_BUSY_WAIT_S = 20
 
 # Monitor diagnostico per lo SVILUPPATORE (vedi diag.py). Non è una funzione utente: non
 # ha interruttore nell'interfaccia. Si attiva creando il file bandierina qui sotto nella

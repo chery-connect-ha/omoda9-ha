@@ -144,7 +144,7 @@ def test_il_motivo_ripiega_sul_returncode_se_non_c_e_altro(core):
 
 def test_il_numero_non_finisce_nel_messaggio_di_esito(core, ctx, monkeypatch):
     """Quella frase non resta nel config flow: diventa lo stato di
-    `sensor.omoda9_stato_sessione` (→ recorder, backup) ed è esportata verbatim nella
+    `sensor.chery_connect_session_status` (→ recorder, backup) ed è esportata verbatim nella
     diagnostica, fuori da ogni deny-list. Va mascherata alla sorgente."""
     session = core["session"]
     ctx.phone, ctx.area_code = FX.PHONE, FX.AREA_CODE

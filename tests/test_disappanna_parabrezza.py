@@ -70,7 +70,7 @@ def test_nessun_pulsante_doppione(core):
 def test_il_campo_di_stato_non_e_promosso_a_entita_ricca(core):
     """`fWinHeatingState` deve restare anche binary_sensor.
 
-    Promuoverlo farebbe sparire `binary_sensor.omoda9_riscaldamento_parabrezza`, che esiste
+    Promuoverlo farebbe sparire `binary_sensor.chery_connect_windshield_heating`, che esiste
     dal giugno 2026: l'entità cambierebbe dominio, lo storico si spezzerebbe e nel registro
     resterebbe un orfano `unavailable` — cioè si romperebbe proprio l'invariante di salute
     («0 unavailable») per far quadrare quello del conteggio. Meglio un'entità in più."""
@@ -81,13 +81,13 @@ def test_il_campo_di_stato_non_e_promosso_a_entita_ricca(core):
 
 async def test_lo_switch_esiste_e_segue_lauto(hass, integrazione_avviata):
     """L'entità c'è, e il suo stato viene dal campo dell'auto, non da un'invenzione locale."""
-    stato = hass.states.get("switch.omoda9_disappannamento_parabrezza")
+    stato = hass.states.get("switch.chery_connect_windshield_defog")
     assert stato is not None, "lo switch del disappannamento non è stato creato"
 
 
 async def test_lo_switch_non_ruba_il_binary_sensor(hass, integrazione_avviata):
     """Le due entità devono convivere: quella nuova non sostituisce quella che c'era."""
-    assert hass.states.get("binary_sensor.omoda9_riscaldamento_parabrezza") is not None
-    assert hass.states.get("switch.omoda9_disappannamento_parabrezza") is not None
+    assert hass.states.get("binary_sensor.chery_connect_windshield_heating") is not None
+    assert hass.states.get("switch.chery_connect_windshield_defog") is not None
     # e lo sbrinamento elettrico, che è un'altra funzione, resta al suo posto
-    assert hass.states.get("switch.omoda9_sbrinamento_parabrezza") is not None
+    assert hass.states.get("switch.chery_connect_windshield_defrost") is not None

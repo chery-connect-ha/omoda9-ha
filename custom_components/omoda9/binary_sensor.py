@@ -72,8 +72,10 @@ class _Omoda9RestoreBinary(Omoda9Entity, BinarySensorEntity, RestoreEntity):
     Le sottoclassi forniscono `_live_is_on()` (stato corrente dal coordinator, o
     None se assente); finché il live è None si usa l'ultimo valore ripristinato."""
 
-    def __init__(self, coord, name: str, unique_suffix: str) -> None:
-        super().__init__(coord, name, unique_suffix, entity_id_format=ENTITY_ID_FORMAT)
+    def __init__(self, coord, name: str, unique_suffix: str,
+                 *, translation_key: str | None = None) -> None:
+        super().__init__(coord, name, unique_suffix, entity_id_format=ENTITY_ID_FORMAT,
+                         translation_key=translation_key)
         self._restored: bool | None = None
 
     async def async_added_to_hass(self) -> None:
@@ -115,12 +117,12 @@ class Omoda9Online(_Omoda9RestoreBinary):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coord) -> None:
-        super().__init__(coord, "Omoda9 Connessione", "online")
-        # entity_id PINNED allo storico `omoda9_connessa` (dashboard/automazioni non si rompono);
-        # translation_key forzato a "connessa" per combaciare con la chiave in translations/*.json
-        # (altrimenti la base la deriverebbe da "Connessione" → "connessione", chiave inesistente).
-        self.entity_id = ENTITY_ID_FORMAT.format("omoda9_connessa")
-        self._attr_translation_key = "connessa"
+        # Questa entita' aveva gia', da sola, la toppa che ora e' il meccanismo: la chiave
+        # veniva forzata a mano perche' la base la derivava da "Connessione" e usciva
+        # "connessione", che in translations/*.json non esiste. Adesso la chiave si dichiara
+        # come per tutte le altre, e la tabella ENGLISH_KEYS la porta a "connection"
+        # insieme all'entity_id. Nessun caso speciale rimasto.
+        super().__init__(coord, "Omoda9 Connessione", "online", translation_key="connessa")
 
     def _live_is_on(self) -> bool | None:
         rt = self.coordinator.data.get("realtime") or {}

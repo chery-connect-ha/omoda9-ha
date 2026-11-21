@@ -29,7 +29,7 @@ from custom_components.omoda9 import coordinator as coord_mod
 from custom_components.omoda9 import switch as switch_mod
 from custom_components.omoda9.const import DOMAIN, MACRO_PRESET_S
 
-MACRO = "switch.omoda9_raffredda_tutto"
+MACRO = "switch.chery_connect_cool_everything"
 
 
 class _Msg:
@@ -164,7 +164,7 @@ async def test_attesa_annunciata_mentre_sveglia_lauto(hass, integrazione_avviata
     """Durante la sveglia l'utente deve vedere che sta succedendo qualcosa.
 
     Il silenzio di quei ~35 secondi è l'innesco del difetto qui sopra: l'utente ripreme
-    perché nulla si muove. Il testo finisce nello stato di `sensor.omoda9_esito_comando`,
+    perché nulla si muove. Il testo finisce nello stato di `sensor.chery_connect_command_result`,
     che Home Assistant tronca a 255 caratteri → deve starci con margine."""
     monkeypatch.setattr(switch_mod, "MACRO_WAKE_WAIT", 0.05)
     coord = _coordinator(hass, integrazione_avviata)
@@ -227,7 +227,7 @@ async def test_ripristino_riarma_la_scadenza(hass, config_entry, cloud, monkeypa
     finito = dt_util.utcnow() - timedelta(seconds=MACRO_PRESET_S + 60)       # già scaduto
     mock_restore_cache(hass, (
         State(MACRO, "on", last_changed=acceso_da, last_updated=acceso_da),
-        State("switch.omoda9_riscalda_tutto", "on", last_changed=finito, last_updated=finito),
+        State("switch.chery_connect_heat_everything", "on", last_changed=finito, last_updated=finito),
     ))
 
     await _avvia(hass, config_entry, monkeypatch)
@@ -236,7 +236,7 @@ async def test_ripristino_riarma_la_scadenza(hass, config_entry, cloud, monkeypa
     resto = _entita(hass, MACRO)._resto_scadenza()
     assert resto is not None and 60 < resto <= 120, (
         f"la scadenza va riarmata sul tempo RESIDUO, non da capo (resto={resto})")
-    assert hass.states.get("switch.omoda9_riscalda_tutto").state == "off", (
+    assert hass.states.get("switch.chery_connect_heat_everything").state == "off", (
         "preset finito mentre HA era spento: non si riprende acceso")
 
     await hass.config_entries.async_unload(config_entry.entry_id)
@@ -398,7 +398,7 @@ async def test_la_coda_si_libera_anche_se_il_task_viene_annullato(hass,
     ri-attivi mentre l'invio è in volo."""
     coord = _coordinator(hass, integrazione_avviata)
 
-    def _lento(key, params=None):
+    def _lento(key, params=None, busy_will_retry=False):
         time.sleep(2)
         return "inviato (test)"
 

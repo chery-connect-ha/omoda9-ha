@@ -16,6 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
+from .naming import ENGLISH_KEYS, ID_PREFIX
 from .const import DEFAULT_VEHICLE_NAME, DOMAIN, OPT_MAX_S
 from .coordinator import Omoda9Coordinator
 
@@ -123,6 +124,7 @@ class Omoda9Entity(CoordinatorEntity[Omoda9Coordinator]):
         *,
         object_id: str | None = None,
         entity_id_format: str | None = None,
+        translation_key: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         # `name` NON è più il friendly name (lo dà translation_key): lo teniamo solo per
@@ -131,8 +133,29 @@ class Omoda9Entity(CoordinatorEntity[Omoda9Coordinator]):
         self._raw_name = name
         self._attr_unique_id = f"{coordinator.vin}_{unique_suffix}"
         oid = object_id or slugify(name)          # es. "omoda9_batteria"
-        # translation_key = object_id senza il prefisso dominio → chiave in translations/*.json
-        self._attr_translation_key = oid[len(DOMAIN) + 1:] if oid.startswith(f"{DOMAIN}_") else oid
+        # La chiave di traduzione si DICHIARA. Fino a qui era derivata da `oid`, cioe' dallo
+        # stesso `name` italiano da cui si costruisce l'entity_id: chiave ed entity_id erano
+        # la stessa stringa scritta una volta. La conseguenza non era ovvia e ci e' costata
+        # tre settimane di pianificazione: portare le chiavi in inglese sembrava richiedere
+        # di muovere ogni entity_id, quindi sembrava potersi fare SOLO nella release del
+        # cambio di dominio - l'unico momento in cui gli entity_id si rigenerano comunque.
+        # Non e' un vincolo di Home Assistant, era questa riga. Dichiarandola, le due cose
+        # si separano: la chiave puo' diventare inglese senza che nessun entity_id si
+        # muova, e chi e' installato non vede cambiare niente tranne il nome mostrato.
+        # Il ripiego resta la derivazione di prima, cosi' le entita' non ancora convertite
+        # continuano a funzionare identiche e la conversione si fa una piattaforma per volta.
+        derivata = translation_key or (
+            oid[len(DOMAIN) + 1:] if oid.startswith(f"{DOMAIN}_") else oid)
+        # Passaggio all'inglese, per chiave e per entity_id insieme. Una chiave presente in
+        # ENGLISH_KEYS vince su tutto, incluso un object_id scritto a mano: e' l'unico modo
+        # perche' la conversione sia completa invece che a macchie. Chi NON e' in tabella
+        # resta esattamente com'era - una entita' nuova aggiunta domani funziona senza
+        # sapere che questa tabella esiste, e poi ci entra quando la si traduce.
+        inglese = ENGLISH_KEYS.get(derivata)
+        if inglese is not None:
+            derivata = inglese
+            oid = f"{ID_PREFIX}_{inglese}"
+        self._attr_translation_key = derivata
         # entity_id ESPLICITO = continuità col bridge (default = slugify(name)).
         if entity_id_format:
             self.entity_id = entity_id_format.format(oid)

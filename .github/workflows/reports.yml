@@ -1,0 +1,40 @@
+name: Vehicle reports
+
+# Un rapporto e' un file committato in un repository pubblico, quindi entra nella storia di
+# git per sempre. Il controllo che protegge chi lo ha caricato deve girare PRIMA del merge,
+# ogni volta: una diagnostica sfuggita non redatta non si ritira cancellando il file.
+
+on:
+  pull_request:
+    paths: ["reports/**", "tools/validate_report.py", "tools/build_models_table.py"]
+  push:
+    branches: [master]
+    paths: ["reports/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate the reports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Every report is plausible, and carries nothing personal
+        run: python tools/validate_report.py
+      - name: The generated table matches the reports
+        # Rigenerata e confrontata invece di rigenerata e committata: un workflow che
+        # scrive sul repository e' una cosa in piu' che puo' rompersi, e qui il costo di
+        # dimenticarsene e' una riga di istruzioni nel diff, non un dato perso.
+        run: |
+          python tools/build_models_table.py
+          if ! git diff --quiet -- docs/tested-models.md; then
+            echo "::error::docs/tested-models.md is out of date. Run tools/build_models_table.py and commit the result."
+            git --no-pager diff -- docs/tested-models.md
+            exit 1
+          fi
+          echo "the table matches the reports"

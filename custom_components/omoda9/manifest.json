@@ -1,19 +1,26 @@
 {
   "domain": "omoda9",
-  "name": "Omoda 9 / Jaecoo",
-  "codeowners": ["@Caslinovich"],
+  "name": "Chery Connect",
+  "after_dependencies": [
+    "recorder"
+  ],
+  "codeowners": [
+    "@Caslinovich",
+    "@drake69",
+    "@JackRonan"
+  ],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/chery-connect-ha/omoda9-ha",
   "integration_type": "device",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/chery-connect-ha/omoda9-ha/issues",
   "requirements": [
     "paho-mqtt>=2.0",
-    "requests>=2.28",
     "pycryptodome>=3.17",
-    "numpy>=1.21",
-    "pillow>=9.0"
+    "numpy>=1.21"
   ],
   "version": "1.14.0"
 }

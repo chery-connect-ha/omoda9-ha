@@ -25,18 +25,18 @@ from custom_components.omoda9.const import (
 # Ripartizione attesa, verificata dal vivo (v1.5.24, 2026-07-06 → 105 entità, 0 unavailable).
 # Modificare questi numeri è una DECISIONE: va fatto insieme al changelog e alle note.
 #
-# 2026-08-10 → 106: aggiunto `switch.omoda9_disappannamento_parabrezza` (disappannamento del
+# 2026-08-10 → 106: aggiunto `switch.chery_connect_windshield_defog` (disappannamento del
 # parabrezza dal clima, campo `fWinHeatingState`, voce di permesso 2045). È una entità IN PIÙ e
 # non una sostituzione: il campo NON è stato promosso a "ricco", proprio per non far sparire
-# `binary_sensor.omoda9_riscaldamento_parabrezza` lasciando un orfano `unavailable`.
+# `binary_sensor.chery_connect_windshield_heating` lasciando un orfano `unavailable`.
 #
-# 2026-08-10 → 107: aggiunto `sensor.omoda9_partenza_programmata`, lettura del piano di partenza
+# 2026-08-10 → 107: aggiunto `sensor.chery_connect_scheduled_departure`, lettura del piano di partenza
 # che l'auto ci manda già a ogni sonda (`appointmentTravelSetVOS`) e che finora buttavamo via.
 # Nessuna chiamata nuova verso il cloud: solo un campo che smettevamo di ignorare.
 ATTESO = {
     "binary_sensor": 27,
     "sensor": 41,
-    "button": 14,
+    "button": 15,
     "switch": 18,
     "cover": 3,
     "number": 2,
@@ -67,7 +67,11 @@ ATTESO = {
 #    fatta durante una carica. Se `chargingPower` arrivasse anche su una PHEV quella lista ha
 #    una voce di troppo; se non arrivasse, i due contatori vanno nel ramo BEV. Serve UN frame
 #    di sola lettura da un'auto attaccata alla spina.
-TOTALE_ATTESO = 110
+#
+# 110 -> 111 on 2026-10-02: `button.chery_connect_vent_sunroof` ("Vent sunroof", command
+# `tetto_ventila`, skylightControl controlType 2). A deliberate extra button, the sunroof
+# counterpart of `button.chery_connect_vent_windows`; the sunroof cover is unchanged.
+TOTALE_ATTESO = 111
 
 
 def test_totale_dichiarato_coerente():
@@ -119,8 +123,8 @@ def test_pulsanti_dal_catalogo_comandi(core):
     assert not orfani, f"comandi 'ricchi' che non esistono nel catalogo: {orfani}"
 
     pulsanti = catalogo - COMMANDS_AS_RICH_ENTITY
-    assert len(pulsanti) == 9, (
-        f"i pulsanti generati dal catalogo sono {len(pulsanti)}, attesi 9. "
+    assert len(pulsanti) == 10, (
+        f"i pulsanti generati dal catalogo sono {len(pulsanti)}, attesi 10. "
         f"Se hai aggiunto un comando, valuta se va in COMMANDS_AS_RICH_ENTITY "
         f"(lock/switch/cover) o se è davvero un pulsante nuovo. Attuali: {sorted(pulsanti)}"
     )
@@ -145,7 +149,7 @@ async def test_conteggio_entita_reale(hass, integrazione_avviata):
     conteggio: dict[str, int] = {}
     for entity_id in hass.states.async_entity_ids():
         dominio, _, oggetto = entity_id.partition(".")
-        if oggetto.startswith("omoda9_"):
+        if oggetto.startswith("chery_connect_"):
             conteggio[dominio] = conteggio.get(dominio, 0) + 1
 
     differenze = {p: (conteggio.get(p, 0), ATTESO[p])

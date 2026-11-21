@@ -27,9 +27,9 @@ from custom_components.omoda9 import coordinator as coord_mod
 from custom_components.omoda9 import entity as entity_mod
 from custom_components.omoda9.const import DOMAIN
 
-SEDILE = "switch.omoda9_ventilazione_sedile_guida"
-SERRATURA = "lock.omoda9_serratura"
-RIC_PROG = "switch.omoda9_ricarica_programmata"
+SEDILE = "switch.chery_connect_driver_seat_ventilation"
+SERRATURA = "lock.chery_connect_lock"
+RIC_PROG = "switch.chery_connect_scheduled_charging"
 
 
 class _Msg:
@@ -172,17 +172,17 @@ async def test_lantifurto_si_rilegge_dopo_il_comando(hass, integrazione_avviata,
     monkeypatch.setattr(coord_mod.Omoda9Coordinator, "async_query_theft", _finta_lettura)
 
     await hass.services.async_call("switch", "turn_on",
-                                   {"entity_id": "switch.omoda9_antifurto"}, blocking=True)
+                                   {"entity_id": "switch.chery_connect_alarm"}, blocking=True)
     await hass.async_block_till_done()
 
     assert len(letture) >= 1, "dopo il comando va richiesto lo stato reale"
     entita = next(e for e in hass.data["entity_components"]["switch"].entities
-                  if e.entity_id == "switch.omoda9_antifurto")
+                  if e.entity_id == "switch.chery_connect_alarm")
     assert entita._real is False, "il ripiego va aggiornato con ciò che dice il backend"
     # ...ma NON deve prendere il posto di ciò che l'utente ha appena chiesto: il backend
     # potrebbe rispondere prima che l'auto abbia eseguito (la conferma vera arriva fra 8 e 38
     # secondi) e l'interruttore tornerebbe indietro un istante dopo la pressione.
-    assert hass.states.get("switch.omoda9_antifurto").state == "on"
+    assert hass.states.get("switch.chery_connect_alarm").state == "on"
 
 
 async def test_la_scheda_del_clima_non_torna_off_su_una_conferma_vuota(hass,
@@ -197,16 +197,16 @@ async def test_la_scheda_del_clima_non_torna_off_su_una_conferma_vuota(hass,
     await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))
 
     await hass.services.async_call("climate", "turn_on",
-                                   {"entity_id": "climate.omoda9_clima"}, blocking=True)
-    assert hass.states.get("climate.omoda9_clima").state == "heat_cool"
+                                   {"entity_id": "climate.chery_connect_climate"}, blocking=True)
+    assert hass.states.get("climate.chery_connect_climate").state == "heat_cool"
 
     await _consegna(hass, coord, FX.envelope("1104", {
         "result": "3", "resultTime": "1721390002000", "seq": "X-1"}))
-    assert hass.states.get("climate.omoda9_clima").state == "heat_cool", (
+    assert hass.states.get("climate.chery_connect_climate").state == "heat_cool", (
         "una conferma senza il campo del clima non dice niente sul clima")
 
     await _consegna(hass, coord, FX.telemetry_5a02(frontHVACState="0"))
-    assert hass.states.get("climate.omoda9_clima").state == "off", (
+    assert hass.states.get("climate.chery_connect_climate").state == "off", (
         "...ma quando il campo arriva davvero, vince l'auto")
 
 
@@ -215,20 +215,20 @@ async def test_il_baule_non_si_riapre_su_un_push_di_posizione(hass, integrazione
     """Stessa regola sulle tre aperture motorizzate (baule, finestrini, tetto)."""
     coord = _coordinator(hass, integrazione_avviata)
     await _consegna(hass, coord, FX.telemetry_5a02(trunkDoor="1"))      # baule aperto
-    assert hass.states.get("cover.omoda9_baule").state == "open"
+    assert hass.states.get("cover.chery_connect_trunk").state == "open"
 
     await hass.services.async_call("cover", "close_cover",
-                                   {"entity_id": "cover.omoda9_baule"}, blocking=True)
-    assert hass.states.get("cover.omoda9_baule").state == "closed"
+                                   {"entity_id": "cover.chery_connect_trunk"}, blocking=True)
+    assert hass.states.get("cover.chery_connect_trunk").state == "closed"
 
     await _consegna(hass, coord, FX.position_1301())
-    assert hass.states.get("cover.omoda9_baule").state == "closed", (
+    assert hass.states.get("cover.chery_connect_trunk").state == "closed", (
         "un push di posizione non dice niente sul baule")
 
     # ...e la metà complementare, senza la quale il test passerebbe anche se la cover non
     # dichiarasse affatto i propri campi: quando il campo arriva davvero, vince l'auto.
     await _consegna(hass, coord, FX.telemetry_5a02(trunkDoor="1"))
-    assert hass.states.get("cover.omoda9_baule").state == "open", (
+    assert hass.states.get("cover.chery_connect_trunk").state == "open", (
         "il campo del baule è arrivato: l'ottimismo deve cedere")
 
 

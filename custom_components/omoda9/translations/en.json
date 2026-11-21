@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Omoda 9 / Jaecoo",
+        "title": "Chery Connect",
         "description": "Choose how to sign in to your Omoda/Jaecoo account. Use the phone option if your account is registered with a phone number instead of an email.",
         "menu_options": {
           "login_email": "Sign in with email",
@@ -77,7 +77,7 @@
         }
       },
       "reauth_confirm": {
-        "title": "Re-authenticate Omoda 9 / Jaecoo",
+        "title": "Re-authenticate Chery Connect",
         "description": "The session has expired: until you re-authenticate, the integration cannot talk to the car and commands and sensors stay frozen.\n\n**No code has been sent automatically.** Choose “Send me a new code” to have a fresh one sent to {email}.{reason}",
         "menu_options": {
           "send_code": "Send me a new code",
@@ -184,6 +184,10 @@
           "entry_not_found": "Integration not found — reload Home Assistant and try again."
         }
       }
+    },
+    "entity_ids_renamed": {
+      "title": "Omoda 9: {count} entities were renamed",
+      "description": "The entity ids of this integration moved from Italian to English: `sensor.omoda9_batteria` is now `sensor.chery_connect_battery`, and {count} entities on this vehicle were renamed.\n\n**Your history came with them.** Graphs, long-term statistics and the energy dashboard followed the rename automatically. There is nothing to reinstall and nothing to log in to again.\n\n**What did not follow: names you typed yourself.** Automations, scripts, template sensors and dashboard cards that refer to an entity by name still point at the old one. Home Assistant shows those as unknown entities.\n\nWhere to look: Settings, Automations and scenes, then any automation flagged with an unknown entity. The full old-to-new list is here: {url}\n\nDismiss this notice once you have been through them."
     }
   },
   "options": {
@@ -201,354 +205,366 @@
   },
   "entity": {
     "binary_sensor": {
-      "a_casa": {
+      "at_home": {
         "name": "At home"
       },
-      "alta_tensione_attiva": {
+      "high_voltage_active": {
         "name": "High voltage active"
       },
-      "auto_sveglia": {
+      "car_awake": {
         "name": "Car awake"
       },
-      "avviso_carburante_basso": {
+      "low_fuel_warning": {
         "name": "Low fuel warning"
       },
-      "avviso_gomma_ant_dx": {
+      "tire_warning_front_right": {
         "name": "Tire warning front right"
       },
-      "avviso_gomma_ant_sx": {
+      "tire_warning_front_left": {
         "name": "Tire warning front left"
       },
-      "avviso_gomma_post_dx": {
+      "tire_warning_rear_right": {
         "name": "Tire warning rear right"
       },
-      "avviso_gomma_post_sx": {
+      "tire_warning_rear_left": {
         "name": "Tire warning rear left"
       },
-      "avviso_ricarica_necessaria": {
+      "charge_needed_warning": {
         "name": "Charge needed warning"
       },
-      "batteria_scarica": {
+      "low_battery": {
         "name": "Low battery"
       },
-      "cofano": {
+      "hood": {
         "name": "Hood"
       },
-      "connessa": {
+      "connection": {
         "name": "Connection"
       },
-      "finestrino_anteriore_dx": {
+      "front_right_window": {
         "name": "Front right window"
       },
-      "finestrino_anteriore_sx": {
+      "front_left_window": {
         "name": "Front left window"
       },
-      "finestrino_posteriore_dx": {
+      "rear_right_window": {
         "name": "Rear right window"
       },
-      "finestrino_posteriore_sx": {
+      "rear_left_window": {
         "name": "Rear left window"
       },
-      "motore": {
+      "engine": {
         "name": "Engine"
       },
-      "porta_anteriore_dx": {
+      "front_right_door": {
         "name": "Front right door"
       },
-      "porta_anteriore_sx": {
+      "front_left_door": {
         "name": "Front left door"
       },
-      "porta_posteriore_dx": {
+      "rear_right_door": {
         "name": "Rear right door"
       },
-      "porta_posteriore_sx": {
+      "rear_left_door": {
         "name": "Rear left door"
       },
-      "portellone_in_movimento": {
+      "tailgate_moving": {
         "name": "Tailgate moving"
       },
-      "purificazione_aria": {
+      "air_purification": {
         "name": "Air purification"
       },
-      "riscaldamento_parabrezza": {
+      "windshield_heating": {
         "name": "Windshield heating"
       },
-      "sessione": {
+      "session": {
         "name": "Session"
       },
-      "spina_ricarica": {
+      "charging_cable": {
         "name": "Charging cable"
       },
-      "tendina_tetto": {
+      "sunroof_blind": {
         "name": "Sunroof blind"
       }
     },
     "button": {
-      "aggiorna_posizione": {
+      "refresh_location": {
         "name": "Refresh location"
       },
-      "aggiorna_stato_completo": {
+      "refresh_full_status": {
         "name": "Refresh full status"
       },
-      "antifurto_off": {
+      "alarm_off": {
         "name": "Alarm off"
       },
-      "antifurto_on": {
+      "alarm_on": {
         "name": "Alarm on"
       },
-      "clima_raffredda_off": {
+      "cool_everything_off": {
         "name": "Cool everything off"
       },
-      "clima_raffredda_on": {
+      "cool_everything": {
         "name": "Cool everything"
       },
-      "clima_riscalda_off": {
+      "heat_everything_off": {
         "name": "Heat everything off"
       },
-      "clima_riscalda_on": {
+      "heat_everything": {
         "name": "Heat everything"
       },
-      "conferma_otp": {
+      "confirm_otp": {
         "name": "Confirm OTP"
       },
-      "finestrini_ventila": {
+      "vent_windows": {
         "name": "Vent windows"
       },
-      "localizza": {
+      "vent_sunroof": {
+        "name": "Vent sunroof"
+      },
+      "locate_car_gps": {
         "name": "Locate car (GPS)"
       },
-      "richiedi_codice_otp": {
+      "request_otp_code": {
         "name": "Request OTP code"
       },
-      "sveglia_auto": {
+      "wake_car": {
         "name": "Wake car"
       },
-      "trova_auto": {
+      "find_car_flash_lights": {
         "name": "Find car (flash lights)"
       }
     },
     "climate": {
-      "clima": {
+      "climate": {
         "name": "Climate"
       }
     },
     "cover": {
-      "baule": {
+      "trunk": {
         "name": "Trunk"
       },
-      "finestrini": {
+      "windows": {
         "name": "Windows"
       },
-      "tetto": {
+      "sunroof": {
         "name": "Sunroof"
       }
     },
     "device_tracker": {
-      "posizione": {
+      "location": {
         "name": "Location"
       }
     },
     "lock": {
-      "serratura": {
+      "lock": {
         "name": "Lock"
       }
     },
     "number": {
-      "durata_clima": {
+      "climate_duration": {
         "name": "Climate duration"
       },
-      "ricarica_durata": {
+      "charge_duration": {
         "name": "Charge duration"
       }
     },
     "sensor": {
-      "autonomia_benzina": {
+      "fuel_range": {
         "name": "Fuel range"
       },
-      "autonomia_benzina_miglia": {
+      "petrol_range_miles": {
         "name": "Petrol range (miles)"
       },
-      "autonomia_elettrica": {
+      "electric_range": {
         "name": "Electric range"
       },
-      "autonomia_totale": {
+      "total_range": {
         "name": "Total range"
       },
-      "batteria": {
+      "battery": {
         "name": "Battery"
       },
-      "carburante_residuo": {
+      "fuel_remaining": {
         "name": "Fuel remaining"
       },
-      "chilometraggio_ibrido": {
+      "hybrid_mileage": {
         "name": "Hybrid mileage"
       },
-      "consumo_medio_carburante": {
+      "average_fuel_consumption": {
         "name": "Average fuel consumption"
       },
-      "consumo_medio_elettrico": {
+      "average_energy_consumption": {
         "name": "Average energy consumption"
       },
-      "corrente_batteria_hv": {
+      "hv_battery_current": {
         "name": "HV battery current"
       },
-      "dati_auto_aggiornati": {
+      "car_data_updated": {
         "name": "Car data updated"
       },
-      "energia_ricarica_a_casa": {
+      "home_charging_energy": {
         "name": "Home charging energy"
       },
-      "energia_ricarica_fuori_casa": {
+      "away_charging_energy": {
         "name": "Away charging energy"
       },
-      "esito_comando": {
+      "command_result": {
         "name": "Command result"
       },
-      "esito_sonda_posizione": {
+      "location_probe_result": {
         "name": "Location probe result"
       },
-      "esito_sveglia": {
+      "wake_up_result": {
         "name": "Wake-up result"
       },
-      "odometro": {
+      "odometer": {
         "name": "Odometer"
       },
-      "partenza_programmata": {
+      "scheduled_departure": {
         "name": "Scheduled departure"
       },
-      "presa_ricarica_rapida": {
+      "fast_charging_port": {
         "name": "Fast charging port"
       },
-      "pressione_gomma_ant_dx": {
+      "tire_pressure_front_right": {
         "name": "Tire pressure front right"
       },
-      "pressione_gomma_ant_sx": {
+      "tire_pressure_front_left": {
         "name": "Tire pressure front left"
       },
-      "pressione_gomma_post_dx": {
+      "tire_pressure_rear_right": {
         "name": "Tire pressure rear right"
       },
-      "pressione_gomma_post_sx": {
+      "tire_pressure_rear_left": {
         "name": "Tire pressure rear left"
       },
-      "ricarica_programmata_stato": {
+      "scheduled_charging_status": {
         "name": "Scheduled charging status"
       },
-      "riscaldamento_sedile_post_centrale": {
+      "rear_center_seat_heating": {
         "name": "Rear center seat heating"
       },
-      "stato_ricarica": {
+      "charging_status": {
         "name": "Charging status"
       },
-      "stato_sessione": {
+      "session_status": {
         "name": "Session status"
       },
-      "temperatura_gomma_ant_dx": {
+      "tire_temperature_front_right": {
         "name": "Tire temperature front right"
       },
-      "temperatura_gomma_ant_sx": {
+      "tire_temperature_front_left": {
         "name": "Tire temperature front left"
       },
-      "temperatura_gomma_post_dx": {
+      "tire_temperature_rear_right": {
         "name": "Tire temperature rear right"
       },
-      "temperatura_gomma_post_sx": {
+      "tire_temperature_rear_left": {
         "name": "Tire temperature rear left"
       },
-      "temperatura_impostata_dx": {
+      "set_temperature_right": {
         "name": "Set temperature right"
       },
-      "temperatura_impostata_sx": {
+      "set_temperature_left": {
         "name": "Set temperature left"
       },
-      "tempo_di_ricarica_residuo": {
+      "remaining_charge_time": {
         "name": "Remaining charge time"
       },
-      "tensione_batteria_hv": {
+      "hv_battery_voltage": {
         "name": "HV battery voltage"
       },
-      "tetto_stato_movimento": {
+      "sunroof_movement_state": {
         "name": "Sunroof movement state"
       },
-      "ultima_posizione": {
+      "last_position": {
         "name": "Last position"
       },
-      "ultima_sveglia": {
+      "last_wake_up": {
         "name": "Last wake-up"
       },
-      "ultimo_contatto": {
+      "last_seen": {
         "name": "Last seen"
       },
-      "velocita": {
+      "speed": {
         "name": "Speed"
       },
-      "ventilazione_sedile_post_centrale": {
+      "rear_center_seat_ventilation": {
         "name": "Rear center seat ventilation"
+      },
+      "charging_power": {
+        "name": "Charging power"
+      },
+      "wltp_range": {
+        "name": "WLTP range"
+      },
+      "electric_efficiency_mi_kwh": {
+        "name": "Electric efficiency (mi/kWh)"
       }
     },
     "switch": {
-      "aggiornamento_automatico": {
+      "automatic_updates": {
         "name": "Automatic updates"
       },
-      "antifurto": {
+      "alarm": {
         "name": "Alarm"
       },
-      "disappannamento_parabrezza": {
+      "windshield_defog": {
         "name": "Windshield defog"
       },
-      "raffredda_tutto": {
+      "cool_everything": {
         "name": "Cool everything"
       },
-      "ricarica": {
+      "charging": {
         "name": "Charging"
       },
-      "ricarica_programmata": {
+      "scheduled_charging": {
         "name": "Scheduled charging"
       },
-      "riscalda_tutto": {
+      "heat_everything": {
         "name": "Heat everything"
       },
-      "riscaldamento_lunotto": {
+      "rear_window_heating": {
         "name": "Rear window heating"
       },
-      "riscaldamento_sedile_guida": {
+      "driver_seat_heating": {
         "name": "Driver seat heating"
       },
-      "riscaldamento_sedile_passeggero": {
+      "passenger_seat_heating": {
         "name": "Passenger seat heating"
       },
-      "riscaldamento_sedile_post_dx": {
+      "rear_right_seat_heating": {
         "name": "Rear right seat heating"
       },
-      "riscaldamento_sedile_post_sx": {
+      "rear_left_seat_heating": {
         "name": "Rear left seat heating"
       },
-      "riscaldamento_volante": {
+      "steering_wheel_heating": {
         "name": "Steering wheel heating"
       },
-      "sbrinamento_parabrezza": {
+      "windshield_defrost": {
         "name": "Windshield defrost"
       },
-      "ventilazione_sedile_guida": {
+      "driver_seat_ventilation": {
         "name": "Driver seat ventilation"
       },
-      "ventilazione_sedile_passeggero": {
+      "passenger_seat_ventilation": {
         "name": "Passenger seat ventilation"
       },
-      "ventilazione_sedile_post_dx": {
+      "rear_right_seat_ventilation": {
         "name": "Rear right seat ventilation"
       },
-      "ventilazione_sedile_post_sx": {
+      "rear_left_seat_ventilation": {
         "name": "Rear left seat ventilation"
       }
     },
     "text": {
-      "codice_otp": {
+      "otp_code": {
         "name": "OTP code"
       }
     },
     "time": {
-      "ricarica_orario_di_inizio": {
+      "charge_start_time": {
         "name": "Charge start time"
       }
     }

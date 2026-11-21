@@ -1,0 +1,32 @@
+adopt_legacy_entities:
+  name: Adopt entities from the omoda_jaecoo installation
+  description: >-
+    Takes over the entities of an older omoda_jaecoo installation, with their
+    history. Home Assistant treats that line as a different integration, so
+    without this you get new empty entities while years of history stay attached
+    to something you are about to remove. Disable the old integration first.
+  fields:
+    dry_run:
+      name: Dry run
+      description: >-
+        Report what would happen and change nothing. Run this first.
+      default: true
+      selector:
+        boolean:
+
+recover_legacy_history:
+  name: Recover history from a removed omoda_jaecoo installation
+  description: >-
+    For when the old integration has already been deleted. Its entities are gone
+    from the registry, but the recorder still holds their data: this moves the
+    long-term statistics and the state history onto the entities of this
+    integration. Nothing needs to be reinstalled, and the old integration does
+    not need to exist.
+  fields:
+    dry_run:
+      name: Dry run
+      description: >-
+        Report what would happen and change nothing. Run this first.
+      default: true
+      selector:
+        boolean:

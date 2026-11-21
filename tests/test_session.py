@@ -122,6 +122,39 @@ def test_otp_e_email_non_passano_da_argv(core, ctx, monkeypatch):
     assert visto["env"].get("OMODA_OTP") == "123456"
 
 
+def test_otp_accettato_ma_gateway_ko_dice_perche(core, ctx, monkeypatch):
+    """Issue #62: tre persone in Romania, Spagna e Belgio, tre cause possibili, un solo
+    messaggio. Il codice OTP viene ACCETTATO (`RESULT: OK`) e cio' che fallisce e' il login
+    al gateway subito dopo. `check` sa gia' distinguere rete / scaduta / rinnovo fallito, ma
+    il motivo veniva scartato nell'assegnazione e l'utente leggeva sempre la stessa frase.
+
+    Questo test esiste perche' la riga scartata e' invisibile a occhio in una rilettura:
+    `ok, _detail, _status = check(ctx)` sembra corretta, e per due mesi nessuno l'ha notata."""
+    session = core["session"]
+
+    class Esito:
+        returncode = 0
+        stdout = "RESULT: OK"
+        stderr = ""
+
+    monkeypatch.setattr(session.subprocess, "run", lambda *a, **kw: Esito())
+
+    for dettaglio, stato in (
+        ("errore rete: ConnectionError", "NET_ERROR"),
+        ("Sessione scaduta \u274c \u2014 riautentica", "EXPIRED"),
+    ):
+        monkeypatch.setattr(session, "check", lambda _c, d=dettaglio, s=stato: (False, d, s))
+        ok, msg = session.confirm_otp(ctx, "123456")
+        assert ok is False
+        assert dettaglio in msg, f"il motivo di check non arriva all'utente: {msg!r}"
+        assert stato in msg, f"il marcatore di stato non arriva all'utente: {msg!r}"
+
+    # E quando va bene, va bene: nessuna regressione sul ramo felice.
+    monkeypatch.setattr(session, "check", lambda _c: (True, "Sessione attiva", "OK"))
+    ok, _msg = session.confirm_otp(ctx, "123456")
+    assert ok is True
+
+
 def test_codice_otp_vuoto_non_lancia_il_sottoprocesso(core, ctx, monkeypatch):
     session = core["session"]
 

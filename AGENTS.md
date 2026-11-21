@@ -68,6 +68,22 @@ people expect. Redact before you paste. Fixture data is synthetic.
 at runtime — not a new branch, class, or `if model == …`. If you find yourself
 adding one, you have found an architecture problem: say so instead of encoding it.
 
+**English is this project's working language. Italian is its second language.** Those
+are two different statements and both are meant.
+
+*Working language* means: everything that has to be **reviewed or maintained** is written
+in English. Code, comments, docstrings, commit messages, pull requests, issues and their
+titles, review comments, and the documents in this repository. The test is who the sentence
+is addressed to - a collaborator, or somebody driving the car.
+
+*Second language* means Italian is supported on purpose, not tolerated. `translations/it.json`
+is a first-class product language and is not to be "fixed"; the Italian half of `CHANGELOG.md`
+and the command-result text stay Italian for the same reason. And in conversation - an issue,
+a review thread - writing in Italian is fine: add an English version alongside it, or ask for
+one, so the queue stays readable to everyone. **Nobody is kept out of a discussion here for
+their English.** The rule exists so that a thread can be read by the whole group, not so that
+a maintainer has to argue in a second language to be taken seriously.
+
 **Write the code in English — identifiers, comments and docstrings.** The people
 maintaining this live in Italy, the UK, Denmark, Austria and Poland, and the prose around
 the project is already English: commit messages, pull requests, `CONTRIBUTING.md`, this
@@ -89,17 +105,26 @@ translating them would destroy exactly what makes them worth reading. So:
 **Two things this rule does not cover**, deliberately:
 
 - **entity translation keys and `entity_id` slugs** (`autonomia_benzina`,
-  `carburante_residuo`, …), of which **91 out of 107 are currently Italian**. Those are
-  user-visible identifiers: renaming one changes an `entity_id` and breaks somebody's
-  automations, dashboards and long-term statistics. Never as a side effect of tidying.
+  `carburante_residuo`, …). Measured on 27 September 2026: **110 translation keys, 0 of
+  them the slug of an English name.** Those are user-visible identifiers: renaming one
+  changes an `entity_id` and breaks somebody's automations, dashboards and long-term
+  statistics. Never as a side effect of tidying.
 
-  **They are not excluded forever, though — they are booked for the one moment when they
-  are free.** The HA domain rename (`omoda9` → `chery_connect`) changes every `entity_id`
-  in the integration anyway, and costs every user one reconfiguration. Renaming the slug at
-  the same time costs them nothing on top of a migration they are already doing; renaming it
-  at any other time is a second break for no reason. So the whole set moves **in that
-  release and in no other**, listed in its notes, with an old → new table so people can fix
-  their automations in one pass. See step 3 of #10;
+  **They move in one dedicated release, and the reason that release exists is this.** An
+  earlier version of this paragraph said they were booked for the HA domain rename, on the
+  grounds that the domain rename regenerates every `entity_id` anyway so the slug rename
+  would be free. That was measured and is wrong on both halves. Changing an integration's
+  domain means moving entities between integrations, which Home Assistant supports through
+  `async_update_entity_platform` - used by **0 of the 1,401 core integrations**. Renaming
+  `unique_id` and `entity_id` **within** an integration is the ordinary path, used by 40 and
+  11 of them. The slug rename does not need the domain rename; it was only ever waiting on
+  the translation key being derived from the same string as the `entity_id`, which no longer
+  happens.
+
+  So: the domain stays `omoda9`, the slugs move on their own, in a release that carries
+  nothing else and an old → new table in its notes so people fix their automations in one
+  pass. The change is automatic for whoever is installed - the integration rewrites its own
+  entity registry at first start - and what breaks is references written by hand. See #10;
 - **the user-facing Italian in `translations/it.json` and in command-result text**, which is
   a translation and is supposed to be in Italian.
 
