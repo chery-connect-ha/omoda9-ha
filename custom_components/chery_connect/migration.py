@@ -50,6 +50,10 @@ MIGRATED_FROM_KEY = "migrated_from_entry_id"
 SOURCE_DOMAIN_KEY = "migrated_from_domain"
 MIGRATION_DONE_KEY = "migration_done"
 
+# Prefix of the notice the old code (`handover.py` in 1.14) raises after handing a vehicle over;
+# followed by the entry id of this integration. Shared with that file: change both or neither.
+HANDOVER_DONE_ISSUE_PREFIX = "handover_done_"
+
 # Config entry keys that changed name between the lines, old -> new. Everything else is common
 # ancestry and keeps its name; keys that only one line has are carried along and ignored.
 _RENAMED_DATA_KEYS: dict[str, dict[str, str]] = {
@@ -218,7 +222,12 @@ async def async_complete_migration(hass: HomeAssistant, entry: ConfigEntry) -> b
         True when a move was carried out now, False when there was nothing to do.
     """
     source_id = entry.data.get(MIGRATED_FROM_KEY)
-    if not source_id or entry.data.get(MIGRATION_DONE_KEY):
+    if not source_id:
+        return False
+    if entry.data.get(MIGRATION_DONE_KEY):
+        # Handed over by the old code (1.14), which leaves a notice under its own domain saying what
+        # is left to do in the Marketplace. Being set up means it has been done: the notice goes.
+        ir.async_delete_issue(hass, entry.data.get(SOURCE_DOMAIN_KEY) or "", f"{HANDOVER_DONE_ISSUE_PREFIX}{entry.entry_id}")
         return False
     source_domain = entry.data.get(SOURCE_DOMAIN_KEY) or ""
     vin = entry.data.get(CONF_VIN) or ""
