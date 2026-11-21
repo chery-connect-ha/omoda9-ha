@@ -394,6 +394,9 @@
       "hybrid_mileage": {
         "name": "Chilometraggio ibrido"
       },
+      "electric_mileage": {
+        "name": "Chilometraggio elettrico"
+      },
       "average_fuel_consumption": {
         "name": "Consumo medio carburante"
       },

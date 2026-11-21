@@ -95,6 +95,7 @@ ENGLISH_KEYS: dict[str, str] = {
     "batteria":                       "battery",              # Battery
     "carburante_residuo":             "fuel_remaining",       # Fuel remaining
     "chilometraggio_ibrido":          "hybrid_mileage",       # Hybrid mileage
+    "chilometraggio_elettrico":       "electric_mileage",     # Electric mileage
     "consumo_medio_carburante":       "average_fuel_consumption",# Average fuel consumption
     "consumo_medio_elettrico":        "average_energy_consumption",# Average energy consumption
     "corrente_batteria_hv":           "hv_battery_current",   # HV battery current

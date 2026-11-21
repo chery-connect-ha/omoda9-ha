@@ -39,6 +39,7 @@ from .const import (
     CONF_TENANT_CODE, CONF_COUNTRY_ID,
     CONF_POLL_NORMAL, CONF_POLL_CHARGING, DEFAULT_POLL_NORMAL_MIN,
     DEFAULT_POLL_CHARGING_MIN, POLL_WAKE_WAIT, COMMAND_SETTLE_S, COMMAND_QUEUE_WAIT,
+    COMMAND_SETTLE_SLOW_S, COMMAND_BUSY_RETRIES, COMMAND_BUSY_WAIT_S,
     HV_ON_POLL_EVERY, HV_ON_POLL_MAX,
     CHARGING_POLL_EVERY, CHARGING_POLL_MAX, DRIVE_WATCH_EVERY,
     CONF_VEHICLE_NAME, DATA_VEHICLE_MODEL, DATA_VEHICLE_BRAND,
@@ -46,7 +47,7 @@ from .const import (
     DATA_CLIMATE_LO, DATA_CLIMATE_HI, DATA_AIR_DURATIONS,
     DATA_CAPS_PROBED, DATA_CAPS_PROBED_V2, capabilities_from_item,
     CLIMA_MIN_DEFAULT, CLIMA_MAX_DEFAULT, CLIMA_STEP_DEFAULT,
-    DEFAULTS, DIAG_SWITCH_FILE, NOTE_COMANDO_S,
+    DEFAULTS, DIAG_SWITCH_FILE, NOTE_COMANDO_S, FIELDS_AS_RICH_ENTITY,
 )
 from .timers import (
     TimerRegistry, GRUPPO_POLL,
@@ -366,6 +367,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # sveglia più efficace — e il secondo si prende un A00082.
         self._sveglia_task: asyncio.Task | None = None
         self._fields: dict[str, str] = {}
+        # When the car last said each field (`time.time()`). `fields` keeps the value but not
+        # its age, and for a field that only ever arrives inside command confirmations the age
+        # is the whole story: see `REAR_DEFROST_MAX_S` in const.py.
+        self._fields_at: dict[str, float] = {}
         self._state_lock = threading.Lock()  # [H2] serializza _fields/position tra thread paho/executor/loop
         self._last_msg_ts: float = 0.0
         # contatore dei push di CONFERMA comando (non della telemetria): è l'ancora di
@@ -382,7 +387,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         self._note_cmd_at: float | None = None
         self.position: dict | None = None
         self.otp_code: str = ""   # impostato dall'entità text «Codice OTP», letto da confirm
-        self.data = {"fields": {}, "msg_fields": {}, "position": None,
+        self.data = {"fields": {}, "fields_at": {}, "msg_fields": {}, "position": None,
                      "awake": False, "car_connected": False,
                      "session_ok": None, "session_detail": "",
                      # — sensori diagnostici (parità col bridge) —
@@ -618,6 +623,12 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         breve quando l'auto è attaccata alla colonnina (`poll_charging_min`), altrimenti
         `poll_normal_min`. Ogni ciclo SVEGLIA l'auto (vehicleLocation = posizione) e
         forza una lettura realtime (telemetria)."""
+        # Startup seed: always, even with the automatic update switch off. Read-only,
+        # no command to the car: populates realtime plus the merged fields above
+        # (doors/lock) after a restart, when a parked car sends no MQTT.
+        if not self._timers.is_armed(STARTUP_PROBE):
+            self._timers.arm(STARTUP_PROBE,
+                             lambda: async_call_later(self.hass, 15, self._startup_probe_cb))
         if not self.poll_enabled:
             _LOGGER.debug("[poll] disattivato dall'interruttore")
             return
@@ -626,14 +637,6 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             return
         if not self._timers.is_armed(POLL):
             self._schedule_next_poll()
-        # SEED iniziale: una lettura realtime ~15s dopo l'avvio (dato il tempo alla MQTT di
-        # connettersi). Se l'auto è in carica/marcia (HV acceso) il follow-up ravvicinato a 2 min
-        # parte SUBITO, senza attendere il primo poll periodico (fino a 30 min) — l'auto a riposo
-        # NON manda MQTT, quindi senza questo seed dopo un riavvio in carica i sensori restavano
-        # fermi finché non scattava il poll. Sola lettura: nessun comando all'auto. One-shot.
-        if not self._timers.is_armed(STARTUP_PROBE):
-            self._timers.arm(STARTUP_PROBE,
-                             lambda: async_call_later(self.hass, 15, self._startup_probe_cb))
 
     async def _startup_probe_cb(self, _now) -> None:
         self._timers.cancel(STARTUP_PROBE)
@@ -882,8 +885,10 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             for k, v in data.items():
                 if k != "time" and k not in CMD_CONFIRM_META:
                     self._fields[k] = str(v)
+                    self._fields_at[k] = now
                     msg_fields[k] = str(v)
             fields_copy = dict(self._fields)
+            fields_at_copy = dict(self._fields_at)
 
         # [diag] auto-discovery: chiavi 5A02 che l'auto manda ma che META non mappa. È il
         # canale per scoprire la telemetria ancora mancante (autonomia/TPMS). Fuori dal
@@ -901,7 +906,8 @@ class Omoda9Coordinator(DataUpdateCoordinator):
                         and k not in GEO_KEYS and not _is_unit_flag(k)):
                     self._diag.note_unknown_field(k, v, svc)
 
-        patch.update({"fields": fields_copy, "msg_fields": msg_fields, "awake": True})
+        patch.update({"fields": fields_copy, "fields_at": fields_at_copy,
+                      "msg_fields": msg_fields, "awake": True})
         if is_confirmation:
             patch["cmd_status"] = self._esito_con_note(self._format_cmd_result(data))
             # [H2] il contatore è l'ancora della pausa di coda → si tocca sotto lock, perché
@@ -1126,20 +1132,19 @@ class Omoda9Coordinator(DataUpdateCoordinator):
     # in `repairs.py`/`config_flow.py`), perché quello vive in memoria e sopravviverebbe.
 
     # ───────────────── coda comandi (l'auto ne esegue uno alla volta) ─────────────────
-    async def _settle_after_command(self) -> None:
-        """Pausa dopo un comando, prima che parta il prossimo in coda: aspetta il push di
-        CONFERMA dell'auto oppure COMMAND_SETTLE_S, quale che arrivi prima. Serve a non
-        ricolpire l'auto mentre è ancora occupata (A00082).
+    async def _settle_after_command(self, max_s: float | None = None) -> None:
+        """Pause after a command, before the next one in the queue goes out: waits for the
+        car's CONFIRMATION push or `max_s` (default COMMAND_SETTLE_S), whichever comes first.
+        It keeps us from hitting the car again while it is still busy (A00082).
 
-        ⚠️ L'ancora è `_confirm_n`, NON `last_seen`. `last_seen` avanza a OGNI messaggio, e
-        un'auto sveglia manda telemetria 5A02 ogni pochi secondi: la pausa usciva quindi al
-        primo mezzo secondo — proprio nel caso in cui serviva, cioè con la vettura desta e un
-        comando appena partito. Risultato misurato in campo (luglio 2026): la coda non
-        proteggeva da due pressioni ravvicinate e il secondo comando tornava A00082 «auto
-        occupata». Contando solo le conferme la pausa dura finché l'auto ha davvero
-        risposto."""
+        ⚠️ The anchor is `_confirm_n`, NOT `last_seen`. `last_seen` moves on EVERY message,
+        and an awake car sends 5A02 telemetry every few seconds: the pause used to end within
+        half a second — exactly when it was needed, with the car awake and a command just
+        sent. Measured in the field (July 2026): the queue did not protect two close taps and
+        the second command came back A00082 "car busy". Counting confirmations only, the
+        pause lasts until the car has really answered."""
         anchor = self._confirm_n
-        deadline = time.monotonic() + COMMAND_SETTLE_S
+        deadline = time.monotonic() + (COMMAND_SETTLE_S if max_s is None else max_s)
         while time.monotonic() < deadline:
             await asyncio.sleep(0.5)
             if self._confirm_n != anchor:
@@ -1218,7 +1223,7 @@ class Omoda9Coordinator(DataUpdateCoordinator):
         # l'auto, mentre Home Assistant lo considera annullato.
         consegnato = False
         try:
-            res = await self.hass.async_add_executor_job(self._send_command, key, params)
+            res = await self._send_retrying_busy(key, params)
             consegnato = True
         except Exception as err:  # noqa: BLE001 — instrada il rimedio, poi RILANCIA
             if self._diag is not None:
@@ -1247,22 +1252,51 @@ class Omoda9Coordinator(DataUpdateCoordinator):
 
         async def _hold_then_release() -> None:
             try:
-                await self._settle_after_command()
+                await self._settle_after_command(COMMAND_SETTLE_SLOW_S.get(key))
             finally:
                 self._cmd_gate.release()
 
         self.hass.async_create_background_task(_hold_then_release(), f"{DOMAIN}_cmd_settle")
         return res
 
-    def _send_command(self, key: str, params: dict | None = None) -> str:
+    async def _send_retrying_busy(self, key: str, params: dict | None) -> str:
+        """Send `key`, and send it again if the car refused it as busy (A00082).
+
+        Runs while holding the queue slot, so a retry keeps its place: nothing queued behind
+        it overtakes it. Each retry waits for the confirmation of whatever kept the car busy
+        (that is when the car is free again), or COMMAND_BUSY_WAIT_S at most. Any other
+        refusal, and the last busy one, propagate unchanged."""
+        retries = 0
+        while True:
+            last_try = retries >= COMMAND_BUSY_RETRIES
+            try:
+                return await self.hass.async_add_executor_job(
+                    self._send_command, key, params, not last_try)
+            except Exception as err:  # noqa: BLE001 — anything but "busy" goes straight up
+                if last_try or not getattr(err, "retryable", False):
+                    raise
+                retries += 1
+                _LOGGER.info("[cmd] %s: car busy, retry %d of %d once it is free",
+                             key, retries, COMMAND_BUSY_RETRIES)
+                await self._settle_after_command(COMMAND_BUSY_WAIT_S)
+
+    def _send_command(self, key: str, params: dict | None = None,
+                      busy_will_retry: bool = False) -> str:
         from .core import commands as CMD
         msgs: list[str] = []
         note: list[str] = []
 
         def emit(m):
-            msgs.append(str(m))
+            m = str(m)
+            # A busy refusal that is going to be retried is not the outcome yet. Published as
+            # it is, it reads as a failure ("HTTP 200 A00082 …") and the "command failed"
+            # blueprint pushes it to the phone, seconds before the retry succeeds.
+            if busy_will_retry and any(code in m for code in CMD.RETRYABLE_CODES):
+                m = ("Auto occupata con un altro comando: riprovo appena si libera ⏳ · "
+                     "Car busy with another command: retrying as soon as it is free")
+            msgs.append(m)
             _LOGGER.info("[cmd] %s", m)
-            self._update({"cmd_status": str(m)[:STATO_MAX]})
+            self._update({"cmd_status": m[:STATO_MAX]})
 
         def avvisa(m):
             """Avviso che l'utente deve poter LEGGERE, non solo un passaggio.
@@ -1544,6 +1578,18 @@ class Omoda9Coordinator(DataUpdateCoordinator):
             elif impronta != self._impronta_dati:
                 patch["car_data_ts"] = dt_util.utcnow()
             self._impronta_dati = impronta
+            # Merge the physical state carried by the realtime channel
+            # (doors/windows/lock/trunk/sunroof/climate/seats/engine/plug) into
+            # `fields`, using the same 0/1 encoding as the 5A02 pushes. Those
+            # entities read from `fields`, so without this a parked car — which
+            # sends no MQTT — leaves them `unknown`. Relates to #54.
+            state_keys = set(META) | FIELDS_AS_RICH_ENTITY
+            rt_fields = {k: str(v) for k, v in data.items()
+                         if k in state_keys and v is not None and str(v).strip() not in ("", "None")}
+            if rt_fields:
+                with self._state_lock:
+                    self._fields.update(rt_fields)
+                    patch["fields"] = dict(self._fields)
         if isinstance(data, dict) and "lat" in data and "lon" in data:
             geo = {k: data[k] for k in GEO_KEYS if k in data}
             with self._state_lock:

@@ -350,6 +350,9 @@
       "hybrid_mileage": {
         "name": "Hybride kilometerstand"
       },
+      "electric_mileage": {
+        "name": "Elektrische kilometerstand"
+      },
       "average_fuel_consumption": {
         "name": "Gemiddeld brandstofverbruik"
       },

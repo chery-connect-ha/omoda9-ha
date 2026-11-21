@@ -394,6 +394,9 @@
       "hybrid_mileage": {
         "name": "Hybrid mileage"
       },
+      "electric_mileage": {
+        "name": "Electric mileage"
+      },
       "average_fuel_consumption": {
         "name": "Average fuel consumption"
       },
