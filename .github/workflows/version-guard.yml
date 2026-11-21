@@ -43,7 +43,9 @@ jobs:
           MANIFEST=custom_components/chery_connect/manifest.json
 
           new=$(jq -r .version "$MANIFEST")
-          base=$(git show "$BASE:$MANIFEST" | jq -r .version)
+          # Before 2.0 the package lived under the omoda9 domain: a base from then has the manifest there.
+          base=$(git show "$BASE:$MANIFEST" 2>/dev/null || git show "$BASE:custom_components/omoda9/manifest.json")
+          base=$(printf '%s' "$base" | jq -r .version)
 
           if [ "$new" = "$base" ]; then
             echo "Version unchanged ($base): nothing to check."
