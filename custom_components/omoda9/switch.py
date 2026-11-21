@@ -31,7 +31,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.util import dt as dt_util
 
 from .const import (CAMPO_CLIMA, DOMAIN, MACRO_GRAZIA_S, MACRO_WAKE_WAIT,
-                    MACRO_WAKE_WAIT_AWAKE, MACRO_PRESET_S)
+                    MACRO_WAKE_WAIT_AWAKE, MACRO_PRESET_S, REAR_DEFROST_MAX_S)
 from .entity import Omoda9Entity, Omoda9OptimisticMixin, field_on
 
 
@@ -54,9 +54,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     disappanna = Omoda9ComfortSwitch(
         coord, "Omoda9 Disappannamento parabrezza", "disappannamento_parabrezza", "fWinHeatingState",
         "disappanna_parabrezza", "disappanna_parabrezza_off", "mdi:car-defrost-front")
+    # The only comfort switch with an expiry: its field never comes back in the telemetry.
     lunotto = Omoda9ComfortSwitch(
         coord, "Omoda9 Riscaldamento lunotto", "rWinHeatingState", "rWinHeatingState",
-        "defrost_lunotto", "defrost_lunotto_off", "mdi:car-defrost-rear")
+        "defrost_lunotto", "defrost_lunotto_off", "mdi:car-defrost-rear",
+        max_on_s=REAR_DEFROST_MAX_S)
     volante = Omoda9ComfortSwitch(
         coord, "Omoda9 Riscaldamento volante", "steerWheelHeating", "steerWheelHeating",
         "volante_caldo", "volante_caldo_off", "mdi:steering")
@@ -124,32 +126,97 @@ class Omoda9ComfortSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEntity, Res
     _attr_device_class = SwitchDeviceClass.SWITCH
 
     def __init__(self, coord, name: str, suffix: str, field: str,
-                 on_cmd: str, off_cmd: str, icon: str) -> None:
+                 on_cmd: str, off_cmd: str, icon: str,
+                 max_on_s: float | None = None) -> None:
         super().__init__(coord, name, suffix, entity_id_format=ENTITY_ID_FORMAT)
         self._field = field
-        # il campo che questa entità legge: è ciò che chiude l'ottimismo (vedi il mixin)
+        # the field this entity reads: it is what closes the optimism (see the mixin)
         self._opt_keys = (field,)
         self._on_cmd = on_cmd
         self._off_cmd = off_cmd
         self._attr_icon = icon
         self._restored: bool | None = None
         self._exclusive: "Omoda9ComfortSwitch | None" = None
+        # For a field the car never re-publishes on its own (see `REAR_DEFROST_MAX_S`): how
+        # long a reported "on" stays believable. None = the last value holds until the car
+        # says otherwise, which is right for every field the telemetry does carry.
+        self._max_on_s = max_on_s
+        self._restored_at: float | None = None
+        self._expiry_unsub = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
         if last is not None and last.state in ("on", "off"):
             self._restored = last.state == "on"
+            # The age has to survive a restart too, or a restart in the middle would bring the
+            # switch back "on" with nothing left that can ever turn it off. `last_changed` is
+            # when it went on; as for the presets, a restart can only make the window shorter.
+            if self._restored:
+                self._restored_at = last.last_changed.timestamp()
+        self._schedule_expiry()
+
+    async def async_will_remove_from_hass(self) -> None:
+        self._cancel_expiry()
+        await super().async_will_remove_from_hass()
 
     def _live_on(self) -> bool | None:
         return field_on(self.coordinator.data.get("fields", {}).get(self._field))
+
+    def _on_since(self) -> float | None:
+        """When the car last stated the "on" that would be shown, if it can go stale.
+
+        None when there is no expiry for this switch, or nothing "on" to expire."""
+        if self._max_on_s is None:
+            return None
+        live = self._live_on()
+        if live is None:
+            return self._restored_at if self._restored else None
+        if not live:
+            return None
+        return self.coordinator.data.get("fields_at", {}).get(self._field)
+
+    def _stale(self) -> bool:
+        since = self._on_since()
+        return since is not None and time.time() - since >= self._max_on_s
 
     @property
     def is_on(self) -> bool | None:
         if self._opt_value is not None:
             return self._opt_value
+        if self._stale():
+            return False
         live = self._live_on()
         return live if live is not None else self._restored
+
+    def _handle_coordinator_update(self) -> None:
+        self._schedule_expiry()
+        super()._handle_coordinator_update()
+
+    def _cancel_expiry(self) -> None:
+        if self._expiry_unsub is not None:
+            self._expiry_unsub()
+            self._expiry_unsub = None
+
+    @callback
+    def _schedule_expiry(self) -> None:
+        """Re-render the state when the "on" being shown stops being believable.
+
+        Without it the switch would only flip at the next coordinator update, and the car is
+        asleep by then: nothing else arrives for hours. Replaced, never stacked."""
+        self._cancel_expiry()
+        since = self._on_since()
+        if since is None:
+            return
+        # +1 s: the timer runs on the loop's monotonic clock and `_stale` reads the wall clock
+        remaining = since + self._max_on_s - time.time() + 1
+        if remaining > 0:
+            self._expiry_unsub = async_call_later(self.hass, remaining, self._expiry_reached)
+
+    @callback
+    def _expiry_reached(self, _now) -> None:
+        self._expiry_unsub = None
+        self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs) -> None:
         # mutua esclusione: accendere questo spegne subito il gemello (es. aria↔caldo sedile)
