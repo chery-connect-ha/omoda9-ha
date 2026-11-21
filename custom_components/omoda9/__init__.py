@@ -264,6 +264,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         await hass.async_add_executor_job(coordinator.async_stop)
         raise
+
+    # Last, and outside the cleanup above: the integration is fully up whatever the bridge does.
+    # When `chery_connect` is installed this is the only code that can tell the owner to move.
+    from .successor import async_offer_successor
+    await async_offer_successor(hass, entry)
     return True
 
 

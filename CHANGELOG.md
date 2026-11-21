@@ -101,6 +101,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Internal: the integration no longer asks to install `requests` and `pillow`.** Home Assistant already ships both, and its validator now rejects a custom integration that lists them, which would have blocked this release. Nothing changes on your installation: the integration uses the copies Home Assistant already has.
 
+- **Getting ready for the move to Chery Connect.** The next major version installs under its final name, Chery Connect (`chery_connect`), next to this one. When that happens, this version notices it, shows Chery Connect as discovered in Settings, Devices and services, and adds a notice explaining what to do. Until then it does nothing at all. Nothing moves on its own: you start the move, and it brings your entities and their history with it.
+
 ### 🇮🇹 Italiano
 
 - **Nuovo pulsante «Ventila tetto»: il tetto ora si può anche inclinare, non solo aprire o
@@ -184,6 +186,8 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 - **Tre sensori che esistono solo su un'auto elettrica erano rimasti coi vecchi nomi italiani, e non avevano nessuna traduzione.** Potenza di ricarica, autonomia WLTP ed efficienza elettrica nascono solo dopo che l'auto ha confermato di essere solo elettrica, cosa che avviene a configurazione gia' fatta: non c'erano nella tabella dei nomi, e nei file di traduzione non c'erano mai stati. Adesso hanno identificativi inglesi come tutto il resto e un nome in ogni lingua. Se li hai, vengono rinominati da soli al prossimo avvio e lo storico li segue.
 
 - **Lavoro interno: l'integrazione non chiede piu' di installare `requests` e `pillow`.** Home Assistant li include gia' entrambi, e il suo validatore adesso rifiuta un'integrazione custom che li elenca, cosa che avrebbe bloccato questo rilascio. Sulla tua installazione non cambia niente: l'integrazione usa le copie che Home Assistant ha gia'.
+
+- **Preparazione al passaggio a Chery Connect.** La prossima versione maggiore si installa col suo nome definitivo, Chery Connect (`chery_connect`), accanto a questa. Quando succede, questa versione se ne accorge, mostra Chery Connect fra le integrazioni rilevate in Impostazioni, Dispositivi e servizi, e aggiunge un avviso che spiega cosa fare. Fino ad allora non fa niente. Niente si sposta da solo: il passaggio lo avvii tu, e porta con sé le entità e il loro storico.
 
 ## v1.13.0 — 2026-08-10
 

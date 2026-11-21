@@ -188,6 +188,10 @@
     "entity_ids_renamed": {
       "title": "Omoda 9: {count} entities were renamed",
       "description": "The entity ids of this integration moved from Italian to English: `sensor.omoda9_batteria` is now `sensor.chery_connect_battery`, and {count} entities on this vehicle were renamed.\n\n**Your history came with them.** Graphs, long-term statistics and the energy dashboard followed the rename automatically. There is nothing to reinstall and nothing to log in to again.\n\n**What did not follow: names you typed yourself.** Automations, scripts, template sensors and dashboard cards that refer to an entity by name still point at the old one. Home Assistant shows those as unknown entities.\n\nWhere to look: Settings, Automations and scenes, then any automation flagged with an unknown entity. The full old-to-new list is here: {url}\n\nDismiss this notice once you have been through them."
+    },
+    "successor_available": {
+      "title": "{title}: Chery Connect is installed, move this vehicle to it",
+      "description": "This integration is being replaced by **Chery Connect** (`chery_connect`), the same code under its final name. It is now installed on this Home Assistant, and this vehicle is still running on the old integration.\n\n**To move it**, open Settings, Devices and services: Chery Connect is listed as discovered. Press Add and follow the steps. It reuses the login of this integration, so no new code by text message, and it brings your entities and their history across.\n\n**Until you do, nothing changes**: this integration keeps working as before. Full guide: {url}"
     }
   },
   "options": {
