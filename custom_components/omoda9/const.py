@@ -422,6 +422,13 @@ CAMPO_CLIMA = "frontHVACState"
 # Sufficiente allo scopo, che è impedire una bugia perpetua, non garantire un istante.
 OPT_MAX_S = 15 * 60
 
+# Età massima del fix GPS perché "A casa" dica casa/fuori (#94). Prima la disponibilità seguiva
+# l'interruttore Auto Update, ma un fix arriva anche senza polling (pulsante di localizzazione,
+# payload realtime con la posizione). 24 ore: un'auto parcheggiata per la notte non si muove e
+# non deve diventare non disponibile; dopo un giorno senza fix il sensore smette di affermare.
+# Come OPT_MAX_S non è una sveglia: si valuta quando il coordinator notifica le entità.
+AT_HOME_FIX_MAX_AGE_S = 24 * 3600
+
 # Per quanto tempo gli avvisi di un comando (durata corretta, campi saltati, rifiuto già
 # annunciato) restano attaccati all'esito che l'utente legge su «Esito comando».
 #
