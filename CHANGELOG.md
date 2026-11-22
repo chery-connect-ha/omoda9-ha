@@ -20,9 +20,13 @@ dell'integrazione: aggiorna da **HACS → Omoda 9 / Jaecoo → Aggiorna**.
 
 - **Porte, finestrini, serratura e motore tornano a mostrare lo stato reale ad auto parcheggiata.** Questi stati arrivano via MQTT solo quando l'auto pubblica; da ferma restavano `unknown`. Ora la lettura realtime (che li trasporta con la stessa codifica) li riversa nei campi letti dalle entità, e la lettura iniziale parte sempre dopo l'avvio anche con l'aggiornamento automatico spento (sola lettura, nessun comando). Non risolve un MQTT che resta muto (vedi #54), ma gli stati tornano visibili. *Relates to #54.*
 
+- **La ricarica programmata accesa da qui non torna più su Off dopo 15 minuti.** Su alcune auto il piano attivato da Home Assistant non torna in telemetria; scaduta l'attesa, l'interruttore ricadeva sul piano di prima del comando e mostrava Off con la ricarica programmata attiva sull'auto e nell'app. Ora l'interruttore tiene l'ultimo valore consegnato all'auto finché l'auto non comunica un piano nuovo. Un piano attivato dall'app ufficiale resta invisibile, perché l'auto non lo invia. *Fixes #49.*
+
 ### 🇬🇧 English
 
 - **Doors, windows, lock and engine show their real state again on a parked car.** These states arrive via MQTT only while the car publishes; when parked they stayed `unknown`. The realtime read (which carries them with the same encoding) now merges them into the fields the entities read, and the startup read always runs after boot even with automatic update off (read-only, no command). It does not fix an MQTT channel that stays silent (see #54), but the states become visible again. *Relates to #54.*
+
+- **Scheduled charging switched on from here no longer falls back to Off after 15 minutes.** On some cars the plan enabled from Home Assistant never comes back in telemetry; once the wait ran out, the switch fell back to the plan from before the command and showed Off while scheduled charging was active on the car and in the app. The switch now keeps the last value delivered to the car until the car reports a new plan. A plan enabled from the official app is still not visible, because the car does not send it. *Fixes #49.*
 
 ## v1.14.0 - 2026-11-21
 
