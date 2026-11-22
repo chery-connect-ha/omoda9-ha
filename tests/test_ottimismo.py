@@ -253,3 +253,43 @@ async def test_un_messaggio_anteriore_al_comando_non_annulla_lottimismo(hass,
 
     assert hass.states.get(SEDILE).state == "on", (
         "il messaggio è anteriore al comando: non può smentirlo")
+
+
+async def test_la_ricarica_programmata_resta_accesa_oltre_il_tetto(hass, integrazione_avviata, comandi, monkeypatch):
+    """#49: il piano acceso da qui non torna in telemetria, e scaduto il tetto restava acceso.
+
+    Su una Jaecoo 7 l'auto non ripubblica `chargeAppointPlans` dopo un'attivazione partita da Home
+    Assistant (il 5A02 è un diario delle variazioni). Prima, allo scadere di OPT_MAX_S, l'interruttore
+    ricadeva sul piano di PRIMA del comando e mostrava Off con la ricarica programmata attiva
+    sull'auto e nell'app ufficiale."""
+    monkeypatch.setattr(entity_mod, "OPT_MAX_S", 0)      # tetto immediato
+    coord = _coordinator(hass, integrazione_avviata)
+    await _consegna(hass, coord, FX.telemetry_5a02(chargeAppointPlans="[{'switchStatus': '0', 'startTime': '465'}]"))
+    assert hass.states.get(RIC_PROG).state == "off"
+
+    await hass.services.async_call("switch", "turn_on", {"entity_id": RIC_PROG}, blocking=True)
+    await _consegna(hass, coord, FX.position_1301())     # un messaggio qualsiasi: il tetto scade
+
+    assert hass.states.get(RIC_PROG).state == "on", (
+        "il comando è stato consegnato e l'auto non ha detto altro: il piano di prima non vale più")
+
+    # ...e la metà complementare: quando l'auto parla del piano, vince lei.
+    await _consegna(hass, coord, FX.telemetry_5a02(chargeAppointPlans="[{'switchStatus': '0', 'startTime': '465'}]"))
+    assert hass.states.get(RIC_PROG).state == "off", (
+        "un piano arrivato dopo il comando è la verità, anche se lo smentisce")
+
+
+async def test_un_comando_rifiutato_non_diventa_lo_stato_della_ricarica_programmata(hass, integrazione_avviata, monkeypatch):
+    """Solo un comando consegnato diventa l'ultimo stato noto: un rifiuto lascia ciò che si sapeva."""
+    async def _rifiuto(self, key, params=None):
+        raise RuntimeError("A00084 (test)")
+
+    monkeypatch.setattr(coord_mod.Omoda9Coordinator, "async_send_command", _rifiuto)
+    coord = _coordinator(hass, integrazione_avviata)
+    await _consegna(hass, coord, FX.telemetry_5a02(chargeAppointPlans="[{'switchStatus': '0', 'startTime': '465'}]"))
+
+    with pytest.raises(Exception):
+        await hass.services.async_call("switch", "turn_on", {"entity_id": RIC_PROG}, blocking=True)
+    await _consegna(hass, coord, FX.position_1301())
+
+    assert hass.states.get(RIC_PROG).state == "off", "il comando non è partito: il piano resta quello dell'auto"
