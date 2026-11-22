@@ -89,3 +89,66 @@ async def test_un_garage_dentro_casa_separa_le_due_risposte(zone_casa_e_garage):
     """
     assert car_zone(zone_casa_e_garage, CASA) == "away"       # semantica device_tracker
     assert in_zona_casa(zone_casa_e_garage, CASA) is True     # contenimento: e' a casa
+
+
+# ───────────────────────── disponibilità di "A casa" (#94) ─────────────────────────
+
+A_CASA = "binary_sensor.chery_connect_at_home"
+
+
+def _msg(payload: dict):
+    """Busta MQTT minima, come in `test_ottimismo.py`.
+
+    Args:
+        payload: envelope del messaggio dell'auto, già nel formato delle fixture.
+    """
+    import json
+
+    class _Msg:
+        topic = "app/1/test/account/msgCenter/msg"
+
+    m = _Msg()
+    m.payload = json.dumps(payload).encode()
+    return m
+
+
+async def test_a_casa_resta_disponibile_con_auto_update_spento(hass, integrazione_avviata):
+    """Un fix fresco con Auto Update spento: prima il sensore era non disponibile, ora risponde."""
+    import fixtures as FX
+    from custom_components.omoda9.const import DOMAIN
+
+    coord = hass.data[DOMAIN][integrazione_avviata.entry_id]
+    coord.set_poll_enabled(False)
+    coord._on_car_message(None, None, _msg(FX.position_1301()))
+    await hass.async_block_till_done()
+
+    assert hass.states.get(A_CASA).state != "unavailable", "la posizione è fresca: Auto Update non c'entra"
+
+
+async def test_a_casa_non_disponibile_con_un_fix_vecchio(hass, integrazione_avviata):
+    """Oltre AT_HOME_FIX_MAX_AGE_S il sensore smette di affermare casa/fuori."""
+    from datetime import timedelta
+
+    import fixtures as FX
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.omoda9.const import AT_HOME_FIX_MAX_AGE_S, DOMAIN
+
+    coord = hass.data[DOMAIN][integrazione_avviata.entry_id]
+    coord._on_car_message(None, None, _msg(FX.position_1301()))
+    await hass.async_block_till_done()
+    coord._update({"last_pos_fix": dt_util.utcnow() - timedelta(seconds=AT_HOME_FIX_MAX_AGE_S + 60)})
+    await hass.async_block_till_done()
+
+    assert hass.states.get(A_CASA).state == "unavailable", "un fix di più di un giorno fa non dice dove sia l'auto adesso"
+
+
+async def test_a_casa_non_disponibile_senza_fix(hass, integrazione_avviata):
+    """Nessuna posizione mai ricevuta: non c'è niente da affermare."""
+    from custom_components.omoda9.const import DOMAIN
+
+    coord = hass.data[DOMAIN][integrazione_avviata.entry_id]
+    coord._update({"last_pos_fix": None, "position": None})
+    await hass.async_block_till_done()
+
+    assert hass.states.get(A_CASA).state == "unavailable"
