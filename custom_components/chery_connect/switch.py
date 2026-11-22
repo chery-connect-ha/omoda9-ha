@@ -650,6 +650,13 @@ class Omoda9ScheduledChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEnt
         # quando l'auto ha già detto che il piano è spento.
         self._opt_keys = ("chargeAppointPlans",)
         self._restored: bool | None = None
+        # Ultimo valore comandato e consegnato all'auto, con l'ancora `last_seen` del momento del
+        # comando. Serve perché il canale 5A02 è un diario delle VARIAZIONI: su una Jaecoo 7 il piano
+        # attivato da qui non torna mai in telemetria (#49), e allo scadere di OPT_MAX_S l'interruttore
+        # ricadeva sul `chargeAppointPlans` di PRIMA del comando, cioè su Off con il piano acceso.
+        # Lo si dimentica solo quando un messaggio POSTERIORE al comando porta il campo: lì vince l'auto.
+        self._commanded: bool | None = None
+        self._commanded_anchor = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -673,8 +680,42 @@ class Omoda9ScheduledChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEnt
     def is_on(self) -> bool | None:
         if self._opt_value is not None:
             return self._opt_value
+        if self._commanded is not None:
+            return self._commanded
         live = self._live_on()
         return live if live is not None else self._restored
+
+    def _piano_dopo_il_comando(self) -> bool:
+        """Vero se il messaggio appena arrivato è posteriore al comando e porta `chargeAppointPlans`.
+
+        Stesso criterio di `_verita_arrivata` del mixin, ma contro l'ancora del comando e non contro
+        quella dell'ottimismo, che allo scadere di OPT_MAX_S viene azzerata."""
+        if self.coordinator.data.get("last_seen") == self._commanded_anchor:
+            return False
+        return "chargeAppointPlans" in (self.coordinator.data.get("msg_fields") or {})
+
+    def _handle_coordinator_update(self) -> None:
+        """Dimentica il valore comandato appena l'auto comunica un piano posteriore al comando."""
+        if self._commanded is not None and self._piano_dopo_il_comando():
+            self._commanded = None
+            self._commanded_anchor = None
+        super()._handle_coordinator_update()
+
+    async def _command_plan(self, key: str, target: bool, switch_status: int) -> None:
+        """Invia il piano e, se l'auto l'ha ricevuto, lo ricorda come ultimo stato noto.
+
+        Un comando rifiutato (A00084, PIN, sessione) solleva da `_run_command` e non arriva alla
+        memorizzazione: l'interruttore resta su ciò che sapeva prima.
+
+        Args:
+            key: chiave del comando nel catalogo, `ricarica_prog_on` o `ricarica_prog_off`.
+            target: stato che l'interruttore deve mostrare se il comando è consegnato.
+            switch_status: valore di `switchStatus` nel piano spedito, 1 acceso e 0 spento.
+        """
+        anchor = self.coordinator.data.get("last_seen")
+        await self._run_command(key, target, {"mainSwitch": switch_status, "chargeAppointPlans": [self._plan(switch_status)]})
+        self._commanded = target
+        self._commanded_anchor = anchor
 
     def _piano_auto(self) -> dict | None:
         """Il piano come lo riporta l'AUTO, non come l'abbiamo scelto noi."""
@@ -730,12 +771,10 @@ class Omoda9ScheduledChargeSwitch(Omoda9OptimisticMixin, Omoda9Entity, SwitchEnt
                 "switchStatus": switch_status, "timeConsuming": dur_h * 60}
 
     async def async_turn_on(self, **kwargs) -> None:
-        await self._run_command("ricarica_prog_on", True,
-                                {"mainSwitch": 1, "chargeAppointPlans": [self._plan(1)]})
+        await self._command_plan("ricarica_prog_on", True, 1)
 
     async def async_turn_off(self, **kwargs) -> None:
-        await self._run_command("ricarica_prog_off", False,
-                                {"mainSwitch": 0, "chargeAppointPlans": [self._plan(0)]})
+        await self._command_plan("ricarica_prog_off", False, 0)
 
 
 class Omoda9PollingSwitch(Omoda9Entity, SwitchEntity, RestoreEntity):
