@@ -19,7 +19,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, FIELDS_AS_RICH_ENTITY
+from homeassistant.util import dt as dt_util
+
+from .const import AT_HOME_FIX_MAX_AGE_S, DOMAIN, FIELDS_AS_RICH_ENTITY
 from .coordinator import SENSORS
 from .entity import Omoda9Entity, car_zone, field_on
 
@@ -169,9 +171,12 @@ class Omoda9ACasa(Omoda9Entity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        # Deriva dalla posizione: con l'aggiornamento automatico spento il fix GPS non viene
-        # rinfrescato e questo riporterebbe un casa/fuori potenzialmente vecchio.
-        return bool(self.coordinator.poll_enabled)
+        # Deriva dall'età del fix, non da Auto Update (#94): un fix arriva anche senza polling, e il
+        # device_tracker lo mostrava mentre questo sensore, che legge la stessa posizione, lo nascondeva.
+        fix = self.coordinator.data.get("last_pos_fix")
+        if fix is None or not self.coordinator.data.get("position"):
+            return False
+        return (dt_util.utcnow() - fix).total_seconds() <= AT_HOME_FIX_MAX_AGE_S
 
     @property
     def is_on(self) -> bool | None:
